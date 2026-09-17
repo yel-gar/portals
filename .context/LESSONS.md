@@ -1,1 +1,2 @@
 - In CI workflows use `poetry install --no-root`, not `poetry install --with dev`. The dev dependency group is installed by default, and the backend FastAPI project root is not supposed to be installed into the venv.
+- In the backend `Dockerfile` no `apk add` build dependencies are needed, and `pip install poetry` must be placed before `COPY pyproject.toml poetry.lock ./` so that the poetry install layer stays cached when the dependency manifests change.

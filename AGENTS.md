@@ -19,8 +19,14 @@ All changes to structure must be coordinated with user. If the file/directory do
 - `schemas.py` - pydantic models
 - `deps.py` - dependencies functions and annotations. All frequently used dependency functions must use `Annotated[type, Depends(function)]` type alias for typehinting throughout the project.
 - `routes/auth.py` - authorization manager
+- `routes/portals.py` - main app routes
 
 # `.context/` directory info
 - `PROJECT_STATE.md` - put current plan, if it's present here. Put all completed milestones and added features here.
 - `DECISIONS.md` - all architecture-related decisions must first be discussed with user then committed here. Any change conflicting with previously made decisions must be discussed with user.
 - `LESSONS.md` - record user's corrections here to avoid making same mistake.
+
+# Environment variables
+When introducing a new environment variable, always do the following:
+1. Add it to `.env.example`
+2. Document it in the envvars table in `README.md`
