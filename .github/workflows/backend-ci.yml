@@ -1,0 +1,76 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [master]
+    paths: ["backend/**"]
+  pull_request:
+    paths: ["backend/**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: format (black)
+            command: black --check .
+          - name: lint (ruff)
+            command: ruff check .
+          - name: typecheck (mypy)
+            command: mypy .
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: poetry
+          cache-dependency-path: backend/poetry.lock
+
+      - name: Install dependencies
+        working-directory: backend
+        run: poetry install --no-root
+
+      - name: Run ${{ matrix.name }}
+        working-directory: backend
+        run: poetry run ${{ matrix.command }}
+
+  tests:
+    name: tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: poetry
+          cache-dependency-path: backend/poetry.lock
+
+      - name: Install dependencies
+        working-directory: backend
+        run: poetry install --no-root
+
+      - name: Run tests
+        working-directory: backend
+        run: poetry run pytest

@@ -1,0 +1,1 @@
+- In CI workflows use `poetry install --no-root`, not `poetry install --with dev`. The dev dependency group is installed by default, and the backend FastAPI project root is not supposed to be installed into the venv.
