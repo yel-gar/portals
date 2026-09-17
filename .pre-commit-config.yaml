@@ -1,0 +1,40 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-json
+        exclude: ^frontend/tsconfig.*\.json
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-toml
+
+  - repo: local
+    hooks:
+      # --- backend ---
+      - id: black
+        name: black (backend)
+        entry: poetry run -C backend black .
+        language: system
+        pass_filenames: false
+
+      - id: ruff
+        name: ruff (backend)
+        entry: poetry run -C backend ruff check --fix .
+        language: system
+        pass_filenames: false
+
+      - id: mypy
+        name: mypy (backend)
+        entry: poetry run -C backend mypy .
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+
+      - id: pytest
+        name: pytest (backend)
+        entry: poetry -C backend run pytest
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+        stages: [pre-push]
