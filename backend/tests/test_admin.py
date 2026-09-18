@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
 
+import pytest
 from httpx import AsyncClient
 
 from app.models import User
@@ -10,6 +11,7 @@ async def _login(client: AsyncClient, username: str = "alice", password: str = "
     assert login.status_code == 200, login.text
 
 
+@pytest.mark.asyncio
 async def test_admin_requires_superuser(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
     await create_user("alice", "supersecret1")
     await _login(client)
@@ -17,11 +19,13 @@ async def test_admin_requires_superuser(client: AsyncClient, create_user: Callab
     assert response.status_code == 403
 
 
+@pytest.mark.asyncio
 async def test_admin_requires_auth(client: AsyncClient) -> None:
     response = await client.get("/admin/users")
     assert response.status_code == 401
 
 
+@pytest.mark.asyncio
 async def test_create_and_list_users(
     client: AsyncClient,
     create_user: Callable[..., Awaitable[User]],
@@ -40,6 +44,7 @@ async def test_create_and_list_users(
     assert usernames == {"root", "bobby"}
 
 
+@pytest.mark.asyncio
 async def test_create_duplicate_user(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
     await create_user("root", "supersecret1", is_superuser=True)
     await create_user("bobby", "supersecret1")
@@ -49,6 +54,7 @@ async def test_create_duplicate_user(client: AsyncClient, create_user: Callable[
     assert response.status_code == 409
 
 
+@pytest.mark.asyncio
 async def test_set_password(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
     await create_user("root", "supersecret1", is_superuser=True)
     bob = await create_user("bobby", "supersecret1")
@@ -65,6 +71,7 @@ async def test_set_password(client: AsyncClient, create_user: Callable[..., Awai
     assert me.json()["id"] == bob.id
 
 
+@pytest.mark.asyncio
 async def test_set_password_missing_user(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
     await create_user("root", "supersecret1", is_superuser=True)
     await _login(client, username="root")
@@ -73,6 +80,7 @@ async def test_set_password_missing_user(client: AsyncClient, create_user: Calla
     assert response.status_code == 404
 
 
+@pytest.mark.asyncio
 async def test_delete_user(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
     await create_user("root", "supersecret1", is_superuser=True)
     bob = await create_user("bobby", "supersecret1")
@@ -86,6 +94,7 @@ async def test_delete_user(client: AsyncClient, create_user: Callable[..., Await
     assert usernames == {"root"}
 
 
+@pytest.mark.asyncio
 async def test_delete_superuser_forbidden(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
     superuser = await create_user("root", "supersecret1", is_superuser=True)
     await _login(client, username="root")
@@ -94,6 +103,7 @@ async def test_delete_superuser_forbidden(client: AsyncClient, create_user: Call
     assert response.status_code == 409
 
 
+@pytest.mark.asyncio
 async def test_delete_missing_user(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
     await create_user("root", "supersecret1", is_superuser=True)
     await _login(client, username="root")

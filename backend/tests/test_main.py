@@ -6,6 +6,7 @@ from app.db import create_all, init_db
 from app.main import app, lifespan
 
 
+@pytest.mark.asyncio
 async def test_lifespan_starts_and_stops_hubs(postgres_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.main.settings",

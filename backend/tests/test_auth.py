@@ -1,6 +1,7 @@
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
 
+import pytest
 from httpx import AsyncClient
 
 from app.config import settings
@@ -14,6 +15,7 @@ async def _register(client: AsyncClient, username: str, password: str) -> int:
     return response.status_code
 
 
+@pytest.mark.asyncio
 async def test_register_login_me_logout(client: AsyncClient) -> None:
     response = await client.post("/auth/register", json={"username": "alice", "password": "supersecret1"})
     assert response.status_code == 201, response.text
@@ -37,12 +39,14 @@ async def test_register_login_me_logout(client: AsyncClient) -> None:
     assert me.status_code == 401
 
 
+@pytest.mark.asyncio
 async def test_register_duplicate_username(client: AsyncClient) -> None:
     await _register(client, "bobby", "supersecret1")
     response = await client.post("/auth/register", json={"username": "bobby", "password": "othersecret2"})
     assert response.status_code == 409
 
 
+@pytest.mark.asyncio
 async def test_login_invalid_credentials(client: AsyncClient) -> None:
     await _register(client, "carol", "supersecret1")
     wrong_password = await client.post("/auth/login", json={"username": "carol", "password": "wrongpass1"})
@@ -51,6 +55,7 @@ async def test_login_invalid_credentials(client: AsyncClient) -> None:
     assert unknown_user.status_code == 401
 
 
+@pytest.mark.asyncio
 async def test_register_validation_errors(client: AsyncClient) -> None:
     short_username = await client.post("/auth/register", json={"username": "ab", "password": "supersecret1"})
     assert short_username.status_code == 422
@@ -60,11 +65,13 @@ async def test_register_validation_errors(client: AsyncClient) -> None:
     assert missing_fields.status_code == 422
 
 
+@pytest.mark.asyncio
 async def test_logout_is_idempotent(client: AsyncClient) -> None:
     response = await client.post("/auth/logout")
     assert response.status_code == 204
 
 
+@pytest.mark.asyncio
 async def test_expired_session_token_rejected(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
     user = await create_user("bob", "supersecret1")
     token = "e" * 64

@@ -23,6 +23,7 @@ def _portal(**overrides: Any) -> Portal:
     return Portal(**defaults)
 
 
+@pytest.mark.asyncio
 async def test_risk_factor_and_danger_level() -> None:
     safe = _portal(energy_level=0, stability=100, creatures_count=0, expires_at=utc_now() + timedelta(hours=24))
     assert safe.danger_level == DangerLevel.LOW
@@ -57,6 +58,7 @@ async def test_risk_factor_and_danger_level() -> None:
     assert expired.risk_factor <= 1.0
 
 
+@pytest.mark.asyncio
 async def test_closed_flag_makes_portal_unactionable() -> None:
     closed = _portal(is_closed=True, expires_at=utc_now() + timedelta(hours=1))
     assert closed.closed is True
@@ -66,6 +68,7 @@ async def test_closed_flag_makes_portal_unactionable() -> None:
         closed.warn_creatures()
 
 
+@pytest.mark.asyncio
 async def test_mark_unmark_allowed_on_closed_portal() -> None:
     closed = _portal(is_closed=True)
     closed.mark()
@@ -78,6 +81,7 @@ async def test_mark_unmark_allowed_on_closed_portal() -> None:
         unmarked.unmark()
 
 
+@pytest.mark.asyncio
 async def test_action_rules() -> None:
     portal = _portal(creatures_count=1, has_observer=True)
     with pytest.raises(BadAction):

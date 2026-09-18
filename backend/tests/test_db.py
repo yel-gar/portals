@@ -5,6 +5,7 @@ from app import db
 from app.db import get_session_factory
 
 
+@pytest.mark.asyncio
 async def test_db_lifecycle_guards(postgres_url: str) -> None:
     await db.dispose_db()
     await db.dispose_db()  # no-op when the engine is already gone

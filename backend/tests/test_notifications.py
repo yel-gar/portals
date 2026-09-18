@@ -16,6 +16,7 @@ from app.notifications import (
     ("hub", "channel"),
     [(portal_update_hub, PORTAL_NOTIFY_CHANNEL), (action_log_hub, ACTION_LOG_NOTIFY_CHANNEL)],
 )
+@pytest.mark.asyncio
 async def test_hub_receives_postgres_notify(postgres_url: str, hub: UpdateHub, channel: str) -> None:
     url = postgres_url.replace("postgresql+asyncpg", "postgresql")
     await hub.start(url)
@@ -34,6 +35,7 @@ async def test_hub_receives_postgres_notify(postgres_url: str, hub: UpdateHub, c
         await hub.stop()
 
 
+@pytest.mark.asyncio
 async def test_hub_idempotent_stop(postgres_url: str) -> None:
     url = postgres_url.replace("postgresql+asyncpg", "postgresql")
     await portal_update_hub.start(url)
@@ -41,6 +43,7 @@ async def test_hub_idempotent_stop(postgres_url: str) -> None:
     await portal_update_hub.stop()
 
 
+@pytest.mark.asyncio
 async def test_hub_broadcast_wakes_all_subscribers() -> None:
     queue_a = await portal_update_hub.subscribe()
     queue_b = await portal_update_hub.subscribe()

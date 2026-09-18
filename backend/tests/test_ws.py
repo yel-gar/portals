@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import pytest
 from fastapi import WebSocketDisconnect
 from httpx import AsyncClient
 from pydantic import BaseModel
@@ -45,12 +46,9 @@ class _Snapshot(BaseModel):
 
 
 async def _wait_until(predicate: Callable[[], bool], limit: float = 2.0) -> None:
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + limit
-    while not predicate():
-        if loop.time() > deadline:
-            raise AssertionError("условие не выполнилось за отведённое время")
-        await asyncio.sleep(0.01)
+    async with asyncio.timeout(limit):
+        while not predicate():  # noqa: ASYNC110 - polling helper, no event source available
+            await asyncio.sleep(0.01)
 
 
 def _ping_then_disconnect() -> Callable[[], Awaitable[str]]:
@@ -76,6 +74,7 @@ async def _noop_snapshot() -> BaseModel:
     return _Snapshot(snapshot=0)
 
 
+@pytest.mark.asyncio
 async def test_hub_snapshot_loop_exits_on_disconnect() -> None:
     websocket = _MockWebSocket()
     websocket.disconnect.set()
@@ -84,6 +83,7 @@ async def test_hub_snapshot_loop_exits_on_disconnect() -> None:
     assert action_log_hub.subscriber_count == 0
 
 
+@pytest.mark.asyncio
 async def test_hub_snapshot_loop_pushes_snapshot_on_event() -> None:
     websocket = _MockWebSocket()
     calls = 0
@@ -105,6 +105,7 @@ async def test_hub_snapshot_loop_pushes_snapshot_on_event() -> None:
     assert portal_update_hub.subscriber_count == 0
 
 
+@pytest.mark.asyncio
 async def test_hub_snapshot_loop_ignores_client_ping() -> None:
     websocket = _MockWebSocket()
     websocket.set_receive(_ping_then_disconnect())
@@ -113,6 +114,7 @@ async def test_hub_snapshot_loop_ignores_client_ping() -> None:
     assert action_log_hub.subscriber_count == 0
 
 
+@pytest.mark.asyncio
 async def test_portal_ws_rejects_anonymous() -> None:
     websocket = _MockWebSocket()
     await portal_updates(websocket, page=1, items_per_page=20)  # type: ignore[arg-type]
@@ -120,6 +122,7 @@ async def test_portal_ws_rejects_anonymous() -> None:
     assert websocket.accepted is False
 
 
+@pytest.mark.asyncio
 async def test_log_ws_rejects_anonymous() -> None:
     websocket = _MockWebSocket()
     await action_log_updates(websocket, page=1, items_per_page=20)  # type: ignore[arg-type]
@@ -127,6 +130,7 @@ async def test_log_ws_rejects_anonymous() -> None:
     assert websocket.accepted is False
 
 
+@pytest.mark.asyncio
 async def test_portal_ws_sends_initial_snapshot_and_exits(
     client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
 ) -> None:
@@ -145,6 +149,7 @@ async def test_portal_ws_sends_initial_snapshot_and_exits(
     assert payload["items"][0]["name"] == "Alpha"
 
 
+@pytest.mark.asyncio
 async def test_log_ws_sends_initial_snapshot_and_exits(
     client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
 ) -> None:

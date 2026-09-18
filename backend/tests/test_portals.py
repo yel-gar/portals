@@ -18,11 +18,13 @@ async def _login(client: AsyncClient) -> None:
     assert login.status_code == 200, login.text
 
 
+@pytest.mark.asyncio
 async def test_list_portals_requires_auth(client: AsyncClient) -> None:
     response = await client.get("/portals")
     assert response.status_code == 401
 
 
+@pytest.mark.asyncio
 async def test_list_portals_paginated(client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]) -> None:
     await _login(client)
     for i in range(3):
@@ -40,6 +42,7 @@ async def test_list_portals_paginated(client: AsyncClient, create_portal: Callab
     assert len(second_page.json()["items"]) == 1
 
 
+@pytest.mark.asyncio
 async def test_portal_payload_matches_schema(
     client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
 ) -> None:
@@ -69,6 +72,7 @@ async def test_portal_payload_matches_schema(
     }
 
 
+@pytest.mark.asyncio
 async def test_execute_action_flow(client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]) -> None:
     await _login(client)
 
@@ -107,6 +111,7 @@ async def test_execute_action_flow(client: AsyncClient, create_portal: Callable[
     assert response.json()["closed"] is True
 
 
+@pytest.mark.asyncio
 async def test_execute_action_rejected(client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]) -> None:
     await _login(client)
     portal = await create_portal(creatures_count=1)
@@ -119,12 +124,14 @@ async def test_execute_action_rejected(client: AsyncClient, create_portal: Calla
     assert response.status_code == 409
 
 
+@pytest.mark.asyncio
 async def test_execute_action_unknown_portal(client: AsyncClient) -> None:
     await _login(client)
     response = await client.post("/portals/9999", params={"action": Action.DISMISS.value})
     assert response.status_code == 404
 
 
+@pytest.mark.asyncio
 async def test_action_log(client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]) -> None:
     await _login(client)
     portal = await create_portal()
@@ -140,11 +147,13 @@ async def test_action_log(client: AsyncClient, create_portal: Callable[..., Awai
     assert data["items"][0]["user"]["username"] == "alice"
 
 
+@pytest.mark.asyncio
 async def test_action_log_requires_auth(client: AsyncClient) -> None:
     response = await client.get("/portals/log")
     assert response.status_code == 401
 
 
+@pytest.mark.asyncio
 async def test_stats(client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]) -> None:
     await _login(client)
     await create_portal(name="A", energy_level=10, stability=90, creatures_count=0)
@@ -168,11 +177,13 @@ async def test_stats(client: AsyncClient, create_portal: Callable[..., Awaitable
     assert sum(stats["danger_levels"].values()) == stats["open"]
 
 
+@pytest.mark.asyncio
 async def test_stats_requires_auth(client: AsyncClient) -> None:
     response = await client.get("/portals/stats")
     assert response.status_code == 401
 
 
+@pytest.mark.asyncio
 async def test_committed_action_wakes_both_hubs(
     postgres_url: str, client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
 ) -> None:
@@ -198,6 +209,7 @@ async def test_committed_action_wakes_both_hubs(
         await portal_update_hub.stop()
 
 
+@pytest.mark.asyncio
 async def test_rejected_action_sends_no_notification(
     postgres_url: str, client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
 ) -> None:
