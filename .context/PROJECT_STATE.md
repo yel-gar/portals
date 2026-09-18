@@ -1,7 +1,7 @@
 # Project state
 
 ## Current status
-Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: initial superuser bootstrap via env vars; `STABILIZE` reworked to a random 10-30 bump capped at 100.
+Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: filters + ordering for the portal list and action log (HTTP and WebSocket).
 
 ## Review fixes (post M6)
 - `nullable` now set explicitly on every model column.
@@ -29,6 +29,14 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 8. **Final** — pre-commit --all-files, full pytest run, doc refresh.
 
 ## Completed milestones
+
+### Portal list & action log: filters + ordering (latest batch)
+- `PortalOrder` / `LogOrder` enums in `app/models.py` drive the `order_by` whitelist: `risk` (default), `expires_at`, `creatures`, `name` for portals; `newest` (default) / `oldest` for the log. Unknown values → 422.
+- Portal filters: `closed`, `danger_level`, `has_observer`, `is_marked`, `search` (case-insensitive name/world substring). Log filters: `action`, `portal_id`, `user_id`.
+- Risk/danger SQL expressions extracted from `/stats` into `_risk_expression(now)` / `_danger_bucket_expression(now)` (shared with `/stats`);
+- Default portal ordering: risk DESC, expires_at ASC, has_observer DESC, creatures_count DESC, `id ASC` tiebreaker.
+- All query params mirrored on the WS endpoints (`WS /portals/ws`, `WS /portals/log/ws`) via the shared `_portal_page` / `_action_log_page`.
+- Tests: 12 new (default ordering, order_by variants, tie-breakers, each portal filter, combined filters, 422 invalid order_by, log filters/ordering, WS-with-filter). Coverage 99%; mypy/ruff/black clean.
 
 ### Initial superuser bootstrap + STABILIZE rework (latest batch)
 - `INITIAL_SUPERUSER_USERNAME` / `INITIAL_SUPERUSER_PASSWORD` env pair (both or none, lengths validated via shared constants): `app/config.py` `_read_initial_superuser` → `Settings.initial_superuser: tuple[str, str] | None`.

@@ -4,11 +4,12 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
+from datetime import datetime
 from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel
-from sqlalchemy import and_, case, func, or_, select, text
+from sqlalchemy import ColumnElement, and_, case, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
@@ -21,7 +22,7 @@ from ..deps import (
     authenticate_session_token,
 )
 from ..exceptions import BadAction
-from ..models import Action, ActionLogEntry, DangerLevel, Portal, utc_now
+from ..models import Action, ActionLogEntry, DangerLevel, LogOrder, Portal, PortalOrder, utc_now
 from ..notifications import (
     ACTION_LOG_NOTIFY_CHANNEL,
     PORTAL_NOTIFY_CHANNEL,
@@ -46,11 +47,127 @@ _LOGIN_RESPONSES: dict[int | str, dict[str, Any]] = {
 }
 
 
-async def _portal_page(session: AsyncSession, page: int, items_per_page: int) -> PortalListSchema:
-    total = int((await session.scalar(select(func.count()).select_from(Portal))) or 0)
+def _risk_expression(now: datetime) -> ColumnElement[float]:
+    """Risk factor as an SQL expression (mirrors ``Portal.risk_factor``)."""
+    ttl = func.greatest(func.extract("epoch", Portal.expires_at - now), 0.0)
+    ttl_factor = 0.04 * ttl
+    return cast(
+        ColumnElement[float],
+        (Portal.energy_level / 100.0) * 0.2
+        + (1.0 - Portal.stability / 100.0) * 0.2
+        + (0.1 * Portal.creatures_count / (0.1 * Portal.creatures_count + 1.0)) * 0.3
+        + (1.0 - ttl_factor / (ttl_factor + 1.0)) * 0.3,
+    )
+
+
+def _danger_bucket_expression(now: datetime) -> ColumnElement[str]:
+    """Danger level as an SQL CASE expression (mirrors ``Portal.danger_level``)."""
+    risk = _risk_expression(now)
+    return cast(
+        ColumnElement[str],
+        case(
+            (risk <= 0.3, DangerLevel.LOW.value),
+            (risk <= 0.6, DangerLevel.MEDIUM.value),
+            (risk <= 0.9, DangerLevel.HIGH.value),
+            else_=DangerLevel.CRITICAL.value,
+        ),
+    )
+
+
+def _portal_filter_clauses(
+    *,
+    closed: bool | None,
+    danger_level: DangerLevel | None,
+    has_observer: bool | None,
+    is_marked: bool | None,
+    search: str | None,
+    now: datetime,
+) -> list[ColumnElement[Any]]:
+    clauses: list[ColumnElement[Any]] = []
+    if closed is not None:
+        if closed:
+            clauses.append(or_(Portal.is_closed.is_(True), Portal.expires_at <= now))
+        else:
+            clauses.append(and_(Portal.is_closed.is_(False), Portal.expires_at > now))
+    if danger_level is not None:
+        clauses.append(_danger_bucket_expression(now) == danger_level.value)
+    if has_observer is not None:
+        clauses.append(Portal.has_observer.is_(has_observer))
+    if is_marked is not None:
+        clauses.append(Portal.is_marked.is_(is_marked))
+    if search:
+        pattern = f"%{search}%"
+        clauses.append(or_(Portal.name.ilike(pattern), Portal.destination_world.ilike(pattern)))
+    return clauses
+
+
+def _portal_order_clauses(order_by: PortalOrder, now: datetime) -> list[Any]:
+    if order_by is PortalOrder.RISK:
+        return [
+            _risk_expression(now).desc(),
+            Portal.expires_at.asc(),
+            Portal.has_observer.desc(),
+            Portal.creatures_count.desc(),
+            Portal.id.asc(),
+        ]
+    if order_by is PortalOrder.EXPIRES_AT:
+        return [Portal.expires_at.asc(), Portal.id.asc()]
+    if order_by is PortalOrder.CREATURES:
+        return [Portal.creatures_count.desc(), Portal.id.asc()]
+    return [func.lower(Portal.name).asc(), Portal.id.asc()]
+
+
+def _action_log_filter_clauses(
+    *,
+    action: Action | None,
+    portal_id: int | None,
+    user_id: int | None,
+) -> list[ColumnElement[Any]]:
+    clauses: list[ColumnElement[Any]] = []
+    if action is not None:
+        clauses.append(ActionLogEntry.action == action)
+    if portal_id is not None:
+        clauses.append(ActionLogEntry.portal_id == portal_id)
+    if user_id is not None:
+        clauses.append(ActionLogEntry.user_id == user_id)
+    return clauses
+
+
+def _action_log_order_clauses(order_by: LogOrder) -> list[Any]:
+    if order_by is LogOrder.OLDEST:
+        return [ActionLogEntry.timestamp.asc(), ActionLogEntry.id.asc()]
+    return [ActionLogEntry.timestamp.desc(), ActionLogEntry.id.desc()]
+
+
+async def _portal_page(
+    session: AsyncSession,
+    page: int,
+    items_per_page: int,
+    *,
+    closed: bool | None = None,
+    danger_level: DangerLevel | None = None,
+    has_observer: bool | None = None,
+    is_marked: bool | None = None,
+    search: str | None = None,
+    order_by: PortalOrder = PortalOrder.RISK,
+) -> PortalListSchema:
+    now = utc_now()
+    filters = _portal_filter_clauses(
+        closed=closed,
+        danger_level=danger_level,
+        has_observer=has_observer,
+        is_marked=is_marked,
+        search=search,
+        now=now,
+    )
+    total = int((await session.scalar(select(func.count()).select_from(Portal).where(*filters))) or 0)
     portals = (
         await session.scalars(
-            select(Portal).order_by(Portal.id).offset((page - 1) * items_per_page).limit(items_per_page)
+            select(Portal)
+            .where(*filters)
+            .order_by(*_portal_order_clauses(order_by, now))
+            .offset((page - 1) * items_per_page)
+            .limit(items_per_page)
         )
     ).all()
     return PortalListSchema(
@@ -61,12 +178,23 @@ async def _portal_page(session: AsyncSession, page: int, items_per_page: int) ->
     )
 
 
-async def _action_log_page(session: AsyncSession, page: int, items_per_page: int) -> ActionLogListSchema:
-    total = int((await session.scalar(select(func.count()).select_from(ActionLogEntry))) or 0)
+async def _action_log_page(
+    session: AsyncSession,
+    page: int,
+    items_per_page: int,
+    *,
+    action: Action | None = None,
+    portal_id: int | None = None,
+    user_id: int | None = None,
+    order_by: LogOrder = LogOrder.NEWEST,
+) -> ActionLogListSchema:
+    filters = _action_log_filter_clauses(action=action, portal_id=portal_id, user_id=user_id)
+    total = int((await session.scalar(select(func.count()).select_from(ActionLogEntry).where(*filters))) or 0)
     entries = (
         await session.scalars(
             select(ActionLogEntry)
-            .order_by(ActionLogEntry.timestamp.desc(), ActionLogEntry.id.desc())
+            .where(*filters)
+            .order_by(*_action_log_order_clauses(order_by))
             .offset((page - 1) * items_per_page)
             .limit(items_per_page)
         )
@@ -128,7 +256,15 @@ async def _notify_action_committed(session: AsyncSession, portal_id: int) -> Non
     "",
     response_model=PortalListSchema,
     responses=_LOGIN_RESPONSES,
-    description="Список порталов с пагинацией.",
+    description=(
+        "Список порталов с пагинацией, фильтрами и сортировкой.\n\n"
+        "Фильтры: `closed` (true — только закрытые/истёкшие, false — только открытые), "
+        "`danger_level` (LOW/MEDIUM/HIGH/CRITICAL), `has_observer`, `is_marked`, "
+        "`search` (подстрока в названии или целевом мире, без учёта регистра).\n\n"
+        "Сортировка `order_by`: `risk` (по умолчанию — риск DESC, срок истечения ASC, "
+        "наблюдатель внутри DESC, существа внутри DESC), `expires_at` (срок истечения ASC), "
+        "`creatures` (существа внутри DESC), `name` (название ASC)."
+    ),
     summary="Список порталов",
 )
 async def list_portals(
@@ -136,8 +272,24 @@ async def list_portals(
     _user: CurrentUser,
     page: int = Query(1, ge=1),
     items_per_page: int = Query(PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
+    closed: bool | None = Query(None),
+    danger_level: DangerLevel | None = Query(None),
+    has_observer: bool | None = Query(None),
+    is_marked: bool | None = Query(None),
+    search: str | None = Query(None, max_length=256),
+    order_by: PortalOrder = Query(PortalOrder.RISK),
 ) -> PortalListSchema:
-    return await _portal_page(session, page, items_per_page)
+    return await _portal_page(
+        session,
+        page,
+        items_per_page,
+        closed=closed,
+        danger_level=danger_level,
+        has_observer=has_observer,
+        is_marked=is_marked,
+        search=search,
+        order_by=order_by,
+    )
 
 
 @router.websocket("/ws")
@@ -145,6 +297,12 @@ async def portal_updates(
     websocket: WebSocket,
     page: int = Query(1, ge=1),
     items_per_page: int = Query(PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
+    closed: bool | None = Query(None),
+    danger_level: DangerLevel | None = Query(None),
+    has_observer: bool | None = Query(None),
+    is_marked: bool | None = Query(None),
+    search: str | None = Query(None, max_length=256),
+    order_by: PortalOrder = Query(PortalOrder.RISK),
 ) -> None:
     """Push live portal page snapshots. Requires a valid session cookie."""
     token = websocket.cookies.get(settings.session_cookie_name)
@@ -156,9 +314,33 @@ async def portal_updates(
 
         await websocket.accept()
         logger.info("WebSocket подключение пользователя id=%d", user.id)
-        snapshot = await _portal_page(session, page, items_per_page)
+        snapshot = await _portal_page(
+            session,
+            page,
+            items_per_page,
+            closed=closed,
+            danger_level=danger_level,
+            has_observer=has_observer,
+            is_marked=is_marked,
+            search=search,
+            order_by=order_by,
+        )
         await websocket.send_json(snapshot.model_dump(mode="json"))
-        await _hub_snapshot_loop(websocket, portal_update_hub, lambda: _portal_page(session, page, items_per_page))
+        await _hub_snapshot_loop(
+            websocket,
+            portal_update_hub,
+            lambda: _portal_page(
+                session,
+                page,
+                items_per_page,
+                closed=closed,
+                danger_level=danger_level,
+                has_observer=has_observer,
+                is_marked=is_marked,
+                search=search,
+                order_by=order_by,
+            ),
+        )
         logger.info("WebSocket отключение пользователя id=%d", user.id)
 
 
@@ -167,6 +349,10 @@ async def action_log_updates(
     websocket: WebSocket,
     page: int = Query(1, ge=1),
     items_per_page: int = Query(PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
+    action: Action | None = Query(None),
+    portal_id: int | None = Query(None, ge=1),
+    user_id: int | None = Query(None, ge=1),
+    order_by: LogOrder = Query(LogOrder.NEWEST),
 ) -> None:
     """Push live action log page snapshots. Requires a valid session cookie."""
     token = websocket.cookies.get(settings.session_cookie_name)
@@ -178,9 +364,29 @@ async def action_log_updates(
 
         await websocket.accept()
         logger.info("WebSocket подключение журнала действий пользователя id=%d", user.id)
-        snapshot = await _action_log_page(session, page, items_per_page)
+        snapshot = await _action_log_page(
+            session,
+            page,
+            items_per_page,
+            action=action,
+            portal_id=portal_id,
+            user_id=user_id,
+            order_by=order_by,
+        )
         await websocket.send_json(snapshot.model_dump(mode="json"))
-        await _hub_snapshot_loop(websocket, action_log_hub, lambda: _action_log_page(session, page, items_per_page))
+        await _hub_snapshot_loop(
+            websocket,
+            action_log_hub,
+            lambda: _action_log_page(
+                session,
+                page,
+                items_per_page,
+                action=action,
+                portal_id=portal_id,
+                user_id=user_id,
+                order_by=order_by,
+            ),
+        )
         logger.info("WebSocket отключение журнала действий пользователя id=%d", user.id)
 
 
@@ -217,7 +423,11 @@ async def execute_action(portal_id: int, action: Action, session: DbSession, use
     "/log",
     response_model=ActionLogListSchema,
     responses=_LOGIN_RESPONSES,
-    description="Журнал действий с пагинацией.",
+    description=(
+        "Журнал действий с пагинацией, фильтрами и сортировкой.\n\n"
+        "Фильтры: `action` (тип действия), `portal_id`, `user_id`.\n\n"
+        "Сортировка `order_by`: `newest` (по умолчанию — сначала новые) или `oldest`."
+    ),
     summary="Журнал действий",
 )
 async def action_log(
@@ -225,8 +435,20 @@ async def action_log(
     _user: CurrentUser,
     page: int = Query(1, ge=1),
     items_per_page: int = Query(PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
+    action: Action | None = Query(None),
+    portal_id: int | None = Query(None, ge=1),
+    user_id: int | None = Query(None, ge=1),
+    order_by: LogOrder = Query(LogOrder.NEWEST),
 ) -> ActionLogListSchema:
-    return await _action_log_page(session, page, items_per_page)
+    return await _action_log_page(
+        session,
+        page,
+        items_per_page,
+        action=action,
+        portal_id=portal_id,
+        user_id=user_id,
+        order_by=order_by,
+    )
 
 
 @router.get(
@@ -256,20 +478,8 @@ async def stats(session: DbSession, _user: CurrentUser) -> StatsSchema:
         )
     ).one()
 
-    ttl = func.greatest(func.extract("epoch", Portal.expires_at - now), 0.0)
-    ttl_factor = 0.04 * ttl
-    risk = (
-        (Portal.energy_level / 100.0) * 0.2
-        + (1.0 - Portal.stability / 100.0) * 0.2
-        + (0.1 * Portal.creatures_count / (0.1 * Portal.creatures_count + 1.0)) * 0.3
-        + (1.0 - ttl_factor / (ttl_factor + 1.0)) * 0.3
-    )
-    danger_bucket = case(
-        (risk <= 0.3, DangerLevel.LOW.value),
-        (risk <= 0.6, DangerLevel.MEDIUM.value),
-        (risk <= 0.9, DangerLevel.HIGH.value),
-        else_=DangerLevel.CRITICAL.value,
-    )
+    risk = _risk_expression(now)
+    danger_bucket = _danger_bucket_expression(now)
     danger_rows = (
         await session.execute(select(danger_bucket, func.count()).where(open_portal).group_by(danger_bucket))
     ).all()

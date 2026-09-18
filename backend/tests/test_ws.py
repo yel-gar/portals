@@ -8,7 +8,7 @@ from httpx import AsyncClient
 from pydantic import BaseModel
 
 from app.config import settings
-from app.models import Action, Portal
+from app.models import Action, LogOrder, Portal, PortalOrder
 from app.notifications import action_log_hub, portal_update_hub
 from app.routes.portals import _hub_snapshot_loop, action_log_updates, portal_updates
 
@@ -74,6 +74,34 @@ async def _noop_snapshot() -> BaseModel:
     return _Snapshot(snapshot=0)
 
 
+async def _portal_updates_call(websocket: Any, **overrides: Any) -> None:
+    params: dict[str, Any] = {
+        "page": 1,
+        "items_per_page": 20,
+        "closed": None,
+        "danger_level": None,
+        "has_observer": None,
+        "is_marked": None,
+        "search": None,
+        "order_by": PortalOrder.RISK,
+    }
+    params.update(overrides)
+    await portal_updates(websocket, **params)
+
+
+async def _log_updates_call(websocket: Any, **overrides: Any) -> None:
+    params: dict[str, Any] = {
+        "page": 1,
+        "items_per_page": 20,
+        "action": None,
+        "portal_id": None,
+        "user_id": None,
+        "order_by": LogOrder.NEWEST,
+    }
+    params.update(overrides)
+    await action_log_updates(websocket, **params)
+
+
 @pytest.mark.asyncio
 async def test_hub_snapshot_loop_exits_on_disconnect() -> None:
     websocket = _MockWebSocket()
@@ -117,7 +145,7 @@ async def test_hub_snapshot_loop_ignores_client_ping() -> None:
 @pytest.mark.asyncio
 async def test_portal_ws_rejects_anonymous() -> None:
     websocket = _MockWebSocket()
-    await portal_updates(websocket, page=1, items_per_page=20)  # type: ignore[arg-type]
+    await _portal_updates_call(websocket)
     assert websocket.closed_code == 4401
     assert websocket.accepted is False
 
@@ -125,7 +153,7 @@ async def test_portal_ws_rejects_anonymous() -> None:
 @pytest.mark.asyncio
 async def test_log_ws_rejects_anonymous() -> None:
     websocket = _MockWebSocket()
-    await action_log_updates(websocket, page=1, items_per_page=20)  # type: ignore[arg-type]
+    await _log_updates_call(websocket)
     assert websocket.closed_code == 4401
     assert websocket.accepted is False
 
@@ -141,12 +169,30 @@ async def test_portal_ws_sends_initial_snapshot_and_exits(
 
     websocket = _MockWebSocket(cookies={settings.session_cookie_name: token})
     websocket.disconnect.set()
-    await portal_updates(websocket, page=1, items_per_page=20)  # type: ignore[arg-type]
+    await _portal_updates_call(websocket)
     assert websocket.accepted is True
     assert len(websocket.sent) == 1
     payload = websocket.sent[0]
     assert payload["total"] == 1
     assert payload["items"][0]["name"] == "Alpha"
+
+
+@pytest.mark.asyncio
+async def test_portal_ws_honors_filters(client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]) -> None:
+    await _login(client)
+    token = client.cookies.get(settings.session_cookie_name)
+    assert token is not None
+    await create_portal(name="Alpha")
+    await create_portal(name="Beta", is_closed=True)
+
+    websocket = _MockWebSocket(cookies={settings.session_cookie_name: token})
+    websocket.disconnect.set()
+    await _portal_updates_call(websocket, closed=True)
+    assert websocket.accepted is True
+    assert len(websocket.sent) == 1
+    payload = websocket.sent[0]
+    assert payload["total"] == 1
+    assert payload["items"][0]["name"] == "Beta"
 
 
 @pytest.mark.asyncio
@@ -161,7 +207,7 @@ async def test_log_ws_sends_initial_snapshot_and_exits(
 
     websocket = _MockWebSocket(cookies={settings.session_cookie_name: token})
     websocket.disconnect.set()
-    await action_log_updates(websocket, page=1, items_per_page=20)  # type: ignore[arg-type]
+    await _log_updates_call(websocket)
     assert websocket.accepted is True
     assert len(websocket.sent) == 1
     payload = websocket.sent[0]

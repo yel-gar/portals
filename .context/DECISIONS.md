@@ -51,6 +51,13 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 - If a regular (non-superuser) user already holds the configured username, startup **fails fast** with a clear error instead of silently promoting or deleting the account (behavior chosen by user).
 - Implementation lives in `app/bootstrap.py` (`ensure_initial_superuser`), wired into `app/main.py` lifespan.
 
+## Portal list & action log: filters and ordering
+- Portal list and log support server-side filtering and ordering; the same query params apply to the HTTP endpoints and their WebSocket mirror endpoints (both share `_portal_page` / `_action_log_page`).
+- Portal list filters: `closed` (true/false), `danger_level` (LOW/MEDIUM/HIGH/CRITICAL), `has_observer`, `is_marked`, `search` (case-insensitive substring over name or destination world). Log filters: `action`, `portal_id`, `user_id`.
+- `order_by` is a whitelist enum validated by FastAPI (`PortalOrder` / `LogOrder`): `risk` (default), `expires_at`, `creatures`, `name` for portals; `newest` (default) / `oldest` for the log. Unknown values return 422.
+- Default portal ordering: risk DESC, expires_at ASC, has_observer DESC, creatures_count DESC, `id ASC` as the final tiebreaker for stable pagination.
+- Sorting/filtering by risk and danger level happens in SQL: the risk formula and the danger-level CASE are extracted into `_risk_expression(now)` / `_danger_bucket_expression(now)` (already used by `/stats`), mirroring the Python `Portal.risk_factor` / `Portal.danger_level`.
+
 ## Future ideas (not yet implemented)
 - Background tasks that update portal data should also produce `portal_changes` notifications (the trigger-based producer is a later alternative to in-route `pg_notify`).
 - A frontend is not built yet; the API and WebSocket endpoints are backend-only for now.

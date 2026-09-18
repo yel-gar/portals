@@ -48,6 +48,18 @@ class DangerLevel(enum.StrEnum):
     CRITICAL = "CRITICAL"
 
 
+class PortalOrder(enum.StrEnum):
+    RISK = "risk"
+    EXPIRES_AT = "expires_at"
+    CREATURES = "creatures"
+    NAME = "name"
+
+
+class LogOrder(enum.StrEnum):
+    NEWEST = "newest"
+    OLDEST = "oldest"
+
+
 def utc_now() -> datetime:
     return datetime.now(UTC)
 
