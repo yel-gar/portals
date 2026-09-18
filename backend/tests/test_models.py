@@ -98,7 +98,7 @@ async def test_action_rules() -> None:
         stable.stabilize()
     unstable = _portal(stability=30)
     unstable.stabilize()
-    assert unstable.stability == 100
+    assert 40 <= unstable.stability <= 60
 
     critical = _portal(
         energy_level=100,

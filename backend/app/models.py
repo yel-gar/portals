@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import random
 from datetime import UTC, datetime
 
 from sqlalchemy import (
@@ -22,6 +23,7 @@ from .constants import (
     LOGIN_TOKEN_LENGTH,
     PASSWORD_HASH_MAX_LENGTH,
     PORTAL_NAME_MAX_LENGTH,
+    STABILITY_INCREASE_RAND_RANGE,
     USERNAME_MAX_LENGTH,
 )
 from .db import Base
@@ -117,7 +119,8 @@ class Portal(Base):
         self._deny_if_closed()
         if self.stability >= 50:
             raise BadAction("Стабильность портала уже не ниже 50%")
-        self.stability = 100
+        self.stability += random.randint(*STABILITY_INCREASE_RAND_RANGE)
+        self.stability = min(self.stability, 100)
 
     def dismiss(self) -> None:
         self._deny_if_closed()

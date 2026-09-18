@@ -92,7 +92,7 @@ async def test_execute_action_flow(client: AsyncClient, create_portal: Callable[
 
     response = await client.post(f"/portals/{portal_a.id}", params={"action": Action.STABILIZE.value})
     assert response.status_code == 200
-    assert response.json()["stability"] == 100
+    assert 40 <= response.json()["stability"] <= 60
 
     response = await client.post(f"/portals/{portal_a.id}", params={"action": Action.DISMISS.value})
     assert response.status_code == 200

@@ -1,7 +1,7 @@
 # Project state
 
 ## Current status
-Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: `warn_creatures` now empties the portal, action log is streamed over WebSocket, portal actions are commit-safe (row lock + atomic `pg_notify` producers), coverage raised to 99%.
+Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: initial superuser bootstrap via env vars; `STABILIZE` reworked to a random 10-30 bump capped at 100.
 
 ## Review fixes (post M6)
 - `nullable` now set explicitly on every model column.
@@ -29,6 +29,13 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 8. **Final** — pre-commit --all-files, full pytest run, doc refresh.
 
 ## Completed milestones
+
+### Initial superuser bootstrap + STABILIZE rework (latest batch)
+- `INITIAL_SUPERUSER_USERNAME` / `INITIAL_SUPERUSER_PASSWORD` env pair (both or none, lengths validated via shared constants): `app/config.py` `_read_initial_superuser` → `Settings.initial_superuser: tuple[str, str] | None`.
+- New `app/bootstrap.py::ensure_initial_superuser` — runs in the lifespan right after `create_all()`; deletes superusers with a different name (sessions CASCADE, log rows SET NULL), keeps a same-name superuser without resetting its password, fails fast if a regular user holds the configured name.
+- `docker-compose.yml` passes both vars to the backend service; `.env.example` + README envvars table updated.
+- `Portal.stabilize` now adds a random 10-30 to stability (`STABILITY_INCREASE_RAND_RANGE`, new constant) capped at 100, instead of jumping straight to 100; model test updated.
+- Tests: `tests/test_bootstrap.py` (create, delete-different-name incl. cascade/FK-NULL checks, keep-same-name+password, fail-fast), `tests/test_config.py` (+5 env parsing cases), `tests/test_main.py` (lifespan creates superuser).
 
 ### Action log WebSocket + commit safety (latest batch)
 - `Portal.warn_creatures` now sets `creatures_count` to `0` after validating the warning can be issued.

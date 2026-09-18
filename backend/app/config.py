@@ -3,13 +3,45 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from .constants import SESSION_TTL_DAYS
+from .constants import (
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_MIN_LENGTH,
+    SESSION_TTL_DAYS,
+    USERNAME_MAX_LENGTH,
+    USERNAME_MIN_LENGTH,
+)
 
 
 def _as_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on", "y"}
+
+
+def _read_initial_superuser() -> tuple[str, str] | None:
+    """Read and validate the initial-superuser env pair, or return ``None``.
+
+    Both variables must be set together (or neither). Lengths are enforced with
+    the same constants the DB models and Pydantic validators use.
+    """
+    username = (os.getenv("INITIAL_SUPERUSER_USERNAME") or "").strip()
+    password = (os.getenv("INITIAL_SUPERUSER_PASSWORD") or "").strip()
+    if not username and not password:
+        return None
+    if not username or not password:
+        raise RuntimeError(
+            "Задайте обе переменные окружения INITIAL_SUPERUSER_USERNAME и "
+            "INITIAL_SUPERUSER_PASSWORD, либо не задавайте ни одну из них"
+        )
+    if not USERNAME_MIN_LENGTH <= len(username) <= USERNAME_MAX_LENGTH:
+        raise RuntimeError(
+            f"INITIAL_SUPERUSER_USERNAME: длина должна быть от {USERNAME_MIN_LENGTH} до {USERNAME_MAX_LENGTH} символов"
+        )
+    if not PASSWORD_MIN_LENGTH <= len(password) <= PASSWORD_MAX_LENGTH:
+        raise RuntimeError(
+            f"INITIAL_SUPERUSER_PASSWORD: длина должна быть от {PASSWORD_MIN_LENGTH} до {PASSWORD_MAX_LENGTH} символов"
+        )
+    return username, password
 
 
 def _build_database_url() -> str:
@@ -32,6 +64,7 @@ class Settings:
     debug: bool
     session_cookie_name: str = "session_token"
     session_ttl_days: int = SESSION_TTL_DAYS
+    initial_superuser: tuple[str, str] | None = None
 
     @property
     def cookie_secure(self) -> bool:
@@ -44,6 +77,7 @@ def load_settings() -> Settings:
         backend_url=os.getenv("BACKEND_URL", ""),
         frontend_url=os.getenv("FRONTEND_URL", ""),
         debug=_as_bool(os.getenv("DEBUG")),
+        initial_superuser=_read_initial_superuser(),
     )
 
 

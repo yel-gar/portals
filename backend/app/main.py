@@ -7,8 +7,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .bootstrap import ensure_initial_superuser
 from .config import settings
-from .db import create_all, dispose_db, init_db
+from .db import create_all, dispose_db, get_session_factory, init_db
 from .notifications import action_log_hub, portal_update_hub
 from .routes import admin, auth, portals
 
@@ -26,6 +27,10 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     logger.info("Инициализация базы данных")
     init_db(settings.database_url)
     await create_all()
+    if settings.initial_superuser is not None:
+        username, password = settings.initial_superuser
+        logger.info("Проверка начального суперпользователя")
+        await ensure_initial_superuser(get_session_factory(), username, password)
     logger.info("Запуск каналов оповещений Postgres LISTEN/NOTIFY")
     await portal_update_hub.start(settings.database_url)
     await action_log_hub.start(settings.database_url)
