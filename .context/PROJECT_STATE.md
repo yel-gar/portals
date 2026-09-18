@@ -34,6 +34,10 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 ### M3 Auth routes
 - `app/routes/auth.py` - register / login (session cookie, 14-day expiry) / logout / me; 409 duplicate username, 401 invalid credentials
 
+### M4 Portal routes + notifications
+- `app/notifications.py` - `PortalUpdateHub` (dedicated asyncpg connection listening on `portal_changes`, broadcast → WS subscribers)
+- `app/routes/portals.py` - paginated `GET /portals`, `WS /portals/ws` (auth via session cookie, initial snapshot + refresh pushes), `POST /portals/{id}?action=` (409 BadAction, writes ActionLogEntry), `GET /portals/log`, `GET /portals/stats`. Router-level login dependency (HTTP routes only)
+
 ### Project scaffold
 - Poetry-based backend in `backend/` (FastAPI, SQLAlchemy, asyncpg; python >=3.14)
 - Dev tooling: black, ruff, mypy (strict), pytest, coverage, pre-commit hooks
