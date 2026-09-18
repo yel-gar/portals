@@ -57,6 +57,11 @@ Getting to basic docker setup now. Project itself will be running ultimately thr
 - проверил план агента и внес корректировки
 - провел ревью кода
 
+## Что сделал агент
+- полностью написал код согласно моему ТЗ
+- написал тесты и проверил себя благодаря настроенному на этапе 1 CI
+- провел само-ревью
+
 ## Ошибки агента
 - использовал mock sqlite для тестов, хотя лучше использовать testcontainers, я внес корректировку
 - `nullable` задана почти нигде в моделях БД. По умолчанию колонки nullable, а по ТЗ почти все поля обязательны.
@@ -158,6 +163,41 @@ UserRegisterSchema
 username: length >= 4, <= 64, bring out min length and max length as constant and use it both in db and schema validator
 password: length >= 8, <= 128, bring out as constant as well, but keep in mind you will be storing HASH in database. Hash to be calculated and verified via argon2.
 
+```
+
+# Этап 3. Фронтенд
+Фронтенд создавался небольшими промптами в режиме реального времени с обязательным контролем качества и начальным согласованием макета и стиля.
+
+## Что сделал я
+- предложил варианты фреймворков для фронтенда (Next.js, React)
+- обсудил с агентом выбор стека
+- попросил агента сделать тестовые макеты перед началом основной разработки
+- установил способ деплоя приложения: бэкенд и фронтенд на отдельных доменах
+
+## Что сделал агент
+- создал тестовые макеты
+- обсудил со мной выбор фреймворка и инструментов
+- написал моки апи для тестирования
+
+## Проблемы агента
+- агент сильно застрял на этапе создания начальных макетов - у него неправильно работал инструмент записи, поэтому он до бесконечности перезаписывал. Я закрыл сессию и запустил нового агента с другой моделью.
+
+# Этап 2.1. Доработка бэкенда
+По результатам этапа 2 параллельно с этапом 3 был запущен параллельный агент для исправления проблем с кодом.
+
+## Что сделал я
+- настроил для фронтенда и бэкенда параллельные worktrees и исправил проблему с виртуальными окружениями для pre-commit hooks
+- обозначил бэкенд агенту задачу создать возможность фильтрации и сортировки
+- обозначил задачу создать симулятор создания и изменения порталов
+
+## Что сделал агент
+- добавил возможность фильтрации и сортировки и написал тесты под нее
+- добавил и протестировал симулятор порталов
+- с помощью субагентов провел полный ревью бэкенда и нашел несколько важных проблем
+
+## Ключевые промпты
+```
+Your next task: add a portal populator/simulator. It is a background task that randomly updates some portals every 10 seconds. Changeable values: stability (may increase or decrease), creatures_inside (may decrease or increase). New portals may open with a configurable chance via envvar (default 5% which should be equal to about 1 portal per 3-4 minutes). New portal has completely random values, TTL from 30 seconds to 30 minutes. Write a name generator for worlds and portal names. Also reorder code in routes.portals so that POST /{id} and GET /{id} are nearby.
 ```
 
 # Обработанные и покрытые тестами граничные случаи: Auth и Portals
