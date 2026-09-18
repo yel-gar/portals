@@ -34,6 +34,8 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 ### Frontend kickoff (branch `frontend/react-vite`)
 - Stack confirmed with user: React + Vite + TypeScript (strict), SPA without SSR. Recorded in `DECISIONS.md` and a new "Frontend info" section in `AGENTS.md`.
 - Working-layout decision: frontend branch lives in a git worktree at `../portals-fe` so backend (`master`, main directory) and frontend work proceed in parallel without checkout conflicts.
+- Worktree gotcha: git worktrees do **not** share poetry virtualenvs (`.venv` is gitignored and poetry keys the cache venv to the checkout path). Each new worktree needs its own `poetry -C backend install --no-root` before black/ruff/mypy/pytest work; plain `poetry install` fails because the backend is not an installable root package.
+- Rebasing the frontend branch onto `master` picked up `4078735` (`black`/`ruff` now run only on `^backend/.*\.py$`) — doc-only commits no longer invoke the backend hooks.
 - Design choices confirmed with user and recorded: **Ant Design**, **TanStack Query + snapshot WS hook**, **React Router**, **npm**, **Russian UI / English code**; backend on a separate subdomain with `BACKEND_URL` from compose baked into the frontend build; docker overrides with auto-reload (Vite HMR) for local dev.
 - Next: scaffold `frontend/` (layout to be agreed with user first), then add the compose service and dev override.
 
