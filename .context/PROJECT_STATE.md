@@ -1,7 +1,7 @@
 # Project state
 
 ## Current status
-Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: filters + ordering for the portal list and action log (HTTP and WebSocket), plus an individual portal info endpoint.
+Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: a portal populator/simulator background task (random stability/creatures updates every 10 s, optional spawning of new portals via `PORTAL_OPEN_CHANCE`, fantasy name generators) plus a route reorder in `routes/portals.py` so `POST /{id}` and `GET /{id}` sit next to each other. Tests now cover the simulator, config parsing, and the lifespan wiring: 106 tests, coverage 99%, mypy/ruff/black clean.
 
 ## Code review fixes (2026-09)
 Full review is persisted in `.context/REVIEW.md` (CRITICAL/MAJOR/MINOR/NIT findings, commits `c2197eb..6ed37f0`). All CRITICAL + MAJOR findings fixed:
@@ -43,6 +43,17 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 8. **Final** — pre-commit --all-files, full pytest run, doc refresh.
 
 ## Completed milestones
+
+### Portal simulator + route reorder (latest batch)
+- New `app/simulator.py` — background portal populator:
+  - `simulator_loop()` ticks every `SIMULATOR_TICK_SECONDS` (10 s), started/cancelled in the app lifespan; skipped while `DEBUG` is truthy (mirrors the login rate limiter so tests never have a background writer). Per-tick failures are logged and the loop keeps running; shutdown cancels the task and awaits it.
+  - Each tick picks every open (non-closed, not-expired) portal and with `SIMULATOR_UPDATE_CHANCE` (0.5) nudges `stability` by ±`SIMULATOR_STABILITY_DELTA` (15) and `creatures_count` by ±`SIMULATOR_CREATURES_DELTA` (5), both clamped (`0..100`, creatures also capped at `SIMULATOR_MAX_CREATURES`).
+  - With `settings.portal_open_chance` (`PORTAL_OPEN_CHANCE` env var, default `SIMULATOR_OPEN_CHANCE_DEFAULT = 0.05` ≈ one portal per 3–4 min) a brand-new portal appears: fully random name/world/energy/stability/creatures, `TTL` uniform in `SIMULATOR_PORTAL_TTL_MIN_SECONDS..MAX` (30 s..30 min), unmarked, no observer, open.
+  - Name generators: `world_name()` (syllable composition + ending, e.g. «Альбарион») and `portal_name()` (adjective + noun, 25 % chance of a Roman numeral suffix, e.g. «Шепчущий Коридор IV»), both within the shared `DESTINATION_WORLD_MAX_LENGTH` / `PORTAL_NAME_MAX_LENGTH`.
+  - `simulate_once()` emits `pg_notify` for every changed/spawned portal **inside the same transaction** (new `notify_portal_changed` helper extracted to `app/notifications.py`), so WS subscribers are only woken on a durable commit — the same rule as portal actions.
+- `PORTAL_OPEN_CHANCE` added to `app/config.py` (`_as_float` parser: unset→default, non-numeric or out-of-`0..1` at settings load → fail fast), `docker-compose.yml`, `.env.example` and the README envvars table.
+- `routes/portals.py` reordered: `POST /{portal_id}` and `GET /{portal_id}` are now adjacent, declared **after** the static `/log` and `/stats` routes so the int path param never shadows them (this was verified by the previously-passing /log, /stats tests which caught the intermediate wrong order).
+- Tests: `tests/test_simulator.py` (name shapes, new-portal values, delta/clamping, update+spawn, spawn-skip, closed-portal skip, loop ticks, loop survives tick errors, loop logs changed ids), `tests/test_config.py` (+`_as_float` cases), `tests/test_main.py` (lifespan starts/stops the simulator with `DEBUG` off). 106 pass, coverage 99%.
 
 ### Portal list & action log: filters + ordering (latest batch)
 - `PortalOrder` / `LogOrder` enums in `app/models.py` drive the `order_by` whitelist: `risk` (default), `expires_at`, `creatures`, `name` for portals; `newest` (default) / `oldest` for the log. Unknown values → 422.

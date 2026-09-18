@@ -7,6 +7,7 @@ from .constants import (
     PASSWORD_MAX_LENGTH,
     PASSWORD_MIN_LENGTH,
     SESSION_TTL_DAYS,
+    SIMULATOR_OPEN_CHANCE_DEFAULT,
     USERNAME_MAX_LENGTH,
     USERNAME_MIN_LENGTH,
 )
@@ -16,6 +17,22 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on", "y"}
+
+
+def _as_float(value: str | None, default: float, *, name: str) -> float:
+    """Parse a float env var, or return ``default`` when unset/blank.
+
+    Invalid values fail fast at settings load (like ``_read_initial_superuser``).
+    """
+    if value is None or not value.strip():
+        return default
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise RuntimeError(f"{name}: ожидалось число, получено {value!r}") from None
+    if not 0.0 <= parsed <= 1.0:
+        raise RuntimeError(f"{name}: ожидается значение от 0 до 1, получено {parsed!r}")
+    return parsed
 
 
 def _read_initial_superuser() -> tuple[str, str] | None:
@@ -66,6 +83,7 @@ class Settings:
     session_ttl_days: int = SESSION_TTL_DAYS
     initial_superuser: tuple[str, str] | None = None
     disable_registration: bool = False
+    portal_open_chance: float = SIMULATOR_OPEN_CHANCE_DEFAULT
 
     @property
     def cookie_secure(self) -> bool:
@@ -80,6 +98,9 @@ def load_settings() -> Settings:
         debug=_as_bool(os.getenv("DEBUG")),
         initial_superuser=_read_initial_superuser(),
         disable_registration=_as_bool(os.getenv("DISABLE_REGISTRATION")),
+        portal_open_chance=_as_float(
+            os.getenv("PORTAL_OPEN_CHANCE"), SIMULATOR_OPEN_CHANCE_DEFAULT, name="PORTAL_OPEN_CHANCE"
+        ),
     )
 
 

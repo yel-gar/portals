@@ -24,6 +24,21 @@ async def test_lifespan_starts_and_stops_hubs(postgres_url: str, monkeypatch: py
 
 
 @pytest.mark.asyncio
+async def test_lifespan_starts_and_stops_simulator(postgres_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.main.settings",
+        Settings(database_url=postgres_url, backend_url="", frontend_url="", debug=False),
+    )
+    try:
+        async with lifespan(app):
+            pass
+    finally:
+        # lifespan disposes the global engine; restore it for the remaining tests
+        init_db(postgres_url, pool_class=NullPool)
+        await create_all()
+
+
+@pytest.mark.asyncio
 async def test_lifespan_creates_initial_superuser(postgres_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.main.settings",

@@ -5,6 +5,8 @@ import logging
 from contextlib import suppress
 
 import asyncpg
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +115,22 @@ class UpdateHub:
     async def broadcast(self) -> None:
         for queue in tuple(self._subscribers):
             queue.put_nowait(None)
+
+
+async def notify_portal_changed(session: AsyncSession, portal_id: int) -> None:
+    """Produce a ``portal_changes`` notification inside the caller's transaction."""
+    await session.execute(
+        text("SELECT pg_notify(:channel, :payload)"),
+        {"channel": PORTAL_NOTIFY_CHANNEL, "payload": f"portal:{portal_id}"},
+    )
+
+
+async def notify_action_log_changed(session: AsyncSession, portal_id: int) -> None:
+    """Produce an ``action_log_changes`` notification inside the caller's transaction."""
+    await session.execute(
+        text("SELECT pg_notify(:channel, :payload)"),
+        {"channel": ACTION_LOG_NOTIFY_CHANNEL, "payload": f"log:{portal_id}"},
+    )
 
 
 portal_update_hub = UpdateHub(PORTAL_NOTIFY_CHANNEL)

@@ -21,5 +21,6 @@
 | `DISABLE_REGISTRATION` | When truthy, `POST /auth/register` returns `403` and public registration is disabled | `0`                          | No   |
 | `INITIAL_SUPERUSER_USERNAME` | Backend-only: username of the initial superuser created on startup; must be set together with `INITIAL_SUPERUSER_PASSWORD` | — | No |
 | `INITIAL_SUPERUSER_PASSWORD` | Backend-only: password of the initial superuser created on startup; must be set together with `INITIAL_SUPERUSER_USERNAME` | — | No |
+| `PORTAL_OPEN_CHANCE` | Backend-only: chance (0..1) of the portal simulator opening a new portal on each 10-second tick (0.05 ≈ one portal per 3–4 minutes) | `0.05` | No |
 
 When **both** `INITIAL_SUPERUSER_USERNAME` and `INITIAL_SUPERUSER_PASSWORD` are set, the app creates (or reconciles) a single superuser on startup: any superuser with a different name is deleted, while an existing superuser with the exact name is kept (its password is never reset). Startup fails if a regular user already holds the configured username, or if only one of the two variables is set.

@@ -13,6 +13,18 @@ DESTINATION_WORLD_MAX_LENGTH = 128
 
 STABILITY_INCREASE_RAND_RANGE = (10, 30)
 
+# Portal simulator (app/simulator.py) — background task that keeps the lab "alive".
+SIMULATOR_TICK_SECONDS = 10
+# Per-tick chance of a new portal opening; 0.05 * 10 s tick = about one portal per 3-4 minutes.
+SIMULATOR_OPEN_CHANCE_DEFAULT = 0.05
+SIMULATOR_PORTAL_TTL_MIN_SECONDS = 30
+SIMULATOR_PORTAL_TTL_MAX_SECONDS = 30 * 60
+# Per-tick chance that an open portal is randomly updated (stability / creatures_count).
+SIMULATOR_UPDATE_CHANCE = 0.5
+SIMULATOR_STABILITY_DELTA = 15
+SIMULATOR_CREATURES_DELTA = 5
+SIMULATOR_MAX_CREATURES = 100
+
 # Risk factor formula parameters — shared between the Python property in models.py
 # and the SQL expressions in routes/portals.py so the two cannot drift apart.
 RISK_ENERGY_WEIGHT = 0.2

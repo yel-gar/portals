@@ -75,6 +75,14 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 - **`security.py` exception syntax**: `except (InvalidHashError, VerifyMismatchError)` (parenthesized) replaced the PEP-758-only 3.14 syntax so the module parses on all supported interpreters; covered by `test_security.py`.
 - Login *NIT dismissed by user*: `POST /portals/{id}` keeps `action` as a query parameter — no change.
 
+## Portal simulator (populator)
+- A background task (`app/simulator.py::simulator_loop`) keeps the dashboard "alive": every `SIMULATOR_TICK_SECONDS` (10 s) it randomly tweaks the open portals and, with configurable probability, opens a new one so the table/WS feed keeps changing without manual seeding.
+- Changeable values per tick (with `SIMULATOR_UPDATE_CHANCE = 0.5` per portal): `stability` ±`SIMULATOR_STABILITY_DELTA` (15) and `creatures_count` ±`SIMULATOR_CREATURES_DELTA` (5), both clamped to `0..100` (creatures also capped at `SIMULATOR_MAX_CREATURES = 100`). Closed/expired portals are never touched.
+- A new portal opens each tick with `PORTAL_OPEN_CHANCE` (0..1, default `0.05`, parsed fail-fast at settings load); 0.05 per 10 s tick ≈ one portal per 3–4 minutes. New portals are fully random: name/world/energy/stability/creatures, `TTL` uniform in 30 s..30 min, unmarked, no observer, open.
+- Names come from generators in the simulator: `world_name()` (syllables + ending) and `portal_name()` (adjective + noun, optional Roman-numeral suffix), validated to fit the shared `DESTINATION_WORLD_MAX_LENGTH` / `PORTAL_NAME_MAX_LENGTH`.
+- Simulator updates/creations run in a single transaction and emit `pg_notify` on `portal_changes` **inside that transaction** — same rule as portal actions, so WS subscribers only refresh on a durable commit. (Implements the "Future ideas" note about background task producers.)
+- The simulator is started/cancelled in the app lifespan and is **skipped while `DEBUG` is truthy**, mirroring the login rate limiter, so tests never have a background writer mutating tables.
+
 ## Future ideas (not yet implemented)
 - Background tasks that update portal data should also produce `portal_changes` notifications (the trigger-based producer is a later alternative to in-route `pg_notify`).
 - A frontend is not built yet; the API and WebSocket endpoints are backend-only for now.

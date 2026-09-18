@@ -9,7 +9,7 @@ from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, and_, case, func, or_, select, text
+from sqlalchemy import ColumnElement, and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
@@ -35,10 +35,10 @@ from ..deps import (
 from ..exceptions import BadAction
 from ..models import Action, ActionLogEntry, DangerLevel, LogOrder, Portal, PortalOrder, utc_now
 from ..notifications import (
-    ACTION_LOG_NOTIFY_CHANNEL,
-    PORTAL_NOTIFY_CHANNEL,
     UpdateHub,
     action_log_hub,
+    notify_action_log_changed,
+    notify_portal_changed,
     portal_update_hub,
 )
 from ..schemas import (
@@ -297,14 +297,8 @@ async def _notify_action_committed(session: AsyncSession, portal_id: int) -> Non
     Runs inside the action transaction, so Postgres delivers the notifications
     only when the transaction commits; a failed action never wakes subscribers.
     """
-    await session.execute(
-        text("SELECT pg_notify(:channel, :payload)"),
-        {"channel": PORTAL_NOTIFY_CHANNEL, "payload": f"portal:{portal_id}"},
-    )
-    await session.execute(
-        text("SELECT pg_notify(:channel, :payload)"),
-        {"channel": ACTION_LOG_NOTIFY_CHANNEL, "payload": f"log:{portal_id}"},
-    )
+    await notify_portal_changed(session, portal_id)
+    await notify_action_log_changed(session, portal_id)
 
 
 @router.get(
@@ -437,35 +431,6 @@ async def action_log_updates(
         logger.info("WebSocket отключение журнала действий пользователя id=%d", user.id)
 
 
-@router.post(
-    "/{portal_id}",
-    response_model=PortalSchema,
-    responses={
-        **_LOGIN_RESPONSES,
-        status.HTTP_404_NOT_FOUND: {"description": "Портал не найден"},
-        status.HTTP_409_CONFLICT: {"description": "Действие недопустимо для данного портала"},
-        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Неизвестное действие или некорректный id"},
-    },
-    description="Выполнить действие над порталом. Действие записывается в журнал.",
-    summary="Действие над порталом",
-)
-async def execute_action(portal_id: int, action: Action, session: DbSession, user: CurrentUser) -> Portal:
-    portal = await session.get(Portal, portal_id, with_for_update=True)
-    if portal is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Портал не найден")
-    try:
-        getattr(portal, action.value.lower())()
-    except BadAction as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
-    session.add(ActionLogEntry(user_id=user.id, portal_id=portal.id, action=action))
-    await session.flush()
-    await _notify_action_committed(session, portal.id)
-    await session.commit()
-    await session.refresh(portal)
-    logger.info("Действие %s выполнено порталом id=%d пользователем id=%d", action.value, portal.id, user.id)
-    return portal
-
-
 @router.get(
     "/log",
     response_model=ActionLogListSchema,
@@ -544,6 +509,35 @@ async def stats(session: DbSession, _user: CurrentUser) -> StatsSchema:
         danger_levels=danger_levels,
         avg_risk=avg_risk,
     )
+
+
+@router.post(
+    "/{portal_id}",
+    response_model=PortalSchema,
+    responses={
+        **_LOGIN_RESPONSES,
+        status.HTTP_404_NOT_FOUND: {"description": "Портал не найден"},
+        status.HTTP_409_CONFLICT: {"description": "Действие недопустимо для данного портала"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Неизвестное действие или некорректный id"},
+    },
+    description="Выполнить действие над порталом. Действие записывается в журнал.",
+    summary="Действие над порталом",
+)
+async def execute_action(portal_id: int, action: Action, session: DbSession, user: CurrentUser) -> Portal:
+    portal = await session.get(Portal, portal_id, with_for_update=True)
+    if portal is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Портал не найден")
+    try:
+        getattr(portal, action.value.lower())()
+    except BadAction as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    session.add(ActionLogEntry(user_id=user.id, portal_id=portal.id, action=action))
+    await session.flush()
+    await _notify_action_committed(session, portal.id)
+    await session.commit()
+    await session.refresh(portal)
+    logger.info("Действие %s выполнено порталом id=%d пользователем id=%d", action.value, portal.id, user.id)
+    return portal
 
 
 @router.get(
