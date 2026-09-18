@@ -1,0 +1,194 @@
+from __future__ import annotations
+
+import enum
+from datetime import UTC, datetime
+
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    func,
+)
+from sqlalchemy import (
+    Enum as SQLEnum,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .constants import (
+    DESTINATION_WORLD_MAX_LENGTH,
+    LOGIN_TOKEN_LENGTH,
+    PASSWORD_HASH_MAX_LENGTH,
+    PORTAL_NAME_MAX_LENGTH,
+    USERNAME_MAX_LENGTH,
+)
+from .db import Base
+from .exceptions import BadAction
+
+
+class Action(enum.StrEnum):
+    CLOSE = "CLOSE"
+    STABILIZE = "STABILIZE"
+    DISMISS = "DISMISS"
+    SEND_OBSERVER = "SEND_OBSERVER"
+    RECALL_OBSERVER = "RECALL_OBSERVER"
+    MARK = "MARK"
+    UNMARK = "UNMARK"
+    WARN_CREATURES = "WARN_CREATURES"
+
+
+class DangerLevel(enum.StrEnum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+def utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+class Portal(Base):
+    __tablename__ = "portals"
+    __table_args__ = (
+        CheckConstraint("energy_level >= 0 AND energy_level <= 100", name="ck_portals_energy_range"),
+        CheckConstraint("stability >= 0 AND stability <= 100", name="ck_portals_stability_range"),
+        CheckConstraint("creatures_count >= 0", name="ck_portals_creatures_non_negative"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(PORTAL_NAME_MAX_LENGTH))
+    destination_world: Mapped[str] = mapped_column(String(DESTINATION_WORLD_MAX_LENGTH))
+    energy_level: Mapped[int] = mapped_column(Integer)
+    stability: Mapped[int] = mapped_column(Integer)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    creatures_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_update: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    is_marked: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_observer: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    actions: Mapped[list[ActionLogEntry]] = relationship(
+        back_populates="portal", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+    @property
+    def risk_factor(self) -> float:
+        ttl = max((self.expires_at - utc_now()).total_seconds(), 0.0)
+        return (
+            (self.energy_level / 100.0) * 0.2
+            + (1.0 - self.stability / 100.0) * 0.2
+            + (0.1 * self.creatures_count / (0.1 * self.creatures_count + 1)) * 0.3
+            + (1.0 - 0.04 * ttl / (0.04 * ttl + 1)) * 0.3
+        )
+
+    @property
+    def danger_level(self) -> DangerLevel:
+        risk = self.risk_factor
+        if risk <= 0.3:
+            return DangerLevel.LOW
+        if risk <= 0.6:
+            return DangerLevel.MEDIUM
+        if risk <= 0.9:
+            return DangerLevel.HIGH
+        return DangerLevel.CRITICAL
+
+    @property
+    def closed(self) -> bool:
+        return self.expires_at <= utc_now() or self.is_closed
+
+    def _deny_if_closed(self) -> None:
+        if self.closed:
+            raise BadAction("Портал закрыт, выполнить действие невозможно")
+
+    def close(self) -> None:
+        self._deny_if_closed()
+        if self.creatures_count > 0:
+            raise BadAction("Нельзя закрыть портал: внутри есть существа")
+        if self.has_observer:
+            raise BadAction("Нельзя закрыть портал: внутри находится наблюдатель")
+        self.is_closed = True
+
+    def stabilize(self) -> None:
+        self._deny_if_closed()
+        if self.stability >= 50:
+            raise BadAction("Стабильность портала уже не ниже 50%")
+        self.stability = 100
+
+    def dismiss(self) -> None:
+        self._deny_if_closed()
+        self.last_update = utc_now()
+
+    def send_observer(self) -> None:
+        self._deny_if_closed()
+        if self.danger_level == DangerLevel.CRITICAL:
+            raise BadAction("Нельзя отправить наблюдателя: критический уровень опасности")
+        if self.has_observer:
+            raise BadAction("Наблюдатель уже находится внутри портала")
+        self.has_observer = True
+
+    def recall_observer(self) -> None:
+        self._deny_if_closed()
+        if not self.has_observer:
+            raise BadAction("Внутри портала нет наблюдателя, некого отзывать")
+        self.has_observer = False
+
+    def mark(self) -> None:
+        if self.is_marked:
+            raise BadAction("Портал уже отмечен")
+        self.is_marked = True
+
+    def unmark(self) -> None:
+        if not self.is_marked:
+            raise BadAction("Портал не отмечен")
+        self.is_marked = False
+
+    def warn_creatures(self) -> None:
+        self._deny_if_closed()
+        if not self.has_observer:
+            raise BadAction("Нет наблюдателя, через которого можно предупредить существ")
+        if self.creatures_count == 0:
+            raise BadAction("Внутри портала нет существ, некому предупреждать")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(USERNAME_MAX_LENGTH), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(PASSWORD_HASH_MAX_LENGTH))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    login_sessions: Mapped[list[LoginSession]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
+    log_entries: Mapped[list[ActionLogEntry]] = relationship(back_populates="user", passive_deletes=True)
+
+
+class LoginSession(Base):
+    __tablename__ = "login_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token: Mapped[str] = mapped_column(String(LOGIN_TOKEN_LENGTH), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[User] = relationship(lazy="joined")
+
+
+class ActionLogEntry(Base):
+    __tablename__ = "action_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    portal_id: Mapped[int] = mapped_column(ForeignKey("portals.id", ondelete="CASCADE"), index=True)
+    action: Mapped[Action] = mapped_column(SQLEnum(Action, name="action"))
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User | None] = relationship(lazy="joined")
+    portal: Mapped[Portal] = relationship(back_populates="actions")
