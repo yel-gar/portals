@@ -38,6 +38,9 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 - `app/notifications.py` - `PortalUpdateHub` (dedicated asyncpg connection listening on `portal_changes`, broadcast → WS subscribers)
 - `app/routes/portals.py` - paginated `GET /portals`, `WS /portals/ws` (auth via session cookie, initial snapshot + refresh pushes), `POST /portals/{id}?action=` (409 BadAction, writes ActionLogEntry), `GET /portals/log`, `GET /portals/stats`. Router-level login dependency (HTTP routes only)
 
+### M5 Admin routes
+- `app/routes/admin.py` - superuser-only user CRUD: create (no superuser flag), list, delete (409 on superuser), set-password
+
 ### Project scaffold
 - Poetry-based backend in `backend/` (FastAPI, SQLAlchemy, asyncpg; python >=3.14)
 - Dev tooling: black, ruff, mypy (strict), pytest, coverage, pre-commit hooks
