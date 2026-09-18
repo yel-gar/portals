@@ -18,6 +18,7 @@
 | `BACKEND_URL`      | Backend origin, added to the CORS allow-list                                   | ``                                  | No   |
 | `FRONTEND_URL`     | Frontend origin, added to the CORS allow-list                                  | ``                                  | No   |
 | `DEBUG`            | When truthy, session cookies are sent without the `Secure` flag                | `0`                                 | No   |
+| `DISABLE_REGISTRATION` | When truthy, `POST /auth/register` returns `403` and public registration is disabled | `0`                          | No   |
 | `INITIAL_SUPERUSER_USERNAME` | Backend-only: username of the initial superuser created on startup; must be set together with `INITIAL_SUPERUSER_PASSWORD` | — | No |
 | `INITIAL_SUPERUSER_PASSWORD` | Backend-only: password of the initial superuser created on startup; must be set together with `INITIAL_SUPERUSER_USERNAME` | — | No |
 

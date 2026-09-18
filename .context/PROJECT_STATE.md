@@ -3,6 +3,20 @@
 ## Current status
 Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: filters + ordering for the portal list and action log (HTTP and WebSocket), plus an individual portal info endpoint.
 
+## Code review fixes (2026-09)
+Full review is persisted in `.context/REVIEW.md` (CRITICAL/MAJOR/MINOR/NIT findings, commits `c2197eb..6ed37f0`). All CRITICAL + MAJOR findings fixed:
+- **C1/M1/M8 — WS fixes**: `_hub_snapshot_loop` subscribes before the initial snapshot, coalesces bursts, handles send/query errors (logs, keeps running), cleans up cancelled tasks; handlers authenticate with a short-lived session and open a fresh session per snapshot (no pool pinning).
+- **M2** — `Username`/`Password` Annotated aliases (shared length constants) used in all auth schemas.
+- **M3** — login timing equalizer (`burn_password_verify_time` on unknown username); `security.py` exception syntax fixed and covered by `test_security.py`.
+- **M4** — `app/ratelimit.py` (in-memory sliding window, 5/60 s per IP, disabled in DEBUG) throttles login → 429; `DISABLE_REGISTRATION` disables `/auth/register` → 403; both documented in `.env.example` + README.
+- **M5** — `register`/`create_user` commits wrapped in `IntegrityError` → 409 (race-safe; concurrent-duplicate tests added).
+- **M6** — new `POST /auth/password` revokes all-but-current session; admin set-password revokes all of the target user's sessions.
+- **M7** — `UpdateHub`: idempotent `start()`, robust `stop()`, supervised reconnection with exponential backoff + subscriber wake-up on recovery (real reconnect test via `connection.terminate()`).
+- **M9** — flaky `test_list_portals_filters` de-flaked: Critical portal is expired at creation (TTL clamps to 0 → risk stays >0.9, closed/CRITICAL buckets time-invariant).
+- **M10** — unknown-token tests: HTTP `/auth/me` 401 and WS 4401 for both endpoints (covers `deps.py` unknown-session branch).
+- Risk formula weights/thresholds extracted to `app/constants.py` and referenced by both the Python helper and the SQL expressions.
+- `POST /portals/{id}` `action` query param kept (NIT dismissed by user).
+
 ## Review fixes (post M6)
 - `nullable` now set explicitly on every model column.
 - Tests rewritten to be fully async (`pytest-asyncio` + `httpx.AsyncClient`/`ASGITransport`); `httpx2` dependency replaced with `httpx`.

@@ -61,6 +61,20 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 ## Portal info endpoint
 - `GET /portals/{id}` returns a single portal (`PortalSchema`, same shape as list items) and 404s for unknown ids. The dynamic `/{id}` route is declared after the static `/log` and `/stats` routes so they are never captured by the int path param.
 
+## Code review fixes (2026-09)
+- **Username/Password field aliases**: `Username`/`Password` = `Annotated[str, Field(min/max_length ...)]` in `app/schemas.py` built from the shared length constants; used by `UserRegisterSchema`, `LoginSchema` and `PasswordChangeSchema` so the DB models and every schema validator can never drift apart.
+- **Login timing equalization**: the login route runs an argon2 verification against a lazily-computed dummy hash when the username does not exist (`security.burn_password_verify_time`), so a missing username cannot be distinguished from a wrong password by response timing.
+- **Login rate limit**: a dependency-free in-memory sliding-window limiter (`app/ratelimit.py`, `SlidingWindowRateLimiter`, 5 attempts / 60 s per client IP) throttles `POST /auth/login` (429). It is **disabled while `DEBUG` is on** — dev/test convenience, no state shared across workers in production (single-process backend assumption, at least one uvicorn worker).
+- **`DISABLE_REGISTRATION`**: new env var; when truthy `POST /auth/register` returns 403. Documented in `.env.example` + README table.
+- **Register / admin create-user race safety**: the pre-check SELECT is only a fast path; the INSERT → commit is wrapped in `IntegrityError` → rollback → 409, making concurrent duplicate registrations race-safe.
+- **Password change revokes sessions**: new `POST /auth/password` (current user) deletes **all** the user's sessions except the current cookie's token (the user stays logged in); admin `POST /admin/users/{id}/set-password` deletes **all** of the target user's sessions.
+- **WS connections no longer pin a pooled session**: the endpoint session is used only for the initial auth lookup and closed before `accept()`; each page snapshot opens its own short-lived session (`get_session_factory()()` context), so a long-lived socket cannot exhaust the connection pool.
+- **Hub loop owns the initial snapshot**: `_hub_snapshot_loop` subscribes **before** rendering the initial page snapshot (an event landing in between cannot be missed), coalesces a burst of hub events into a single re-query, and keeps running through transient DB/send errors (logged) instead of dropping the subscriber. Client pings keep the socket alive; cancelled tasks are always awaited.
+- **`UpdateHub` self-healing**: `start()` is idempotent (stops the previous supervisor first), `stop()` is robust (broadcasts a terminate signal, suppresses close/remove_listener errors, awaits the supervisor, safe to call repeatedly). A background supervisor watches the listener connection (asyncpg termination listener → `asyncio.Event`) and reconnects with exponential backoff (1 s → 30 s); on recovery it broadcasts a refresh event so stale WS clients re-query.
+- **Risk formula single source of truth**: the formula weights/scales (`RISK_*`) and danger thresholds (`DANGER_*`) live in `app/constants.py`, referenced by the Python `models.risk_factor_for()` helper and by the SQL expressions in `routes/portals.py`, so the two cannot drift apart (the SQL must always mirror the Python formula).
+- **`security.py` exception syntax**: `except (InvalidHashError, VerifyMismatchError)` (parenthesized) replaced the PEP-758-only 3.14 syntax so the module parses on all supported interpreters; covered by `test_security.py`.
+- Login *NIT dismissed by user*: `POST /portals/{id}` keeps `action` as a query parameter — no change.
+
 ## Future ideas (not yet implemented)
 - Background tasks that update portal data should also produce `portal_changes` notifications (the trigger-based producer is a later alternative to in-route `pg_notify`).
 - A frontend is not built yet; the API and WebSocket endpoints are backend-only for now.
