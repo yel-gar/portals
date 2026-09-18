@@ -9,7 +9,7 @@ Stack (confirmed with user):
 - Live updates come over the backend snapshot WebSockets (`/portals/ws`, `/portals/log/ws`): each push is a complete page snapshot and must replace the previous server state atomically, not merge piecemeal
 - The backend remains the single source of truth: no duplicated business logic in the frontend
 
-Pending user consultation (do not assume): UI component library, state management, router, package manager, `frontend/` file layout, and how the app is served (docker service vs static hosting; Vite dev proxy for backend + WS in development).
+Decided (see `.context/DECISIONS.md`): **Ant Design**, **TanStack Query + snapshot WS hook**, **React Router**, **npm**, **Russian UI / English code**. The backend is on a **separate subdomain**; `BACKEND_URL` is passed to the frontend via docker compose (dev and prod) and baked into the build. Local dev uses docker compose overrides with auto-reload (Vite HMR). `frontend/` file layout still to be agreed at scaffold time.
 
 Frontend code must keep the same strictness culture as the backend: no unchecked `any`, types shared conceptually with the pydantic schemas (snapshot shapes arrive as JSON and have TS types mirroring them).
 

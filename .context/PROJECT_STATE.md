@@ -1,7 +1,7 @@
 # Project state
 
 ## Current status
-Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: initial superuser bootstrap via env vars; `STABILIZE` reworked to a random 10-30 bump capped at 100. Frontend development has started on branch `frontend/react-vite`: stack decision (React + Vite) committed, scaffolding pending design consultation.
+Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: initial superuser bootstrap via env vars; `STABILIZE` reworked to a random 10-30 bump capped at 100. Frontend development is on branch `frontend/react-vite`: stack and design choices confirmed and documented (React + Vite, Ant Design, TanStack Query + WS hook, React Router, npm, Russian UI / English code, `BACKEND_URL` from compose); scaffolding is the next step.
 
 ## Review fixes (post M6)
 - `nullable` now set explicitly on every model column.
@@ -34,7 +34,8 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 ### Frontend kickoff (branch `frontend/react-vite`)
 - Stack confirmed with user: React + Vite + TypeScript (strict), SPA without SSR. Recorded in `DECISIONS.md` and a new "Frontend info" section in `AGENTS.md`.
 - Working-layout decision: frontend branch lives in a git worktree at `../portals-fe` so backend (`master`, main directory) and frontend work proceed in parallel without checkout conflicts.
-- Pending consultation before scaffolding: UI component library, state management, router, package manager, `frontend/` layout, serving strategy.
+- Design choices confirmed with user and recorded: **Ant Design**, **TanStack Query + snapshot WS hook**, **React Router**, **npm**, **Russian UI / English code**; backend on a separate subdomain with `BACKEND_URL` from compose baked into the frontend build; docker overrides with auto-reload (Vite HMR) for local dev.
+- Next: scaffold `frontend/` (layout to be agreed with user first), then add the compose service and dev override.
 
 ### Initial superuser bootstrap + STABILIZE rework (latest batch)
 - `INITIAL_SUPERUSER_USERNAME` / `INITIAL_SUPERUSER_PASSWORD` env pair (both or none, lengths validated via shared constants): `app/config.py` `_read_initial_superuser` → `Settings.initial_superuser: tuple[str, str] | None`.

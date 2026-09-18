@@ -57,6 +57,15 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 ## Frontend stack
 - The frontend is a **React SPA scaffolded with Vite**, TypeScript in strict mode, with **no SSR/SSG** (no Next.js). Rationale: the app is an authenticated dashboard where everything interesting arrives live in the browser via WebSockets, so server-side rendering buys nothing and would only add machinery (RSC, cookie forwarding, "use client" everywhere) without payoff.
 - The FastAPI backend stays the single source of truth. The frontend consumes JSON HTTP + the two snapshot WebSocket endpoints (`/portals/ws`, `/portals/log/ws`); each WS push is a complete page snapshot and replaces the previous server state atomically.
-- Auth stays cookie-based in the browser: the backend's httpOnly session cookie is handled by the browser automatically (Secure unless `DEBUG`); the frontend never stores the token itself.
-- Still pending user consultation (not committed as decisions): UI component library, state management, router, package manager, `frontend/` file layout, and the serving strategy (docker compose service vs static hosting; Vite dev proxy for backend + WS in development).
+- Auth stays cookie-based in the browser: the backend's httpOnly session cookie is handled by the browser automatically (Secure unless `DEBUG`); the frontend never stores the token itself. Across subdomains this works because the two subdomains share a site (SameSite=Lax cookies are sent same-site).
+- `frontend/` file layout is still to be agreed with the user at scaffold time (structure changes are coordinated with the user).
 - Frontend work happens on branch `frontend/react-vite`; the API/WS endpoints are no longer "backend-only" — see the frontend decision above.
+
+## Frontend design choices (confirmed with user)
+- UI components: **Ant Design** (Table, Tag, Modal, Form, message/notification).
+- UI language: **Russian labels, English code** (identifiers, comments, types in English; all user-visible strings in Russian, consistent with the backend's Russian `BadAction` messages).
+- Server state: **TanStack Query** for REST (portals list, log, stats, auth); live updates via a small custom WebSocket hook that replaces the page snapshot on every push — the backend sends complete snapshots, so state is swapped atomically, never merged.
+- Routing: **React Router** (v7).
+- Package manager: **npm**.
+- Serving: the backend is hosted on a **separate subdomain** from the frontend. The frontend receives the backend origin via `BACKEND_URL`, passed through docker compose in **both development and production**, and baked into the build for all API/WS calls (compose maps it to a Vite-exposed env var, e.g. `VITE_BACKEND_URL`). CORS on the backend already allows the frontend origin via `FRONTEND_URL`.
+- Local development runs the frontend with **auto-reload** through docker compose overrides (bind-mounted workdir + Vite dev server with HMR), mirroring the backend's `docker-compose.override.yml.dev` → `docker-compose.override.yml` pattern.
