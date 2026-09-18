@@ -153,6 +153,7 @@ class Portal(Base):
             raise BadAction("Нет наблюдателя, через которого можно предупредить существ")
         if self.creatures_count == 0:
             raise BadAction("Внутри портала нет существ, некого предупреждать")
+        self.creatures_count = 0
 
 
 class User(Base):

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .db import create_all, dispose_db, init_db
-from .notifications import portal_update_hub
+from .notifications import action_log_hub, portal_update_hub
 from .routes import admin, auth, portals
 
 logging.basicConfig(
@@ -26,11 +26,13 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     logger.info("Инициализация базы данных")
     init_db(settings.database_url)
     await create_all()
-    logger.info("Запуск канала оповещений Postgres LISTEN/NOTIFY")
+    logger.info("Запуск каналов оповещений Postgres LISTEN/NOTIFY")
     await portal_update_hub.start(settings.database_url)
+    await action_log_hub.start(settings.database_url)
     logger.info("Приложение запущено")
     yield
     logger.info("Остановка приложения")
+    await action_log_hub.stop()
     await portal_update_hub.stop()
     await dispose_db()
 

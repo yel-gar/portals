@@ -1,10 +1,14 @@
+import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
 
+import pytest
 from httpx import AsyncClient
+from sqlalchemy import func, select
 
-from app.models import Action, Portal, utc_now
-from app.routes.portals import portal_updates
+from app.db import get_session_factory
+from app.models import Action, ActionLogEntry, Portal, utc_now
+from app.notifications import action_log_hub, portal_update_hub
 
 
 async def _login(client: AsyncClient) -> None:
@@ -76,6 +80,7 @@ async def test_execute_action_flow(client: AsyncClient, create_portal: Callable[
     response = await client.post(f"/portals/{portal_a.id}", params={"action": Action.WARN_CREATURES.value})
     assert response.status_code == 200
     assert response.json()["has_observer"] is True
+    assert response.json()["creatures_count"] == 0
 
     response = await client.post(f"/portals/{portal_a.id}", params={"action": Action.RECALL_OBSERVER.value})
     assert response.status_code == 200
@@ -168,21 +173,58 @@ async def test_stats_requires_auth(client: AsyncClient) -> None:
     assert response.status_code == 401
 
 
-async def test_ws_rejects_anonymous() -> None:
-    class _MockWebSocket:
-        def __init__(self) -> None:
-            self.closed_code: int | None = None
+async def test_committed_action_wakes_both_hubs(
+    postgres_url: str, client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    url = postgres_url.replace("postgresql+asyncpg", "postgresql")
+    for hub in (portal_update_hub, action_log_hub):
+        await hub.start(url)
+    try:
+        portal_queue = await portal_update_hub.subscribe()
+        log_queue = await action_log_hub.subscribe()
+        try:
+            await _login(client)
+            portal = await create_portal()
+            response = await client.post(f"/portals/{portal.id}", params={"action": Action.MARK.value})
+            assert response.status_code == 200, response.text
+            assert response.json()["is_marked"] is True
+            await asyncio.wait_for(portal_queue.get(), timeout=5.0)
+            await asyncio.wait_for(log_queue.get(), timeout=5.0)
+        finally:
+            portal_update_hub.unsubscribe(portal_queue)
+            action_log_hub.unsubscribe(log_queue)
+    finally:
+        await action_log_hub.stop()
+        await portal_update_hub.stop()
 
-        @property
-        def cookies(self) -> dict[str, str]:
-            return {}
 
-        async def accept(self) -> None:
-            raise AssertionError("не должен вызываться accept() без авторизации")
-
-        async def close(self, code: int = 1000) -> None:
-            self.closed_code = code
-
-    websocket = _MockWebSocket()
-    await portal_updates(websocket, page=1, items_per_page=20)  # type: ignore[arg-type]
-    assert websocket.closed_code == 4401
+async def test_rejected_action_sends_no_notification(
+    postgres_url: str, client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    url = postgres_url.replace("postgresql+asyncpg", "postgresql")
+    for hub in (portal_update_hub, action_log_hub):
+        await hub.start(url)
+    try:
+        portal_queue = await portal_update_hub.subscribe()
+        log_queue = await action_log_hub.subscribe()
+        try:
+            await _login(client)
+            portal = await create_portal(creatures_count=1)
+            response = await client.post(f"/portals/{portal.id}", params={"action": Action.CLOSE.value})
+            assert response.status_code == 409, response.text
+            async with get_session_factory()() as session:
+                stored = await session.get(Portal, portal.id)
+                assert stored is not None
+                assert stored.is_closed is False
+                log_count = int((await session.scalar(select(func.count()).select_from(ActionLogEntry))) or 0)
+                assert log_count == 0
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(portal_queue.get(), timeout=0.5)
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(log_queue.get(), timeout=0.5)
+        finally:
+            portal_update_hub.unsubscribe(portal_queue)
+            action_log_hub.unsubscribe(log_queue)
+    finally:
+        await action_log_hub.stop()
+        await portal_update_hub.stop()

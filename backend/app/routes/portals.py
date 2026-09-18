@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect, status
-from sqlalchemy import and_, case, func, or_, select
+from pydantic import BaseModel
+from sqlalchemy import and_, case, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
@@ -20,7 +22,13 @@ from ..deps import (
 )
 from ..exceptions import BadAction
 from ..models import Action, ActionLogEntry, DangerLevel, Portal, utc_now
-from ..notifications import portal_update_hub
+from ..notifications import (
+    ACTION_LOG_NOTIFY_CHANNEL,
+    PORTAL_NOTIFY_CHANNEL,
+    UpdateHub,
+    action_log_hub,
+    portal_update_hub,
+)
 from ..schemas import (
     ActionLogEntrySchema,
     ActionLogListSchema,
@@ -50,6 +58,69 @@ async def _portal_page(session: AsyncSession, page: int, items_per_page: int) ->
         page=page,
         items_per_page=items_per_page,
         total=total,
+    )
+
+
+async def _action_log_page(session: AsyncSession, page: int, items_per_page: int) -> ActionLogListSchema:
+    total = int((await session.scalar(select(func.count()).select_from(ActionLogEntry))) or 0)
+    entries = (
+        await session.scalars(
+            select(ActionLogEntry)
+            .order_by(ActionLogEntry.timestamp.desc(), ActionLogEntry.id.desc())
+            .offset((page - 1) * items_per_page)
+            .limit(items_per_page)
+        )
+    ).all()
+    return ActionLogListSchema(
+        items=cast(list[ActionLogEntrySchema], entries),
+        page=page,
+        items_per_page=items_per_page,
+        total=total,
+    )
+
+
+async def _hub_snapshot_loop(
+    websocket: WebSocket,
+    hub: UpdateHub,
+    snapshot_factory: Callable[[], Awaitable[BaseModel]],
+) -> None:
+    """Push a fresh page snapshot on every hub refresh event until the client disconnects."""
+    queue = await hub.subscribe()
+    try:
+        while True:
+            receive_task = asyncio.create_task(websocket.receive_text())
+            update_task = asyncio.create_task(queue.get())
+            done, pending = await asyncio.wait({receive_task, update_task}, return_when=asyncio.FIRST_COMPLETED)
+            if update_task in done:
+                receive_task.cancel()
+                snapshot = await snapshot_factory()
+                await websocket.send_json(snapshot.model_dump(mode="json"))
+            else:
+                for task in pending:
+                    task.cancel()
+                try:
+                    await receive_task
+                except WebSocketDisconnect:
+                    break
+    finally:
+        hub.unsubscribe(queue)
+        with suppress(RuntimeError):
+            await websocket.close()
+
+
+async def _notify_action_committed(session: AsyncSession, portal_id: int) -> None:
+    """Produce LISTEN/NOTIFY events for the committed action.
+
+    Runs inside the action transaction, so Postgres delivers the notifications
+    only when the transaction commits; a failed action never wakes subscribers.
+    """
+    await session.execute(
+        text("SELECT pg_notify(:channel, :payload)"),
+        {"channel": PORTAL_NOTIFY_CHANNEL, "payload": f"portal:{portal_id}"},
+    )
+    await session.execute(
+        text("SELECT pg_notify(:channel, :payload)"),
+        {"channel": ACTION_LOG_NOTIFY_CHANNEL, "payload": f"log:{portal_id}"},
     )
 
 
@@ -87,29 +158,30 @@ async def portal_updates(
         logger.info("WebSocket подключение пользователя id=%d", user.id)
         snapshot = await _portal_page(session, page, items_per_page)
         await websocket.send_json(snapshot.model_dump(mode="json"))
+        await _hub_snapshot_loop(websocket, portal_update_hub, lambda: _portal_page(session, page, items_per_page))
+        logger.info("WebSocket отключение пользователя id=%d", user.id)
 
-        queue = await portal_update_hub.subscribe()
-        try:
-            while True:
-                receive_task = asyncio.create_task(websocket.receive_text())
-                update_task = asyncio.create_task(queue.get())
-                done, pending = await asyncio.wait({receive_task, update_task}, return_when=asyncio.FIRST_COMPLETED)
-                if update_task in done and update_task.result() is None:
-                    receive_task.cancel()
-                    snapshot = await _portal_page(session, page, items_per_page)
-                    await websocket.send_json(snapshot.model_dump(mode="json"))
-                else:
-                    for task in pending:
-                        task.cancel()
-                    try:
-                        await receive_task
-                    except WebSocketDisconnect:
-                        break
-        finally:
-            portal_update_hub.unsubscribe(queue)
-            logger.info("WebSocket отключение пользователя id=%d", user.id)
-            with suppress(RuntimeError):
-                await websocket.close()
+
+@router.websocket("/log/ws")
+async def action_log_updates(
+    websocket: WebSocket,
+    page: int = Query(1, ge=1),
+    items_per_page: int = Query(PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
+) -> None:
+    """Push live action log page snapshots. Requires a valid session cookie."""
+    token = websocket.cookies.get(settings.session_cookie_name)
+    async with get_session_factory()() as session:
+        user = await authenticate_session_token(session, token)
+        if user is None:
+            await websocket.close(code=4401)
+            return
+
+        await websocket.accept()
+        logger.info("WebSocket подключение журнала действий пользователя id=%d", user.id)
+        snapshot = await _action_log_page(session, page, items_per_page)
+        await websocket.send_json(snapshot.model_dump(mode="json"))
+        await _hub_snapshot_loop(websocket, action_log_hub, lambda: _action_log_page(session, page, items_per_page))
+        logger.info("WebSocket отключение журнала действий пользователя id=%d", user.id)
 
 
 @router.post(
@@ -125,7 +197,7 @@ async def portal_updates(
     summary="Действие над порталом",
 )
 async def execute_action(portal_id: int, action: Action, session: DbSession, user: CurrentUser) -> Portal:
-    portal = await session.get(Portal, portal_id)
+    portal = await session.get(Portal, portal_id, with_for_update=True)
     if portal is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Портал не найден")
     try:
@@ -133,6 +205,8 @@ async def execute_action(portal_id: int, action: Action, session: DbSession, use
     except BadAction as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     session.add(ActionLogEntry(user_id=user.id, portal_id=portal.id, action=action))
+    await session.flush()
+    await _notify_action_committed(session, portal.id)
     await session.commit()
     await session.refresh(portal)
     logger.info("Действие %s выполнено порталом id=%d пользователем id=%d", action.value, portal.id, user.id)
@@ -152,21 +226,7 @@ async def action_log(
     page: int = Query(1, ge=1),
     items_per_page: int = Query(PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
 ) -> ActionLogListSchema:
-    total = int((await session.scalar(select(func.count()).select_from(ActionLogEntry))) or 0)
-    entries = (
-        await session.scalars(
-            select(ActionLogEntry)
-            .order_by(ActionLogEntry.timestamp.desc(), ActionLogEntry.id.desc())
-            .offset((page - 1) * items_per_page)
-            .limit(items_per_page)
-        )
-    ).all()
-    return ActionLogListSchema(
-        items=cast(list[ActionLogEntrySchema], entries),
-        page=page,
-        items_per_page=items_per_page,
-        total=total,
-    )
+    return await _action_log_page(session, page, items_per_page)
 
 
 @router.get(

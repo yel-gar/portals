@@ -65,6 +65,14 @@ async def test_set_password(client: AsyncClient, create_user: Callable[..., Awai
     assert me.json()["id"] == bob.id
 
 
+async def test_set_password_missing_user(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
+    await create_user("root", "supersecret1", is_superuser=True)
+    await _login(client, username="root")
+
+    response = await client.post("/admin/users/9999/set-password", json={"password": "newpassword9"})
+    assert response.status_code == 404
+
+
 async def test_delete_user(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
     await create_user("root", "supersecret1", is_superuser=True)
     bob = await create_user("bobby", "supersecret1")

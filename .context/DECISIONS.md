@@ -14,13 +14,16 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 - `STABILIZE` condition "stability below 0.5" is interpreted for the 0-100 int scale as `stability < 50`; stabilizing sets stability to `100`.
 - `DISMISS` (the UI's "leave open") is an acknowledgement: it only refreshes `last_update` and is rejected while the portal is closed.
 - MARK/UNMARK are the only actions allowed on a closed/expired portal, per requirements.
+- WARN_CREATURES warns the creatures through the observer and empties the portal (`creatures_count = 0`).
 
 ## Action validation
 - Conditions are validated inside `Portal` model methods. They raise `BadAction` (Russian message). Routes map `BadAction` to HTTP 409 Conflict and are the only place that creates `ActionLogEntry` rows and commits.
 
 ## Real-time updates
-- Live updates are delivered over `WS /portals/ws`. Refresh events are broadcast through Postgres `LISTEN/NOTIFY` on channel `portal_changes`, consumed by a dedicated `asyncpg` connection using `add_listener` in `app/notifications.py`.
-- Currently only the listener side runs; producers (background tasks updating portal data, plus a trigger) are planned but not implemented yet.
+- Live updates are delivered over `WS /portals/ws`; action log entries stream over `WS /portals/log/ws`. Both endpoints authenticate by session cookie, push an initial page snapshot, then re-push snapshots whenever their hub broadcasts a refresh event.
+- Refresh events are broadcast through Postgres `LISTEN/NOTIFY` on two channels — `portal_changes` (portal page) and `action_log_changes` (action log page) — each consumed by a dedicated `asyncpg` connection using `add_listener` in `app/notifications.py` (`UpdateHub`, one instance per channel).
+- Producers emit `pg_notify` for both channels from `POST /portals/{id}` inside the action transaction, so subscribers are only woken on a durable commit.
+- Portal actions are commit-safe: the portal row is locked with `SELECT ... FOR UPDATE` (serializing concurrent actions on the same portal), validation and the `ActionLogEntry` row share the transaction, and a rejected/rolled-back action never sends notifications.
 
 ## Auth
 - Auth is cookie-based: a random 64-hex-char login token is stored in `LoginSession` and set as an httpOnly session cookie. `LoginSession.expires_at` defaults to now + 14 days.
@@ -43,5 +46,5 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 - Project uses the built-in `logging` library. Format: `2026-03-02 15:00:18 [INFO] message` (`%(asctime)s [%(levelname)s] %(message)s`, `datefmt=%Y-%m-%d %H:%M:%S`), configured in `app/main.py`, level `DEBUG` when `DEBUG` is truthy.
 
 ## Future ideas (not yet implemented)
-- Migrate the action log (`GET /portals/log`) to WebSocket so new entries stream to clients in real time, like portal updates.
-- Guarantee commit safety for portal actions against race conditions; after committing an action the portal should `NOTIFY` the `portal_changes` channel so the LISTEN/NOTIFY hub wakes WS subscribers (producers are still absent).
+- Background tasks that update portal data should also produce `portal_changes` notifications (the trigger-based producer is a later alternative to in-route `pg_notify`).
+- A frontend is not built yet; the API and WebSocket endpoints are backend-only for now.

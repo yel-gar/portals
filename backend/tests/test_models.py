@@ -28,11 +28,27 @@ async def test_risk_factor_and_danger_level() -> None:
     assert safe.danger_level == DangerLevel.LOW
     assert 0.0 <= safe.risk_factor <= 1.0
 
+    medium = _portal(
+        energy_level=100,
+        stability=100,
+        creatures_count=0,
+        expires_at=utc_now() + timedelta(seconds=30),
+    )
+    assert medium.danger_level == DangerLevel.MEDIUM
+
+    high = _portal(
+        energy_level=100,
+        stability=0,
+        creatures_count=2,
+        expires_at=utc_now() + timedelta(seconds=1),
+    )
+    assert high.danger_level == DangerLevel.HIGH
+
     critical = _portal(
         energy_level=100,
         stability=0,
         creatures_count=1000,
-        expires_at=utc_now() - timedelta(minutes=1),
+        expires_at=utc_now() + timedelta(seconds=1),
     )
     assert critical.danger_level == DangerLevel.CRITICAL
 
@@ -46,6 +62,8 @@ async def test_closed_flag_makes_portal_unactionable() -> None:
     assert closed.closed is True
     with pytest.raises(BadAction):
         closed.dismiss()
+    with pytest.raises(BadAction):
+        closed.warn_creatures()
 
 
 async def test_mark_unmark_allowed_on_closed_portal() -> None:
@@ -55,12 +73,18 @@ async def test_mark_unmark_allowed_on_closed_portal() -> None:
     closed.unmark()
     assert closed.is_marked is False
 
+    unmarked = _portal()
+    with pytest.raises(BadAction):
+        unmarked.unmark()
+
 
 async def test_action_rules() -> None:
     portal = _portal(creatures_count=1, has_observer=True)
     with pytest.raises(BadAction):
         portal.close()
     portal.creatures_count = 0
+    with pytest.raises(BadAction):
+        portal.close()
     portal.has_observer = False
     portal.close()
     assert portal.is_closed is True
@@ -76,8 +100,9 @@ async def test_action_rules() -> None:
         energy_level=100,
         stability=0,
         creatures_count=1000,
-        expires_at=utc_now() - timedelta(minutes=1),
+        expires_at=utc_now() + timedelta(seconds=1),
     )
+    assert critical.danger_level == DangerLevel.CRITICAL
     with pytest.raises(BadAction):
         critical.send_observer()
     safe = _portal()
@@ -94,6 +119,10 @@ async def test_action_rules() -> None:
 
     warned = _portal(has_observer=True, creatures_count=1)
     warned.warn_creatures()
+    assert warned.creatures_count == 0
     no_observer = _portal(creatures_count=1)
     with pytest.raises(BadAction):
         no_observer.warn_creatures()
+    no_creatures = _portal(has_observer=True, creatures_count=0)
+    with pytest.raises(BadAction):
+        no_creatures.warn_creatures()
