@@ -14,3 +14,7 @@
 | `POSTGRES_HOST`    | Backend-only: hostname of the `postgres` service                                | `postgres` (set in `docker-compose.yml`) | No  |
 | `POSTGRES_PORT`    | Backend-only: port the `postgres` service listens on                            | `5432` (set in `docker-compose.yml`)     | No  |
 | `BACKEND_PORT`     | Host port the `backend` container is published on, mapped to the container port `8000` | `8000`                              | No   |
+| `DATABASE_URL`     | Backend-only: overrides the URL assembled from `POSTGRES_*` (e.g. for local runs) | assembled from `POSTGRES_*`          | No   |
+| `BACKEND_URL`      | Backend origin, added to the CORS allow-list                                   | ``                                  | No   |
+| `FRONTEND_URL`     | Frontend origin, added to the CORS allow-list                                  | ``                                  | No   |
+| `DEBUG`            | When truthy, session cookies are sent without the `Secure` flag                | `0`                                 | No   |

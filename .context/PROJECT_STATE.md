@@ -41,6 +41,10 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 ### M5 Admin routes
 - `app/routes/admin.py` - superuser-only user CRUD: create (no superuser flag), list, delete (409 on superuser), set-password
 
+### M6 Entrypoint + env
+- `app/main.py` - lifespan (init_db → create_all → hub.start, hub.stop → dispose), CORS middleware (`BACKEND_URL`/`FRONTEND_URL` origins), router includes
+- `.env.example` + README table: `BACKEND_URL`, `FRONTEND_URL`, `DEBUG`, `DATABASE_URL`
+
 ### Project scaffold
 - Poetry-based backend in `backend/` (FastAPI, SQLAlchemy, asyncpg; python >=3.14)
 - Dev tooling: black, ruff, mypy (strict), pytest, coverage, pre-commit hooks
