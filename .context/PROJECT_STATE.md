@@ -1,7 +1,7 @@
 # Project state
 
 ## Current status
-Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: initial superuser bootstrap via env vars; `STABILIZE` reworked to a random 10-30 bump capped at 100.
+Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: initial superuser bootstrap via env vars; `STABILIZE` reworked to a random 10-30 bump capped at 100. Frontend development has started on branch `frontend/react-vite`: stack decision (React + Vite) committed, scaffolding pending design consultation.
 
 ## Review fixes (post M6)
 - `nullable` now set explicitly on every model column.
@@ -26,9 +26,15 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 5. **M5 Admin routes** — user CRUD + set-password (superuser only).
 6. **M6 Entrypoint + env** — `main.py` lifespan, CORS, envvars (`BACKEND_URL`, `FRONTEND_URL`, `DEBUG`).
 7. **M7 Tests** — model unit tests, auth/portal/admin API tests, coverage gate >= 80.
-8. **Final** — pre-commit --all-files, full pytest run, doc refresh.
+8. **M8 Frontend stack + scaffold** — stack chosen (React + Vite), documented in AGENTS.md/DECISIONS.md; design consultation (UI kit, state, router, layout, serving); `frontend/` scaffolded. Backend milestones 1-7 are complete.
+9. **Final** — pre-commit --all-files, full pytest run, doc refresh.
 
 ## Completed milestones
+
+### Frontend kickoff (branch `frontend/react-vite`)
+- Stack confirmed with user: React + Vite + TypeScript (strict), SPA without SSR. Recorded in `DECISIONS.md` and a new "Frontend info" section in `AGENTS.md`.
+- Working-layout decision: frontend branch lives in a git worktree at `../portals-fe` so backend (`master`, main directory) and frontend work proceed in parallel without checkout conflicts.
+- Pending consultation before scaffolding: UI component library, state management, router, package manager, `frontend/` layout, serving strategy.
 
 ### Initial superuser bootstrap + STABILIZE rework (latest batch)
 - `INITIAL_SUPERUSER_USERNAME` / `INITIAL_SUPERUSER_PASSWORD` env pair (both or none, lengths validated via shared constants): `app/config.py` `_read_initial_superuser` → `Settings.initial_superuser: tuple[str, str] | None`.

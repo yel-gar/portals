@@ -53,4 +53,10 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 
 ## Future ideas (not yet implemented)
 - Background tasks that update portal data should also produce `portal_changes` notifications (the trigger-based producer is a later alternative to in-route `pg_notify`).
-- A frontend is not built yet; the API and WebSocket endpoints are backend-only for now.
+
+## Frontend stack
+- The frontend is a **React SPA scaffolded with Vite**, TypeScript in strict mode, with **no SSR/SSG** (no Next.js). Rationale: the app is an authenticated dashboard where everything interesting arrives live in the browser via WebSockets, so server-side rendering buys nothing and would only add machinery (RSC, cookie forwarding, "use client" everywhere) without payoff.
+- The FastAPI backend stays the single source of truth. The frontend consumes JSON HTTP + the two snapshot WebSocket endpoints (`/portals/ws`, `/portals/log/ws`); each WS push is a complete page snapshot and replaces the previous server state atomically.
+- Auth stays cookie-based in the browser: the backend's httpOnly session cookie is handled by the browser automatically (Secure unless `DEBUG`); the frontend never stores the token itself.
+- Still pending user consultation (not committed as decisions): UI component library, state management, router, package manager, `frontend/` file layout, and the serving strategy (docker compose service vs static hosting; Vite dev proxy for backend + WS in development).
+- Frontend work happens on branch `frontend/react-vite`; the API/WS endpoints are no longer "backend-only" — see the frontend decision above.
