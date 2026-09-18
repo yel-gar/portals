@@ -65,6 +65,7 @@ class Settings:
     session_cookie_name: str = "session_token"
     session_ttl_days: int = SESSION_TTL_DAYS
     initial_superuser: tuple[str, str] | None = None
+    disable_registration: bool = False
 
     @property
     def cookie_secure(self) -> bool:
@@ -78,6 +79,7 @@ def load_settings() -> Settings:
         frontend_url=os.getenv("FRONTEND_URL", ""),
         debug=_as_bool(os.getenv("DEBUG")),
         initial_superuser=_read_initial_superuser(),
+        disable_registration=_as_bool(os.getenv("DISABLE_REGISTRATION")),
     )
 
 

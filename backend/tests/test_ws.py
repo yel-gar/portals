@@ -107,7 +107,7 @@ async def test_hub_snapshot_loop_exits_on_disconnect() -> None:
     websocket = _MockWebSocket()
     websocket.disconnect.set()
     await _hub_snapshot_loop(websocket, action_log_hub, _noop_snapshot)  # type: ignore[arg-type]
-    assert websocket.sent == []
+    assert websocket.sent == [{"snapshot": 0}]
     assert action_log_hub.subscriber_count == 0
 
 
@@ -125,11 +125,14 @@ async def test_hub_snapshot_loop_pushes_snapshot_on_event() -> None:
     try:
         await _wait_until(lambda: portal_update_hub.subscriber_count == 1)
         await portal_update_hub.broadcast()
-        await _wait_until(lambda: len(websocket.sent) == 1)
+        await _wait_until(lambda: len(websocket.sent) == 2)
+        await portal_update_hub.broadcast()
+        await _wait_until(lambda: len(websocket.sent) == 3)
     finally:
         websocket.disconnect.set()
         await asyncio.wait_for(task, timeout=5.0)
-    assert [entry["snapshot"] for entry in websocket.sent] == [1]
+    # initial snapshot + one re-push per broadcast
+    assert [entry["snapshot"] for entry in websocket.sent] == [1, 2, 3]
     assert portal_update_hub.subscriber_count == 0
 
 
@@ -138,7 +141,7 @@ async def test_hub_snapshot_loop_ignores_client_ping() -> None:
     websocket = _MockWebSocket()
     websocket.set_receive(_ping_then_disconnect())
     await _hub_snapshot_loop(websocket, action_log_hub, _noop_snapshot)  # type: ignore[arg-type]
-    assert websocket.sent == []
+    assert websocket.sent == [{"snapshot": 0}]
     assert action_log_hub.subscriber_count == 0
 
 
@@ -153,6 +156,22 @@ async def test_portal_ws_rejects_anonymous() -> None:
 @pytest.mark.asyncio
 async def test_log_ws_rejects_anonymous() -> None:
     websocket = _MockWebSocket()
+    await _log_updates_call(websocket)
+    assert websocket.closed_code == 4401
+    assert websocket.accepted is False
+
+
+@pytest.mark.asyncio
+async def test_portal_ws_rejects_unknown_token() -> None:
+    websocket = _MockWebSocket(cookies={settings.session_cookie_name: "f" * 64})
+    await _portal_updates_call(websocket)
+    assert websocket.closed_code == 4401
+    assert websocket.accepted is False
+
+
+@pytest.mark.asyncio
+async def test_log_ws_rejects_unknown_token() -> None:
+    websocket = _MockWebSocket(cookies={settings.session_cookie_name: "f" * 64})
     await _log_updates_call(websocket)
     assert websocket.closed_code == 4401
     assert websocket.accepted is False

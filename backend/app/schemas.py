@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from .constants import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH
 from .models import Action, DangerLevel
+
+# Shared field constraints: the same length constants the DB models use, applied
+# to every schema that takes a username or password.
+Username = Annotated[str, Field(min_length=USERNAME_MIN_LENGTH, max_length=USERNAME_MAX_LENGTH)]
+Password = Annotated[str, Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)]
 
 
 class PortalSchema(BaseModel):
@@ -34,17 +40,17 @@ class PortalListSchema(BaseModel):
 
 
 class UserRegisterSchema(BaseModel):
-    username: str = Field(min_length=USERNAME_MIN_LENGTH, max_length=USERNAME_MAX_LENGTH)
-    password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)
+    username: Username
+    password: Password
 
 
 class LoginSchema(BaseModel):
-    username: str
-    password: str
+    username: Username
+    password: Password
 
 
 class PasswordChangeSchema(BaseModel):
-    password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)
+    password: Password
 
 
 class UserOutSchema(BaseModel):

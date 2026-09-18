@@ -13,6 +13,17 @@ from sqlalchemy import ColumnElement, and_, case, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
+from ..constants import (
+    DANGER_HIGH_THRESHOLD,
+    DANGER_LOW_THRESHOLD,
+    DANGER_MEDIUM_THRESHOLD,
+    RISK_CREATURES_SCALE,
+    RISK_CREATURES_WEIGHT,
+    RISK_ENERGY_WEIGHT,
+    RISK_STABILITY_WEIGHT,
+    RISK_TTL_SCALE,
+    RISK_TTL_WEIGHT,
+)
 from ..db import get_session_factory
 from ..deps import (
     PAGE_SIZE_DEFAULT,
@@ -50,13 +61,14 @@ _LOGIN_RESPONSES: dict[int | str, dict[str, Any]] = {
 def _risk_expression(now: datetime) -> ColumnElement[float]:
     """Risk factor as an SQL expression (mirrors ``Portal.risk_factor``)."""
     ttl = func.greatest(func.extract("epoch", Portal.expires_at - now), 0.0)
-    ttl_factor = 0.04 * ttl
+    ttl_factor = RISK_TTL_SCALE * ttl
     return cast(
         ColumnElement[float],
-        (Portal.energy_level / 100.0) * 0.2
-        + (1.0 - Portal.stability / 100.0) * 0.2
-        + (0.1 * Portal.creatures_count / (0.1 * Portal.creatures_count + 1.0)) * 0.3
-        + (1.0 - ttl_factor / (ttl_factor + 1.0)) * 0.3,
+        (Portal.energy_level / 100.0) * RISK_ENERGY_WEIGHT
+        + (1.0 - Portal.stability / 100.0) * RISK_STABILITY_WEIGHT
+        + (RISK_CREATURES_SCALE * Portal.creatures_count / (RISK_CREATURES_SCALE * Portal.creatures_count + 1.0))
+        * RISK_CREATURES_WEIGHT
+        + (1.0 - ttl_factor / (ttl_factor + 1.0)) * RISK_TTL_WEIGHT,
     )
 
 
@@ -66,9 +78,9 @@ def _danger_bucket_expression(now: datetime) -> ColumnElement[str]:
     return cast(
         ColumnElement[str],
         case(
-            (risk <= 0.3, DangerLevel.LOW.value),
-            (risk <= 0.6, DangerLevel.MEDIUM.value),
-            (risk <= 0.9, DangerLevel.HIGH.value),
+            (risk <= DANGER_LOW_THRESHOLD, DangerLevel.LOW.value),
+            (risk <= DANGER_MEDIUM_THRESHOLD, DangerLevel.MEDIUM.value),
+            (risk <= DANGER_HIGH_THRESHOLD, DangerLevel.HIGH.value),
             else_=DangerLevel.CRITICAL.value,
         ),
     )
@@ -212,24 +224,67 @@ async def _hub_snapshot_loop(
     hub: UpdateHub,
     snapshot_factory: Callable[[], Awaitable[BaseModel]],
 ) -> None:
-    """Push a fresh page snapshot on every hub refresh event until the client disconnects."""
+    """Subscribe to the hub, push an initial snapshot, then re-push on every refresh event.
+
+    The subscription happens before the initial render so an event landing in
+    between is not missed; a burst of events is coalesced into a single re-query.
+    A failing snapshot query is logged and the loop keeps running, so a transient
+    DB error never drops the subscriber. Only a client disconnect or a failed send
+    terminates the loop.
+    """
     queue = await hub.subscribe()
     try:
+        try:
+            snapshot = await snapshot_factory()
+            await websocket.send_json(snapshot.model_dump(mode="json"))
+        except WebSocketDisconnect:
+            return
+        except Exception:
+            logger.exception("WebSocket: ошибка при формировании начального снапшота")
+            return
+        receive_task: asyncio.Task[str] | None = None
         while True:
-            receive_task = asyncio.create_task(websocket.receive_text())
             update_task = asyncio.create_task(queue.get())
-            done, pending = await asyncio.wait({receive_task, update_task}, return_when=asyncio.FIRST_COMPLETED)
-            if update_task in done:
-                receive_task.cancel()
-                snapshot = await snapshot_factory()
-                await websocket.send_json(snapshot.model_dump(mode="json"))
-            else:
-                for task in pending:
-                    task.cancel()
+            if receive_task is None:
+                receive_task = asyncio.create_task(websocket.receive_text())
+            done, pending = await asyncio.wait({update_task, receive_task}, return_when=asyncio.FIRST_COMPLETED)
+            cancelled: list[asyncio.Task[Any]] = []
+            disconnected = False
+            if receive_task in done:
                 try:
                     await receive_task
                 except WebSocketDisconnect:
-                    break
+                    disconnected = True
+                receive_task = None
+                if update_task in pending:
+                    update_task.cancel()
+                    cancelled.append(update_task)
+            if update_task in done:
+                if receive_task is not None and receive_task in pending:
+                    receive_task.cancel()
+                    cancelled.append(receive_task)
+                receive_task = None
+                # Drain queued refresh events so a burst triggers a single re-query.
+                while not queue.empty():
+                    queue.get_nowait()
+                try:
+                    snapshot = await snapshot_factory()
+                    await websocket.send_json(snapshot.model_dump(mode="json"))
+                except WebSocketDisconnect:
+                    disconnected = True
+                except Exception:
+                    logger.exception("WebSocket: ошибка при обновлении снапшота страницы")
+            if disconnected:
+                for task in (update_task, receive_task):
+                    if task is not None and not task.done() and task not in cancelled:
+                        task.cancel()
+                        cancelled.append(task)
+            # Finalize cancelled tasks so none is left "pending" after the loop.
+            for task in cancelled:
+                with suppress(asyncio.CancelledError, WebSocketDisconnect):
+                    await task
+            if disconnected:
+                break
     finally:
         hub.unsubscribe(queue)
         with suppress(RuntimeError):
@@ -306,30 +361,23 @@ async def portal_updates(
 ) -> None:
     """Push live portal page snapshots. Requires a valid session cookie."""
     token = websocket.cookies.get(settings.session_cookie_name)
+    if token is None:
+        await websocket.close(code=4401)
+        return
     async with get_session_factory()() as session:
         user = await authenticate_session_token(session, token)
-        if user is None:
-            await websocket.close(code=4401)
-            return
+    if user is None:
+        await websocket.close(code=4401)
+        return
 
-        await websocket.accept()
-        logger.info("WebSocket подключение пользователя id=%d", user.id)
-        snapshot = await _portal_page(
-            session,
-            page,
-            items_per_page,
-            closed=closed,
-            danger_level=danger_level,
-            has_observer=has_observer,
-            is_marked=is_marked,
-            search=search,
-            order_by=order_by,
-        )
-        await websocket.send_json(snapshot.model_dump(mode="json"))
-        await _hub_snapshot_loop(
-            websocket,
-            portal_update_hub,
-            lambda: _portal_page(
+    await websocket.accept()
+    logger.info("WebSocket подключение пользователя id=%d", user.id)
+
+    # A fresh short-lived session per snapshot keeps the connection pool free
+    # instead of pinning one connection for the whole socket lifetime.
+    async def snapshot_factory() -> PortalListSchema:
+        async with get_session_factory()() as session:
+            return await _portal_page(
                 session,
                 page,
                 items_per_page,
@@ -339,8 +387,11 @@ async def portal_updates(
                 is_marked=is_marked,
                 search=search,
                 order_by=order_by,
-            ),
-        )
+            )
+
+    try:
+        await _hub_snapshot_loop(websocket, portal_update_hub, snapshot_factory)
+    finally:
         logger.info("WebSocket отключение пользователя id=%d", user.id)
 
 
@@ -356,28 +407,21 @@ async def action_log_updates(
 ) -> None:
     """Push live action log page snapshots. Requires a valid session cookie."""
     token = websocket.cookies.get(settings.session_cookie_name)
+    if token is None:
+        await websocket.close(code=4401)
+        return
     async with get_session_factory()() as session:
         user = await authenticate_session_token(session, token)
-        if user is None:
-            await websocket.close(code=4401)
-            return
+    if user is None:
+        await websocket.close(code=4401)
+        return
 
-        await websocket.accept()
-        logger.info("WebSocket подключение журнала действий пользователя id=%d", user.id)
-        snapshot = await _action_log_page(
-            session,
-            page,
-            items_per_page,
-            action=action,
-            portal_id=portal_id,
-            user_id=user_id,
-            order_by=order_by,
-        )
-        await websocket.send_json(snapshot.model_dump(mode="json"))
-        await _hub_snapshot_loop(
-            websocket,
-            action_log_hub,
-            lambda: _action_log_page(
+    await websocket.accept()
+    logger.info("WebSocket подключение журнала действий пользователя id=%d", user.id)
+
+    async def snapshot_factory() -> ActionLogListSchema:
+        async with get_session_factory()() as session:
+            return await _action_log_page(
                 session,
                 page,
                 items_per_page,
@@ -385,8 +429,11 @@ async def action_log_updates(
                 portal_id=portal_id,
                 user_id=user_id,
                 order_by=order_by,
-            ),
-        )
+            )
+
+    try:
+        await _hub_snapshot_loop(websocket, action_log_hub, snapshot_factory)
+    finally:
         logger.info("WebSocket отключение журнала действий пользователя id=%d", user.id)
 
 

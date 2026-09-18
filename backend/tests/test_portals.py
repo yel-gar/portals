@@ -205,6 +205,8 @@ async def test_list_portals_filters(client: AsyncClient, create_portal: Callable
         destination_world="Narnia",
         expires_at=utc_now() + timedelta(hours=5),
     )
+    # Critical is expired at creation: the TTL clamps to zero, so its risk stays
+    # above 0.9 for the whole test and the closed/CRITICAL buckets are stable.
     await create_portal(
         name="Critical",
         energy_level=100,
@@ -212,15 +214,15 @@ async def test_list_portals_filters(client: AsyncClient, create_portal: Callable
         creatures_count=100,
         has_observer=True,
         destination_world="Xanadu",
-        expires_at=utc_now() + timedelta(seconds=5),
+        expires_at=utc_now() - timedelta(minutes=1),
     )
     await create_portal(name="Expired", destination_world="Narnia", expires_at=utc_now() - timedelta(minutes=1))
     await create_portal(name="Closed", destination_world="Zion", is_closed=True, energy_level=80, stability=20)
 
     closed_only = await client.get("/portals", params={"closed": "true"})
-    assert {item["name"] for item in closed_only.json()["items"]} == {"Expired", "Closed"}
+    assert {item["name"] for item in closed_only.json()["items"]} == {"Expired", "Closed", "Critical"}
     open_only = await client.get("/portals", params={"closed": "false"})
-    assert {item["name"] for item in open_only.json()["items"]} == {"Low", "Critical"}
+    assert {item["name"] for item in open_only.json()["items"]} == {"Low"}
 
     critical_only = await client.get("/portals", params={"danger_level": "CRITICAL"})
     assert [item["name"] for item in critical_only.json()["items"]] == ["Critical"]
@@ -244,7 +246,7 @@ async def test_list_portals_filters(client: AsyncClient, create_portal: Callable
     by_common_world = await client.get("/portals", params={"search": "narnia"})
     assert {item["name"] for item in by_common_world.json()["items"]} == {"Low", "Expired"}
 
-    combined = await client.get("/portals", params={"closed": "false", "danger_level": "CRITICAL", "search": "xan"})
+    combined = await client.get("/portals", params={"closed": "true", "danger_level": "CRITICAL", "search": "xan"})
     assert [item["name"] for item in combined.json()["items"]] == ["Critical"]
 
 

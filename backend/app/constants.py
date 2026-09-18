@@ -12,3 +12,16 @@ PORTAL_NAME_MAX_LENGTH = 128
 DESTINATION_WORLD_MAX_LENGTH = 128
 
 STABILITY_INCREASE_RAND_RANGE = (10, 30)
+
+# Risk factor formula parameters — shared between the Python property in models.py
+# and the SQL expressions in routes/portals.py so the two cannot drift apart.
+RISK_ENERGY_WEIGHT = 0.2
+RISK_STABILITY_WEIGHT = 0.2
+RISK_CREATURES_WEIGHT = 0.3
+RISK_TTL_WEIGHT = 0.3
+RISK_CREATURES_SCALE = 0.1
+RISK_TTL_SCALE = 0.04
+
+DANGER_LOW_THRESHOLD = 0.3
+DANGER_MEDIUM_THRESHOLD = 0.6
+DANGER_HIGH_THRESHOLD = 0.9

@@ -19,10 +19,19 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .constants import (
+    DANGER_HIGH_THRESHOLD,
+    DANGER_LOW_THRESHOLD,
+    DANGER_MEDIUM_THRESHOLD,
     DESTINATION_WORLD_MAX_LENGTH,
     LOGIN_TOKEN_LENGTH,
     PASSWORD_HASH_MAX_LENGTH,
     PORTAL_NAME_MAX_LENGTH,
+    RISK_CREATURES_SCALE,
+    RISK_CREATURES_WEIGHT,
+    RISK_ENERGY_WEIGHT,
+    RISK_STABILITY_WEIGHT,
+    RISK_TTL_SCALE,
+    RISK_TTL_WEIGHT,
     STABILITY_INCREASE_RAND_RANGE,
     USERNAME_MAX_LENGTH,
 )
@@ -64,6 +73,22 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def risk_factor_for(energy_level: int, stability: int, creatures_count: int, ttl_seconds: float) -> float:
+    """Compute the portal risk factor from raw values (mirror of the SQL expression).
+
+    Single source of truth on the Python side; the parameter values come from
+    ``app.constants`` and are shared with ``routes/portals.py`` SQL expressions.
+    """
+    ttl = max(ttl_seconds, 0.0)
+    return (
+        (energy_level / 100.0) * RISK_ENERGY_WEIGHT
+        + (1.0 - stability / 100.0) * RISK_STABILITY_WEIGHT
+        + (RISK_CREATURES_SCALE * creatures_count / (RISK_CREATURES_SCALE * creatures_count + 1.0))
+        * RISK_CREATURES_WEIGHT
+        + (1.0 - RISK_TTL_SCALE * ttl / (RISK_TTL_SCALE * ttl + 1.0)) * RISK_TTL_WEIGHT
+    )
+
+
 class Portal(Base):
     __tablename__ = "portals"
     __table_args__ = (
@@ -93,21 +118,16 @@ class Portal(Base):
     @property
     def risk_factor(self) -> float:
         ttl = max((self.expires_at - utc_now()).total_seconds(), 0.0)
-        return (
-            (self.energy_level / 100.0) * 0.2
-            + (1.0 - self.stability / 100.0) * 0.2
-            + (0.1 * self.creatures_count / (0.1 * self.creatures_count + 1)) * 0.3
-            + (1.0 - 0.04 * ttl / (0.04 * ttl + 1)) * 0.3
-        )
+        return risk_factor_for(self.energy_level, self.stability, self.creatures_count, ttl)
 
     @property
     def danger_level(self) -> DangerLevel:
         risk = self.risk_factor
-        if risk <= 0.3:
+        if risk <= DANGER_LOW_THRESHOLD:
             return DangerLevel.LOW
-        if risk <= 0.6:
+        if risk <= DANGER_MEDIUM_THRESHOLD:
             return DangerLevel.MEDIUM
-        if risk <= 0.9:
+        if risk <= DANGER_HIGH_THRESHOLD:
             return DangerLevel.HIGH
         return DangerLevel.CRITICAL
 

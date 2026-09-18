@@ -44,6 +44,44 @@ async def test_hub_idempotent_stop(postgres_url: str) -> None:
 
 
 @pytest.mark.asyncio
+async def test_hub_start_is_idempotent(postgres_url: str) -> None:
+    url = postgres_url.replace("postgresql+asyncpg", "postgresql")
+    await portal_update_hub.start(url)
+    await portal_update_hub.start(url)
+    try:
+        queue = await portal_update_hub.subscribe()
+        try:
+            connection = await asyncpg.connect(url)
+            try:
+                await connection.execute(f"NOTIFY {PORTAL_NOTIFY_CHANNEL}")
+            finally:
+                await connection.close()
+            await asyncio.wait_for(queue.get(), timeout=10.0)
+        finally:
+            portal_update_hub.unsubscribe(queue)
+    finally:
+        await portal_update_hub.stop()
+
+
+@pytest.mark.asyncio
+async def test_hub_reconnects_after_termination(postgres_url: str) -> None:
+    url = postgres_url.replace("postgresql+asyncpg", "postgresql")
+    await portal_update_hub.start(url)
+    try:
+        queue = await portal_update_hub.subscribe()
+        try:
+            connection = portal_update_hub._connection
+            assert connection is not None
+            connection.terminate()  # kill the listener connection; the supervisor must reconnect
+            # on recovery the hub broadcasts and wakes subscribers
+            await asyncio.wait_for(queue.get(), timeout=10.0)
+        finally:
+            portal_update_hub.unsubscribe(queue)
+    finally:
+        await portal_update_hub.stop()
+
+
+@pytest.mark.asyncio
 async def test_hub_broadcast_wakes_all_subscribers() -> None:
     queue_a = await portal_update_hub.subscribe()
     queue_b = await portal_update_hub.subscribe()
