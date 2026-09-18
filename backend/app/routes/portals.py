@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections import Counter
+import logging
 from contextlib import suppress
+from typing import Any, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
@@ -16,10 +17,9 @@ from ..deps import (
     CurrentUser,
     DbSession,
     authenticate_session_token,
-    get_current_user,
 )
 from ..exceptions import BadAction
-from ..models import Action, ActionLogEntry, Portal
+from ..models import Action, ActionLogEntry, DangerLevel, Portal, utc_now
 from ..notifications import portal_update_hub
 from ..schemas import (
     ActionLogEntrySchema,
@@ -29,35 +29,43 @@ from ..schemas import (
     StatsSchema,
 )
 
-router = APIRouter(prefix="/portals", tags=["portals"], dependencies=[Depends(get_current_user)])
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/portals", tags=["portals"])
+
+_LOGIN_RESPONSES: dict[int | str, dict[str, Any]] = {
+    status.HTTP_401_UNAUTHORIZED: {"description": "Требуется авторизация"}
+}
 
 
 async def _portal_page(session: AsyncSession, page: int, items_per_page: int) -> PortalListSchema:
-    total = int((await session.execute(select(func.count()).select_from(Portal))).scalar_one())
+    total = int((await session.scalar(select(func.count()).select_from(Portal))) or 0)
     portals = (
-        (
-            await session.execute(
-                select(Portal).order_by(Portal.id).offset((page - 1) * items_per_page).limit(items_per_page)
-            )
+        await session.scalars(
+            select(Portal).order_by(Portal.id).offset((page - 1) * items_per_page).limit(items_per_page)
         )
-        .scalars()
-        .all()
-    )
+    ).all()
     return PortalListSchema(
-        items=[PortalSchema.model_validate(portal) for portal in portals],
+        items=cast(list[PortalSchema], portals),
         page=page,
         items_per_page=items_per_page,
         total=total,
     )
 
 
-@router.get("", response_model=PortalListSchema)
+@router.get(
+    "",
+    response_model=PortalListSchema,
+    responses=_LOGIN_RESPONSES,
+    description="Список порталов с пагинацией.",
+    summary="Список порталов",
+)
 async def list_portals(
     session: DbSession,
+    _user: CurrentUser,
     page: int = Query(1, ge=1),
     items_per_page: int = Query(PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
 ) -> PortalListSchema:
-    """List portals (paginated). Requires login; 401 otherwise."""
     return await _portal_page(session, page, items_per_page)
 
 
@@ -76,6 +84,7 @@ async def portal_updates(
             return
 
         await websocket.accept()
+        logger.info("WebSocket подключение пользователя id=%d", user.id)
         snapshot = await _portal_page(session, page, items_per_page)
         await websocket.send_json(snapshot.model_dump(mode="json"))
 
@@ -98,13 +107,24 @@ async def portal_updates(
                         break
         finally:
             portal_update_hub.unsubscribe(queue)
+            logger.info("WebSocket отключение пользователя id=%d", user.id)
             with suppress(RuntimeError):
                 await websocket.close()
 
 
-@router.post("/{portal_id}", response_model=PortalSchema)
-async def execute_action(portal_id: int, action: Action, session: DbSession, user: CurrentUser) -> PortalSchema:
-    """Commit an action on a portal. 404 unknown portal, 409 action not allowed."""
+@router.post(
+    "/{portal_id}",
+    response_model=PortalSchema,
+    responses={
+        **_LOGIN_RESPONSES,
+        status.HTTP_404_NOT_FOUND: {"description": "Портал не найден"},
+        status.HTTP_409_CONFLICT: {"description": "Действие недопустимо для данного портала"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Неизвестное действие или некорректный id"},
+    },
+    description="Выполнить действие над порталом. Действие записывается в журнал.",
+    summary="Действие над порталом",
+)
+async def execute_action(portal_id: int, action: Action, session: DbSession, user: CurrentUser) -> Portal:
     portal = await session.get(Portal, portal_id)
     if portal is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Портал не найден")
@@ -115,49 +135,95 @@ async def execute_action(portal_id: int, action: Action, session: DbSession, use
     session.add(ActionLogEntry(user_id=user.id, portal_id=portal.id, action=action))
     await session.commit()
     await session.refresh(portal)
-    return PortalSchema.model_validate(portal)
+    logger.info("Действие %s выполнено порталом id=%d пользователем id=%d", action.value, portal.id, user.id)
+    return portal
 
 
-@router.get("/log", response_model=ActionLogListSchema)
+@router.get(
+    "/log",
+    response_model=ActionLogListSchema,
+    responses=_LOGIN_RESPONSES,
+    description="Журнал действий с пагинацией.",
+    summary="Журнал действий",
+)
 async def action_log(
     session: DbSession,
+    _user: CurrentUser,
     page: int = Query(1, ge=1),
     items_per_page: int = Query(PAGE_SIZE_DEFAULT, ge=1, le=PAGE_SIZE_MAX),
 ) -> ActionLogListSchema:
-    """List recorded action log entries (paginated). Requires login; 401 otherwise."""
-    total = int((await session.execute(select(func.count()).select_from(ActionLogEntry))).scalar_one())
+    total = int((await session.scalar(select(func.count()).select_from(ActionLogEntry))) or 0)
     entries = (
-        (
-            await session.execute(
-                select(ActionLogEntry)
-                .order_by(ActionLogEntry.timestamp.desc(), ActionLogEntry.id.desc())
-                .offset((page - 1) * items_per_page)
-                .limit(items_per_page)
-            )
+        await session.scalars(
+            select(ActionLogEntry)
+            .order_by(ActionLogEntry.timestamp.desc(), ActionLogEntry.id.desc())
+            .offset((page - 1) * items_per_page)
+            .limit(items_per_page)
         )
-        .scalars()
-        .all()
-    )
+    ).all()
     return ActionLogListSchema(
-        items=[ActionLogEntrySchema.model_validate(entry) for entry in entries],
+        items=cast(list[ActionLogEntrySchema], entries),
         page=page,
         items_per_page=items_per_page,
         total=total,
     )
 
 
-@router.get("/stats", response_model=StatsSchema)
-async def stats(session: DbSession) -> StatsSchema:
-    """General stats about portals. Danger distribution and avg risk cover open portals."""
-    portals = (await session.execute(select(Portal))).scalars().all()
-    open_portals = [portal for portal in portals if not portal.closed]
-    danger_levels = Counter(portal.danger_level for portal in open_portals)
+@router.get(
+    "/stats",
+    response_model=StatsSchema,
+    responses=_LOGIN_RESPONSES,
+    description=(
+        "Сводная статистика порталов: количество открытых/закрытых, распределение по уровням "
+        "опасности и средний риск по открытым порталам."
+    ),
+    summary="Статистика порталов",
+)
+async def stats(session: DbSession, _user: CurrentUser) -> StatsSchema:
+    now = utc_now()
+    open_portal = and_(Portal.is_closed.is_(False), Portal.expires_at > now)
+    closed_portal = or_(Portal.is_closed.is_(True), Portal.expires_at <= now)
+
+    total, open_count, closed_count, marked, with_observer = (
+        await session.execute(
+            select(
+                func.count(),
+                func.count().filter(open_portal),
+                func.count().filter(closed_portal),
+                func.count().filter(Portal.is_marked.is_(True)),
+                func.count().filter(Portal.has_observer.is_(True)),
+            ).select_from(Portal)
+        )
+    ).one()
+
+    ttl = func.greatest(func.extract("epoch", Portal.expires_at - now), 0.0)
+    ttl_factor = 0.04 * ttl
+    risk = (
+        (Portal.energy_level / 100.0) * 0.2
+        + (1.0 - Portal.stability / 100.0) * 0.2
+        + (0.1 * Portal.creatures_count / (0.1 * Portal.creatures_count + 1.0)) * 0.3
+        + (1.0 - ttl_factor / (ttl_factor + 1.0)) * 0.3
+    )
+    danger_bucket = case(
+        (risk <= 0.3, DangerLevel.LOW.value),
+        (risk <= 0.6, DangerLevel.MEDIUM.value),
+        (risk <= 0.9, DangerLevel.HIGH.value),
+        else_=DangerLevel.CRITICAL.value,
+    )
+    danger_rows = (
+        await session.execute(select(danger_bucket, func.count()).where(open_portal).group_by(danger_bucket))
+    ).all()
+    danger_levels = {DangerLevel(bucket): count for bucket, count in danger_rows}
+    for level in DangerLevel:
+        danger_levels.setdefault(level, 0)
+
+    avg_risk = float(await session.scalar(select(func.avg(risk)).where(open_portal)) or 0.0)
     return StatsSchema(
-        total=len(portals),
-        open=len(open_portals),
-        closed=len(portals) - len(open_portals),
-        marked=sum(portal.is_marked for portal in portals),
-        with_observer=sum(portal.has_observer for portal in portals),
-        danger_levels=dict(danger_levels),
-        avg_risk=sum(portal.risk_factor for portal in open_portals) / len(open_portals) if open_portals else 0.0,
+        total=total,
+        open=open_count,
+        closed=closed_count,
+        marked=marked,
+        with_observer=with_observer,
+        danger_levels=danger_levels,
+        avg_risk=avg_risk,
     )

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from datetime import timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Cookie, HTTPException, Response, status
 from sqlalchemy import delete, select
 
 from ..config import settings
@@ -12,12 +14,23 @@ from ..models import LoginSession, User, utc_now
 from ..schemas import LoginSchema, UserOutSchema, UserRegisterSchema
 from ..security import hash_password, verify_password
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=UserOutSchema, status_code=status.HTTP_201_CREATED)
-async def register(data: UserRegisterSchema, session: DbSession) -> UserOutSchema:
-    """Register a new user. 409 if the username is already taken."""
+@router.post(
+    "/register",
+    response_model=UserOutSchema,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_409_CONFLICT: {"description": "Пользователь с таким именем уже существует"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Некорректные username или password"},
+    },
+    description="Регистрация нового пользователя. Возвращает данные пользователя.",
+    summary="Регистрация",
+)
+async def register(data: UserRegisterSchema, session: DbSession) -> User:
     existing = await session.scalar(select(User).where(User.username == data.username))
     if existing is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Пользователь с таким именем уже существует")
@@ -28,14 +41,24 @@ async def register(data: UserRegisterSchema, session: DbSession) -> UserOutSchem
     session.add(user)
     await session.commit()
     await session.refresh(user)
-    return UserOutSchema.model_validate(user)
+    logger.info("Зарегистрирован пользователь username=%s id=%d", user.username, user.id)
+    return user
 
 
-@router.post("/login", response_model=UserOutSchema)
-async def login(data: LoginSchema, session: DbSession, response: Response) -> UserOutSchema:
-    """Log in, issue a session cookie. 401 on invalid credentials."""
+@router.post(
+    "/login",
+    response_model=UserOutSchema,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Неверное имя пользователя или пароль"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Некорректные username или password"},
+    },
+    description="Вход в систему; при успехе в cookie выдаётся токен сессии.",
+    summary="Вход",
+)
+async def login(data: LoginSchema, session: DbSession, response: Response) -> User:
     user = await session.scalar(select(User).where(User.username == data.username))
     if user is None or not verify_password(data.password, user.password_hash):
+        logger.warning("Неудачная попытка входа username=%s", data.username)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверное имя пользователя или пароль")
 
     token = secrets.token_hex(32)
@@ -56,13 +79,20 @@ async def login(data: LoginSchema, session: DbSession, response: Response) -> Us
         secure=settings.cookie_secure,
         path="/",
     )
-    return UserOutSchema.model_validate(user)
+    logger.info("Вход пользователя username=%s id=%d", user.username, user.id)
+    return user
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(session: DbSession, request: Request) -> Response:
-    """Drop the session token and unset the cookie. Idempotent."""
-    token = request.cookies.get(settings.session_cookie_name)
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    description="Завершение сессии: токен удаляется из БД, cookie очищается. Идемпотентно.",
+    summary="Выход",
+)
+async def logout(
+    session: DbSession,
+    token: Annotated[str | None, Cookie(alias=settings.session_cookie_name)] = None,
+) -> Response:
     if token is not None:
         await session.execute(delete(LoginSession).where(LoginSession.token == token))
         await session.commit()
@@ -71,7 +101,14 @@ async def logout(session: DbSession, request: Request) -> Response:
     return response
 
 
-@router.get("/me", response_model=UserOutSchema)
-async def me(user: CurrentUser) -> UserOutSchema:
-    """Return the currently authenticated user's id and username. 401 if not authenticated."""
-    return UserOutSchema.model_validate(user)
+@router.get(
+    "/me",
+    response_model=UserOutSchema,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Требуется авторизация"},
+    },
+    description="Данные текущего пользователя (id и username).",
+    summary="Текущий пользователь",
+)
+async def me(user: CurrentUser) -> User:
+    return user

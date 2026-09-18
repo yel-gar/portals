@@ -3,6 +3,19 @@
 ## Current status
 Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API.
 
+## Review fixes (post M6)
+- `nullable` now set explicitly on every model column.
+- Tests rewritten to be fully async (`pytest-asyncio` + `httpx.AsyncClient`/`ASGITransport`); `httpx2` dependency replaced with `httpx`.
+- Built-in `logging` configured with `2026-03-02 15:00:18 [INFO] message` template.
+- `deps.get_current_user` uses `Cookie` annotation instead of reading `request.cookies` (also in `auth.logout`).
+- All route decorators document error codes via `responses`.
+- Removed redundant `model_validate` on endpoints with `response_model` + `from_attributes`; switched to `session.scalars()`.
+- `/portals/stats` rewritten to use DB aggregate queries (SQL-side risk/danger distribution and avg risk).
+- Restored login requirement (`CurrentUser`) on all HTTP portal routes.
+- Fixed `asyncpg` hub to use `add_listener` (removed `Connection.wait()` API).
+- Fixed `security.py` Python-2 `except` syntax.
+- Future ideas recorded: action log over WebSocket; commit-safety + NOTIFY producer for portal actions.
+
 ## Plan
 Milestones (a git commit happens after each milestone; pre-commit runs on each commit; tests run via pre-push hook / CI):
 

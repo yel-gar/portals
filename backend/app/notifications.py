@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import suppress
 
 import asyncpg
+
+logger = logging.getLogger(__name__)
 
 PORTAL_NOTIFY_CHANNEL = "portal_changes"
 
@@ -11,38 +14,33 @@ PORTAL_NOTIFY_CHANNEL = "portal_changes"
 class PortalUpdateHub:
     """Postgres LISTEN/NOTIFY hub broadcasting refresh events to WS subscribers.
 
-    A dedicated connection listens on the ``portal_changes`` channel. Every
-    received notification triggers ``broadcast()``, waking all subscribed
-    WebSocket clients so they re-query the current portal page. Producers
-    (background tasks and a DB trigger) are planned but not implemented yet.
+    A dedicated connection listens on the ``portal_changes`` channel via
+    ``asyncpg.Connection.add_listener``. Every received notification is
+    broadcast to all subscribed WebSocket clients so they re-query the current
+    portal page. Producers (background tasks and a DB trigger) are planned but
+    not implemented yet.
     """
 
     def __init__(self) -> None:
         self._subscribers: set[asyncio.Queue[None]] = set()
         self._connection: asyncpg.Connection | None = None
-        self._listener_task: asyncio.Task[None] | None = None
 
     async def start(self, database_url: str) -> None:
         url = database_url.replace("postgresql+asyncpg", "postgresql")
         self._connection = await asyncpg.connect(url)
-        await self._connection.execute(f"LISTEN {PORTAL_NOTIFY_CHANNEL}")
-        self._listener_task = asyncio.create_task(self._listen_loop())
+        await self._connection.add_listener(PORTAL_NOTIFY_CHANNEL, self._on_notify)
+        logger.info("LISTEN запущен на канале %s", PORTAL_NOTIFY_CHANNEL)
 
     async def stop(self) -> None:
-        if self._listener_task is not None:
-            self._listener_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await self._listener_task
-            self._listener_task = None
         if self._connection is not None:
+            with suppress(ValueError):
+                await self._connection.remove_listener(PORTAL_NOTIFY_CHANNEL, self._on_notify)
             await self._connection.close()
             self._connection = None
+        logger.info("LISTEN остановлен на канале %s", PORTAL_NOTIFY_CHANNEL)
 
-    async def _listen_loop(self) -> None:
-        assert self._connection is not None
-        while True:
-            await self._connection.wait()
-            await self.broadcast()
+    async def _on_notify(self, _connection: asyncpg.Connection, _pid: int, _channel: str, _payload: str) -> None:
+        await self.broadcast()
 
     async def subscribe(self) -> asyncio.Queue[None]:
         queue: asyncio.Queue[None] = asyncio.Queue()

@@ -19,7 +19,7 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 - Conditions are validated inside `Portal` model methods. They raise `BadAction` (Russian message). Routes map `BadAction` to HTTP 409 Conflict and are the only place that creates `ActionLogEntry` rows and commits.
 
 ## Real-time updates
-- Live updates are delivered over `WS /portals/ws`. Refresh events are broadcast through Postgres `LISTEN/NOTIFY` on channel `portal_changes`, consumed by a dedicated listener connection in `app/notifications.py`.
+- Live updates are delivered over `WS /portals/ws`. Refresh events are broadcast through Postgres `LISTEN/NOTIFY` on channel `portal_changes`, consumed by a dedicated `asyncpg` connection using `add_listener` in `app/notifications.py`.
 - Currently only the listener side runs; producers (background tasks updating portal data, plus a trigger) are planned but not implemented yet.
 
 ## Auth
@@ -34,3 +34,14 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 
 ## Testing
 - Tests run against a real PostgreSQL in a `postgres:18-alpine` testcontainers container (per test session), not SQLite, to match the production dialect.
+- Tests are fully async (`pytest-asyncio`, session-scoped event loop for tests and fixtures). HTTP is exercised through `httpx.AsyncClient` + `httpx.ASGITransport`; the app lifespan is not run, DB is initialized/disposed by session fixtures and truncated per test. The WebSocket auth-gate is covered by calling the endpoint directly with a mock websocket.
+
+## Columns nullable
+- `nullable` is set explicitly on every model column (`nullable=False` everywhere except `ActionLogEntry.user_id` which is `nullable=True`), even though SQLAlchemy 2.0 `Mapped[str]` annotations already imply non-nullable.
+
+## Logging
+- Project uses the built-in `logging` library. Format: `2026-03-02 15:00:18 [INFO] message` (`%(asctime)s [%(levelname)s] %(message)s`, `datefmt=%Y-%m-%d %H:%M:%S`), configured in `app/main.py`, level `DEBUG` when `DEBUG` is truthy.
+
+## Future ideas (not yet implemented)
+- Migrate the action log (`GET /portals/log`) to WebSocket so new entries stream to clients in real time, like portal updates.
+- Guarantee commit safety for portal actions against race conditions; after committing an action the portal should `NOTIFY` the `portal_changes` channel so the LISTEN/NOTIFY hub wakes WS subscribers (producers are still absent).

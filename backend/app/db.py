@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -9,6 +11,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import Pool
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -19,16 +24,25 @@ _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
-def init_db(database_url: str, *, echo: bool = False) -> async_sessionmaker[AsyncSession]:
+def init_db(
+    database_url: str,
+    *,
+    echo: bool = False,
+    pool_class: type[Pool] | None = None,
+) -> async_sessionmaker[AsyncSession]:
     """Create the global engine/session factory bound to ``database_url``.
 
     Called by the app lifespan and by tests against their container database.
     """
     global _engine, _session_factory
-    engine = create_async_engine(database_url, echo=echo, pool_pre_ping=True)
+    kwargs: dict[str, Any] = {"echo": echo, "pool_pre_ping": True}
+    if pool_class is not None:
+        kwargs["poolclass"] = pool_class
+    engine = create_async_engine(database_url, **kwargs)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     _engine = engine
     _session_factory = factory
+    logger.info("Инициализирован пул соединений к %s", database_url.rsplit("@", 1)[-1])
     return factory
 
 
@@ -51,6 +65,7 @@ async def dispose_db() -> None:
         await _engine.dispose()
     _engine = None
     _session_factory = None
+    logger.info("Пул соединений закрыт")
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession]:

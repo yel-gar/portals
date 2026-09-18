@@ -59,18 +59,18 @@ class Portal(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(PORTAL_NAME_MAX_LENGTH))
-    destination_world: Mapped[str] = mapped_column(String(DESTINATION_WORLD_MAX_LENGTH))
-    energy_level: Mapped[int] = mapped_column(Integer)
-    stability: Mapped[int] = mapped_column(Integer)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    creatures_count: Mapped[int] = mapped_column(Integer, default=0)
+    name: Mapped[str] = mapped_column(String(PORTAL_NAME_MAX_LENGTH), nullable=False)
+    destination_world: Mapped[str] = mapped_column(String(DESTINATION_WORLD_MAX_LENGTH), nullable=False)
+    energy_level: Mapped[int] = mapped_column(Integer, nullable=False)
+    stability: Mapped[int] = mapped_column(Integer, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    creatures_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_update: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
-    is_marked: Mapped[bool] = mapped_column(Boolean, default=False)
-    has_observer: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_marked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    has_observer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_closed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     actions: Mapped[list[ActionLogEntry]] = relationship(
         back_populates="portal", cascade="all, delete-orphan", passive_deletes=True
@@ -152,17 +152,17 @@ class Portal(Base):
         if not self.has_observer:
             raise BadAction("Нет наблюдателя, через которого можно предупредить существ")
         if self.creatures_count == 0:
-            raise BadAction("Внутри портала нет существ, некому предупреждать")
+            raise BadAction("Внутри портала нет существ, некого предупреждать")
 
 
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    username: Mapped[str] = mapped_column(String(USERNAME_MAX_LENGTH), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(PASSWORD_HASH_MAX_LENGTH))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    username: Mapped[str] = mapped_column(String(USERNAME_MAX_LENGTH), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(PASSWORD_HASH_MAX_LENGTH), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     login_sessions: Mapped[list[LoginSession]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
@@ -174,9 +174,9 @@ class LoginSession(Base):
     __tablename__ = "login_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    token: Mapped[str] = mapped_column(String(LOGIN_TOKEN_LENGTH), unique=True)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    token: Mapped[str] = mapped_column(String(LOGIN_TOKEN_LENGTH), unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     user: Mapped[User] = relationship(lazy="joined")
 
@@ -186,9 +186,9 @@ class ActionLogEntry(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    portal_id: Mapped[int] = mapped_column(ForeignKey("portals.id", ondelete="CASCADE"), index=True)
-    action: Mapped[Action] = mapped_column(SQLEnum(Action, name="action"))
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    portal_id: Mapped[int] = mapped_column(ForeignKey("portals.id", ondelete="CASCADE"), index=True, nullable=False)
+    action: Mapped[Action] = mapped_column(SQLEnum(Action, name="action"), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user: Mapped[User | None] = relationship(lazy="joined")
     portal: Mapped[Portal] = relationship(back_populates="actions")

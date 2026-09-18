@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,9 +20,7 @@ PAGE_SIZE_DEFAULT = 20
 async def authenticate_session_token(session: AsyncSession, token: str | None) -> User | None:
     if token is None:
         return None
-    login_session = (
-        await session.execute(select(LoginSession).where(LoginSession.token == token))
-    ).scalar_one_or_none()
+    login_session = (await session.scalars(select(LoginSession).where(LoginSession.token == token))).one_or_none()
     if login_session is None or login_session.user is None:
         return None
     if login_session.expires_at <= datetime.now(UTC):
@@ -30,8 +28,10 @@ async def authenticate_session_token(session: AsyncSession, token: str | None) -
     return login_session.user
 
 
-async def get_current_user(session: DbSession, request: Request) -> User:
-    token = request.cookies.get(settings.session_cookie_name)
+async def get_current_user(
+    session: DbSession,
+    token: Annotated[str | None, Cookie(alias=settings.session_cookie_name)] = None,
+) -> User:
     user = await authenticate_session_token(session, token)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Требуется авторизация")
