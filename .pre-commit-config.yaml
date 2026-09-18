@@ -16,12 +16,14 @@ repos:
         name: black (backend)
         entry: poetry run -C backend black .
         language: system
+        files: ^backend/.*\.py$
         pass_filenames: false
 
       - id: ruff
         name: ruff (backend)
         entry: poetry run -C backend ruff check --fix .
         language: system
+        files: ^backend/.*\.py$
         pass_filenames: false
 
       - id: mypy
