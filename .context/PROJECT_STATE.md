@@ -25,6 +25,15 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 - `app/models.py` - `Action`/`DangerLevel` enums, `Portal` (risk_factor, danger_level, derived `closed`, all action methods raising `BadAction`), `User`, `LoginSession`, `ActionLogEntry`
 - `DISMISS` = refresh `last_update` only (from AI-WORKLOG: "simply update last update timestamp")
 
+### M2 Schemas + deps
+- `app/config.py` - env-based `Settings` (database URL parts/override, `BACKEND_URL`/`FRONTEND_URL` CORS origins, `DEBUG` → cookie secure flag)
+- `app/security.py` - argon2 hash/verify helpers
+- `app/schemas.py` - pydantic schemas set (`PortalSchema` with derived `closed`/`risk_factor`/`danger_level`, paginated lists, auth, log, stats)
+- `app/deps.py` - `DbSession`/`CurrentUser`/`SuperUser` Annotated dependencies, token-based session auth
+
+### M3 Auth routes
+- `app/routes/auth.py` - register / login (session cookie, 14-day expiry) / logout / me; 409 duplicate username, 401 invalid credentials
+
 ### Project scaffold
 - Poetry-based backend in `backend/` (FastAPI, SQLAlchemy, asyncpg; python >=3.14)
 - Dev tooling: black, ruff, mypy (strict), pytest, coverage, pre-commit hooks
