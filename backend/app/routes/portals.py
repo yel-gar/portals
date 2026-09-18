@@ -497,3 +497,24 @@ async def stats(session: DbSession, _user: CurrentUser) -> StatsSchema:
         danger_levels=danger_levels,
         avg_risk=avg_risk,
     )
+
+
+@router.get(
+    "/{portal_id}",
+    response_model=PortalSchema,
+    responses={
+        **_LOGIN_RESPONSES,
+        status.HTTP_404_NOT_FOUND: {"description": "Портал не найден"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Некорректный id портала"},
+    },
+    description=(
+        "Подробная информация об одном портале (та же структура, что и в списке, "
+        "включая расчётные risk_factor и danger_level)."
+    ),
+    summary="Информация о портале",
+)
+async def portal_info(portal_id: int, session: DbSession, _user: CurrentUser) -> Portal:
+    portal = await session.get(Portal, portal_id)
+    if portal is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Портал не найден")
+    return portal

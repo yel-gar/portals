@@ -58,6 +58,9 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 - Default portal ordering: risk DESC, expires_at ASC, has_observer DESC, creatures_count DESC, `id ASC` as the final tiebreaker for stable pagination.
 - Sorting/filtering by risk and danger level happens in SQL: the risk formula and the danger-level CASE are extracted into `_risk_expression(now)` / `_danger_bucket_expression(now)` (already used by `/stats`), mirroring the Python `Portal.risk_factor` / `Portal.danger_level`.
 
+## Portal info endpoint
+- `GET /portals/{id}` returns a single portal (`PortalSchema`, same shape as list items) and 404s for unknown ids. The dynamic `/{id}` route is declared after the static `/log` and `/stats` routes so they are never captured by the int path param.
+
 ## Future ideas (not yet implemented)
 - Background tasks that update portal data should also produce `portal_changes` notifications (the trigger-based producer is a later alternative to in-route `pg_notify`).
 - A frontend is not built yet; the API and WebSocket endpoints are backend-only for now.

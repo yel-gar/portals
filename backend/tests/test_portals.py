@@ -73,6 +73,55 @@ async def test_portal_payload_matches_schema(
 
 
 @pytest.mark.asyncio
+async def test_portal_info(client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]) -> None:
+    await _login(client)
+    portal = await create_portal(
+        name="Alpha",
+        destination_world="Xanadu",
+        energy_level=80,
+        stability=20,
+        creatures_count=5,
+        has_observer=True,
+    )
+
+    response = await client.get(f"/portals/{portal.id}")
+    assert response.status_code == 200, response.text
+    item = response.json()
+    assert item["id"] == portal.id
+    assert item["name"] == "Alpha"
+    assert item["destination_world"] == "Xanadu"
+    assert item["energy_level"] == 80
+    assert item["stability"] == 20
+    assert item["creatures_count"] == 5
+    assert item["has_observer"] is True
+    assert item["closed"] is False
+    assert isinstance(item["risk_factor"], float)
+    assert item["danger_level"] in {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+
+
+@pytest.mark.asyncio
+async def test_portal_info_not_found(client: AsyncClient) -> None:
+    await _login(client)
+    response = await client.get("/portals/9999")
+    assert response.status_code == 404
+    assert response.json()["detail"] != ""
+
+
+@pytest.mark.asyncio
+async def test_portal_info_invalid_id(client: AsyncClient) -> None:
+    await _login(client)
+    response = await client.get("/portals/abc")
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_portal_info_requires_auth(client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]) -> None:
+    portal = await create_portal()
+    response = await client.get(f"/portals/{portal.id}")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_list_portals_default_ordering(
     client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
 ) -> None:
