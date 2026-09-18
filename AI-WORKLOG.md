@@ -157,4 +157,96 @@ danger_level: DangerLevel (map float value to string)
 UserRegisterSchema
 username: length >= 4, <= 64, bring out min length and max length as constant and use it both in db and schema validator
 password: length >= 8, <= 128, bring out as constant as well, but keep in mind you will be storing HASH in database. Hash to be calculated and verified via argon2.
+
 ```
+
+# Обработанные и покрытые тестами граничные случаи: Auth и Portals
+
+## Auth (регистрация / вход / выход / me / сессии, включая администрирование пользователей)
+
+### Обработанные граничные случаи
+- Границы длины username/password задаются константами, общими для моделей БД и валидаторов Pydantic (`USERNAME` 4–64, `PASSWORD` 8–128) → `422` при слишком коротком / слишком длинном / отсутствующем поле.
+- Дубликат username при регистрации или создании администратором → `409` (проверка до вставки + уникальный индекс).
+- Вход с неверным паролем или неизвестным username → одинаковый `401`, без перечисления пользователей.
+- Проверка пароля fail-closed: `verify_password` ловит `InvalidHashError` и `VerifyMismatchError` и возвращает `False` вместо исключения.
+- Сессионная cookie: httpOnly, `samesite=lax`, `Secure` кроме случая `DEBUG`; токен хранится в `LoginSession` со сроком жизни 14 дней.
+- Истёкший токен сессии → `401` (срок проверяется при каждом аутентифицированном запросе).
+- Выход: удаляет строку `LoginSession` и чистит cookie; идемпотентен → `204` даже без токена.
+- Все защищённые маршруты (`/auth/me`, `/admin/*`, `/portals*`, WebSocket) → `401` без валидной cookie.
+- Администрирование: обычный пользователь → `403`; созданному пользователю нельзя установить флаг суперпользователя; удаление суперпользователя → `409`; несуществующий пользователь при удалении / смене пароля → `404`; длина пароля → `422`.
+- Сессия, у которой удалён пользователь (`login_session.user is None`), считается неаутентифицированной (обрабатывается в `deps.authenticate_session_token`; напрямую не тестируется — целостность FK, без теста).
+
+### Тесты
+- `tests/test_auth.py`
+  - `test_register_login_me_logout` — полный сценарий: регистрация → `401` до входа → вход выдаёт cookie → me → выход → снова `401`
+  - `test_register_duplicate_username` — `409` при повторной регистрации
+  - `test_login_invalid_credentials` — неверный пароль и неизвестный пользователь → `401`
+  - `test_register_validation_errors` — `422` для короткого username / короткого пароля / отсутствующего поля
+  - `test_logout_is_idempotent` — выход без сессии → `204`
+  - `test_expired_session_token_rejected` — истёкший токен в БД → `/auth/me` `401`
+- `tests/test_admin.py`
+  - `test_admin_requires_superuser` — обычный пользователь → `403`
+  - `test_admin_requires_auth` — аноним → `401`
+  - `test_create_and_list_users` — создание возвращает не суперпользователя; список содержит обоих
+  - `test_create_duplicate_user` — `409`
+  - `test_set_password` — смена пароля работает (старая cookie инвалидируется выходом, новый пароль входит)
+  - `test_set_password_missing_user` — `404`
+  - `test_delete_user` — пользователь удалён, список сократился
+  - `test_delete_superuser_forbidden` — `409`
+  - `test_delete_missing_user` — `404`
+
+## Portals (список / действия / журнал / статистика / WebSocket / уведомления)
+
+### Обработанные граничные случаи
+- Все HTTP-маршруты и оба WebSocket-эндпоинта требуют аутентификации → `401` (HTTP) / закрытие `4401` (WS, `accept()` не вызывается).
+- Пагинация: `page >= 1`, `items_per_page` в пределах 1..100, `total` сохраняется; постраничная выборка со смещением.
+- Производные поля портала: `closed = expires_at <= now OR is_closed`; `risk_factor` ограничивает TTL на нуле (никогда не отрицателен для истёкших порталов); `danger_level` — уровни LOW/MEDIUM/HIGH/CRITICAL.
+- Правила действий валидируются в методах модели `Portal` (кидают `BadAction` с описанием на русском; маршрут преобразует в `409`):
+  - любое действие, кроме mark/unmark, на закрытом/истёкшем портале → `409`
+  - `close` — отклоняется, пока внутри есть существа или наблюдатель
+  - `stabilize` — отклоняется, если стабильность уже `>= 50`
+  - `send_observer` — отклоняется при критическом уровне опасности или если наблюдатель уже внутри
+  - `recall_observer` — отклоняется, когда наблюдателя нет
+  - `mark` / `unmark` — отклоняются при уже отмеченном / не отмеченном портале
+  - `warn_creatures` — требует наблюдателя и наличия существ; при успехе обнуляет `creatures_count`
+  - `dismiss` — только обновляет `last_update`, отклоняется на закрытом портале
+- Неизвестный `portal_id` → `404`; некорректное значение `action` → `422` (валидация enum во FastAPI).
+- Безопасность коммита: строка портала блокируется `SELECT ... FOR UPDATE` на время действия (конкурентные действия над одним порталом сериализуются); изменение портала + `ActionLogEntry` + `pg_notify` для `portal_changes`/`action_log_changes` находятся в одной транзакции — уведомления доходят до подписчиков только при состоявшемся коммите; отклонённое действие ничего не коммитит.
+- Журнал действий: сначала новые (`timestamp DESC, id DESC`), записи содержат выполнившего пользователя; требует аутентификацию и по HTTP, и по WS.
+- Статистика считается SQL-агрегатами: количество открытых/закрытых/отмеченных/с наблюдателем, распределение по уровням опасности для открытых порталов (все четыре уровня присутствуют всегда, отсутствующие обнуляются), средний риск; порталы с истёкшим сроком считаются закрытыми.
+- WebSocket-цикл (`_hub_snapshot_loop`): начальный снимок при подключении; повторная отправка при каждом событии хаба; отключение клиента → отписка + закрытие; произвольный текст клиента (ping) игнорируется, цикл продолжается.
+
+### Тесты
+- `tests/test_portals.py`
+  - `test_list_portals_requires_auth` — `401`
+  - `test_list_portals_paginated` — постраничная выборка + `total`
+  - `test_portal_payload_matches_schema` — точный набор полей ответа, включая производные `closed`/`risk_factor`/`danger_level`
+  - `test_execute_action_flow` — happy path: mark, warn_creatures (включая `creatures_count == 0`), recall, stabilize, dismiss, отправка/отзыв наблюдателя, close
+  - `test_execute_action_rejected` — `409` для close с существами и recall без наблюдателя, detail непустой
+  - `test_execute_action_unknown_portal` — `404`
+  - `test_action_log` — записи фиксируются, сначала новые, пользователь привязан
+  - `test_action_log_requires_auth` — `401`
+  - `test_stats` — суммы/пропорции, распределение опасности сходится с числом открытых
+  - `test_stats_requires_auth` — `401`
+  - `test_committed_action_wakes_both_hubs` — выполненное действие будит подписчиков обоих каналов `portal_changes` и `action_log_changes`
+  - `test_rejected_action_sends_no_notification` — действие с `409` → нет записи в журнале, портал не изменён, ни один хаб не уведомлён
+- `tests/test_ws.py`
+  - `test_hub_snapshot_loop_exits_on_disconnect` — цикл завершается и отписывается при отключении
+  - `test_hub_snapshot_loop_pushes_snapshot_on_event` — событие хаба вызывает отправку свежего снимка
+  - `test_hub_snapshot_loop_ignores_client_ping` — текст клиента не ломает цикл
+  - `test_portal_ws_rejects_anonymous` / `test_log_ws_rejects_anonymous` — `4401`, подключение не принимается
+  - `test_portal_ws_sends_initial_snapshot_and_exits` / `test_log_ws_sends_initial_snapshot_and_exits` — аутентифицированный клиент получает начальный снимок страницы/журнала
+- `tests/test_models.py`
+  - `test_risk_factor_and_danger_level` — все четыре уровня опасности, ограничение риска на истёкшем портале
+  - `test_closed_flag_makes_portal_unactionable` — закрытый/истёкший портал отклоняет действия
+  - `test_mark_unmark_allowed_on_closed_portal` — mark/unmark — единственные действия, разрешённые на закрытом портале (включая unmark неотмеченного)
+  - `test_action_rules` — пути принятия и отклонения close/stabilize/send_observer/mark/warn_creatures (warn также обнуляет существ)
+- `tests/test_notifications.py`
+  - `test_hub_receives_postgres_notify` — реальный Postgres NOTIFY будит подписчиков на обоих каналах
+  - `test_hub_idempotent_stop` — повторный `stop()` безопасен
+  - `test_hub_broadcast_wakes_all_subscribers` — broadcast рассылается всем подписчикам, отписка удаляет
+
+## Вспомогательные инфраструктурные тесты (не Auth/Portals, но часть набора)
+- `tests/test_db.py::test_db_lifecycle_guards` — `get_session_factory`/`create_all` кидают исключение до `init_db`; повторная инициализация работает
+- `tests/test_main.py::test_lifespan_starts_and_stops_hubs` — lifespan приложения запускает/останавливает оба LISTEN/NOTIFY хаба
+- `tests/test_config.py` — разбор `_as_bool`/значения по умолчанию, `DATABASE_URL` переопределяет собираемый URL
