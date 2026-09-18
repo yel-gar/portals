@@ -17,6 +17,14 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 
 ## Completed milestones
 
+### M1 Foundation
+- Dependencies: `argon2-cffi`; dev `testcontainers[postgres]`, `pytest-asyncio`; restored `mypy`, `pre-commit`, `coverage` (referenced by CI but missing)
+- `app/constants.py` - shared length constants (username/password/portal columns)
+- `app/exceptions.py` - `BadAction`
+- `app/db.py` - engine/session factory lifecycle (init_db/create_all/dispose), `Base`
+- `app/models.py` - `Action`/`DangerLevel` enums, `Portal` (risk_factor, danger_level, derived `closed`, all action methods raising `BadAction`), `User`, `LoginSession`, `ActionLogEntry`
+- `DISMISS` = refresh `last_update` only (from AI-WORKLOG: "simply update last update timestamp")
+
 ### Project scaffold
 - Poetry-based backend in `backend/` (FastAPI, SQLAlchemy, asyncpg; python >=3.14)
 - Dev tooling: black, ruff, mypy (strict), pytest, coverage, pre-commit hooks
