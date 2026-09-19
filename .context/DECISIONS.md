@@ -3,7 +3,7 @@
 All architecture decisions are recorded here. Chronological, newest at the bottom.
 
 ## UTF
-- All timestamps are stored and compared in UTC. DB datetime columns are timezone-aware (`DateTime(timezone=True)` / `timestamptz`). `last_update` uses `server_default=func.now()` + `onupdate=func.now()`; `ActionLogEntry.timestamp` and `User.created_at` use `server_default=func.now()`.
+- All timestamps are stored and compared in UTC. DB datetime columns are timezone-aware (`DateTime(timezone=True)` / `timestamptz`). `last_update` uses `server_default=func.now()` only — it is touched **exclusively by committed actions** (the action route sets it), never by the simulator; `ActionLogEntry.timestamp` and `User.created_at` use `server_default=func.now()`.
 
 ## Portal semantics
 - `closed` is a **derived** property: `expires_at <= now or is_closed`. It is exposed in `PortalSchema` as `closed`; the raw DB column stays `is_closed`.
@@ -12,7 +12,7 @@ All architecture decisions are recorded here. Chronological, newest at the botto
   where `TTL = max((expires_at - now).total_seconds(), 0.0)` — clamped, expired portals never produce negative TTL.
 - Danger levels: `<= 0.3` LOW, `<= 0.6` MEDIUM, `<= 0.9` HIGH, `> 0.9` CRITICAL.
 - `STABILIZE` condition "stability below 0.5" is interpreted for the 0-100 int scale as `stability < 50`; stabilizing increases stability by a random value from `STABILITY_INCREASE_RAND_RANGE = (10, 30)`, capped at `100`.
-- `DISMISS` (the UI's "leave open") is an acknowledgement: it only refreshes `last_update` and is rejected while the portal is closed.
+- `DISMISS` (the UI's "leave open") **parks the portal at the bottom of every ordering** while a `dismissed_until` window (5 min) is active; it is rejected while the portal is closed and when the remaining TTL is ≤ 5 min («Нельзя отложить портал: до истечения менее 5 минут» — constant `DISMISS_MIN_TTL_SECONDS`). Re-dismissing simply extends the window. The parking is a pure ordering sink clause (`dismissed_until > now`), applied after the open-first clause in every `order_by` mode; closing/expiry ends it with no extra cleanup.
 - MARK/UNMARK are the only actions allowed on a closed/expired portal, per requirements.
 - WARN_CREATURES warns the creatures through the observer and empties the portal (`creatures_count = 0`).
 
@@ -152,3 +152,28 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 ## Frontend: `DISABLE_REGISTRATION` gating (2026-09)
 - Wired exactly like `BACKEND_URL`/`VITE_BACKEND_URL`: both Dockerfile stages (build + dev) map `DISABLE_REGISTRATION` → `VITE_DISABLE_REGISTRATION` (build arg baked in prod, runtime env in the dev override — both the `.dev` template and the local copy updated).
 - `RegisterPage` reads it lazily (`env.ts` `isRegistrationDisabled`, truthy = not empty/`0`/`false`) and renders the backend's own 403 message «Регистрация отключена» instead of the form; the registration API is never attempted. Documented in the frontend README envvars table; the root README row now covers the frontend behaviour too.
+
+## Backend: close auto-recalls the observer (2026-09)
+- `Portal.close()` sets `has_observer = False` before closing: a closed portal can never keep an observer inside, so the operator does not need a separate RECALL first. The action log still records a single `CLOSE` entry. Model test `test_action_rules` rewritten to assert the auto-recall; `test_close_recalls_observer` covers the route.
+
+## Backend: unauthenticated `GET /health` (2026-09)
+- Liveness endpoint for external probes/health-checks: no auth, no DB access, always returns `{"status": "ok"}` (200) regardless of `DEBUG`. Declared inside the app factory after the router includes; documented in the route's `summary`/`description`. Nothing in the app calls it — it exists for the orchestrator.
+
+## Backend: `last_update` = action-only (2026-09)
+- `onupdate=func.now()` dropped from the `last_update` column; `POST /portals/{id}` sets `portal.last_update = utc_now()` after a successful action, inside the same commit as the `ActionLogEntry`. The simulator never touches `last_update` — «обновлено» now reflects operator activity only (previously every simulator tick bumped it via `onupdate`). `test_action_bumps_last_update_but_simulation_does_not` pins both sides.
+
+## Frontend: per-metric deltas «изменение с прошлого снапшота» (2026-09)
+- Decided with the user (explicit override of the "no client-side presentation logic" rule for this feature): the frontend renders **deltas between consecutive snapshots** of the same query scope, colored by what the change means for the lab. The backend stays the source of truth — the delta is pure presentation over snapshots it already sends.
+- Metric polarities: stability/marked/with-observer → increase is good (green); energy/creatures/risk/avg-risk/HIGH+CRITICAL counts → increase is bad (red); total/open/closed/MEDIUM counts → neutral (embers amber). Arrows ▲/▼ via AntD icons; zero deltas render nothing.
+- Baseline hook `useSnapshotBaseline(scope, current)` (new `hooks/useSnapshotBaseline.ts`): the first snapshot in a scope produces no delta; a newer snapshot replaces the baseline only once displayed (delta persists between refreshes, no one-render flash); scope change (page/filter) resets; `keepPreviousData` placeholders are excluded via `isPlaceholderData` at the call sites. Wired into the portal table (energy/stability/creatures/risk), the top stat cards (all six) and the stats page (danger distribution counts + avg-risk circle).
+
+## Frontend: merged observer toggle in the modal (2026-09)
+- The modal's observer entry is a single toggle resolved from `portal.has_observer` (send when empty, recall when present) — the same pattern as MARK/UNMARK. `RECALL_OBSERVER` was removed from `ACTION_ORDER` but stays in `ALL_ACTIONS` (log filter) and `ACTION_META` (log labels/tags). The label refreshes live from the snapshot, so a CLOSE (which auto-recalls the observer) flips the button back to «Отправить наблюдателя».
+
+## Frontend: table action column + reset filters (2026-09)
+- The row button was renamed «Открыть» → «Детали» (it opens the detail modal, it does not open a portal), and a thin fixed amber divider now separates the scrollable data columns from the fixed action column (`onCell`/`onHeaderCell` → `.portal-table-actions-sep`, header and body cells both carry the border).
+- Root-cause fix for reset: `DEFAULT_PORTAL_FILTERS` / `DEFAULT_LOG_FILTERS` now list the optional keys **explicitly as `undefined`**, so `onReset` spreads the defaults over the previous state and truly clears `closed`/`danger_level`/`has_observer`/`is_marked`/`action` instead of silently keeping stale values. New reset tests assert the request params lose the filter after «Сбросить».
+
+## Frontend: AI-WORKLOG tab (2026-09)
+- New `/worklog` route + nav tab «Журнал разработки» (FileTextOutlined) rendering `AI-WORKLOG.md` with `react-markdown` (new dependency). The markdown is bundled via Vite's `?raw` import and styled for the dark embers theme (headings, code fences, blockquotes, tables).
+- The worklog is committed **twice**: repo-root `AI-WORKLOG.md` (canonical) and `frontend/src/worklog/AI-WORKLOG.md` (bundled copy). The Vite build context is `frontend/` only, so the root file cannot be COPYed into the image; the copy must be kept in sync when the root file changes.

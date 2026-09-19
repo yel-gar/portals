@@ -5,6 +5,8 @@ Backend is complete (M1–M7 + follow-ups): magic portals laboratory overseer da
 
 Frontend on branch `frontend/react-vite` (merged with master): real React SPA implemented — auth (cookie only), live portal table + 720px action modal, action log, stats, admin users — embers theme, 52 Vitest tests, `frontend/README.md`. Full lint/format/coverage pipeline now active (oxlint + Prettier, pre-commit hooks, CI workflows). Live-WS verification against the real backend is still pending a dev-container rebuild with the merged backend image.
 
+Latest batch (9 tasks, committed on master): backend — CLOSE auto-recalls the observer, unauthenticated `GET /health`, DISMISS parks the portal (5 min window, rejected when TTL ≤ 5 min), `last_update` only on actions; frontend — reset-filters root-cause fix, per-metric snapshot deltas (table, stat cards, stats page), table rename «Открыть»→«Детали» + fixed divider column, merged observer toggle, AI-WORKLOG tab (`react-markdown` bundling). Backend 126 tests / 99 %; frontend 100 Vitest tests, tsc/oxlint/prettier/build green.
+
 ## Roadmap (frontend, branch `frontend/react-vite`)
 1. **AntD v5 → v6** — done: `antd ^6.6.4` + icons `^6.3.4`, React-19 patch dropped, deprecated APIs migrated (Alert `title`, Table `medium`, Divider `titlePlacement`), embers tokens intact. ✅ (see DECISIONS.md)
 2. **Linter/formatter/coverage/pre-commit** — done: oxlint (react plugin, correctness/suspicious error + perf warn, 0 warnings 0 errors) + Prettier (printWidth 100), `--deny-warnings` strictness, coverage v8 (text + lcov, 76.7 % lines, no hard gate — mirrors backend), pre-commit hooks (format + lint:fix, `^frontend/`), CI workflows `frontend-ci.yml` + `frontend-coverage.yml` (Node 24 parity). ✅ (see DECISIONS.md)
@@ -69,6 +71,20 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 9. **Final** — pre-commit --all-files, full pytest run, doc refresh.
 
 ## Completed milestones
+
+### Nine UX/data tasks (master, 2026-09)
+Backend (all gates green: black/ruff/mypy clean, 126 tests, coverage 99 %):
+- **CLOSE auto-recalls the observer**: `Portal.close()` sets `has_observer = False` before closing (a closed portal can never keep an observer inside); the log still records one `CLOSE` entry. New model test + `test_close_recalls_observer`.
+- **`GET /health`**: unauthenticated liveness endpoint (no DB access, `{"status": "ok"}` regardless of `DEBUG`), declared in the app factory; `test_health_endpoint` parametrized over debug on/off.
+- **DISMISS parks the portal**: new `dismissed_until` timestamptz column; `dismiss()` sets it to now + `DISMISS_DURATION_SECONDS` (5 min) and rejects when TTL ≤ `DISMISS_MIN_TTL_SECONDS` (5 min) with «Нельзя отложить портал: до истечения менее 5 минут» (409). Ordering has a `dismissed_sinks` clause after open-first in **every** `order_by` mode; `dismissed_until` added to `PortalSchema` and to the exact field-set assertion. Tests: model dismiss semantics, API park, urgent 409, sink in all four orderings + window expiry.
+- **`last_update` action-only**: `onupdate` dropped; `execute_action` sets it after a successful action; the simulator never bumps it. `test_action_bumps_last_update_but_simulation_does_not` pins both sides.
+
+Frontend (gates green: 100 Vitest tests, tsc/oxlint/prettier/build):
+- **Reset-filters root cause**: `DEFAULT_PORTAL_FILTERS`/`DEFAULT_LOG_FILTERS` now list optional keys explicitly as `undefined`, so «Сбросить» truly clears `closed`/`danger_level`/`has_observer`/`is_marked`/`action`. New reset tests assert the request params lose the filter.
+- **Per-metric deltas**: `useSnapshotBaseline` hook (per-scope baseline, placeholder-safe) + `DeltaIndicator` (▲/▼, green/red/embers polarity) wired into the portal table (energy/stability/creatures/risk), the six stat cards and the stats page (danger distribution + avg-risk circle). Tests: hook semantics, table deltas over a WS frame, StatCards deltas.
+- **Table action column**: «Открыть» → «Детали», plus a fixed 1px amber divider between the scrollable data columns and the action column (header + body cells).
+- **Merged observer toggle**: modal resolves SEND/RECALL from `portal.has_observer` (like MARK/UNMARK); `RECALL_OBSERVER` removed from `ACTION_ORDER` but kept in the log filter. Tests: label flip per state, live flip when the portal closes over the socket.
+- **AI-WORKLOG tab**: `react-markdown` dependency; worklog bundled copy at `frontend/src/worklog/AI-WORKLOG.md` (`?raw` import — Vite build context is `frontend/` only, keep in sync with the root file); new `/worklog` route, nav tab «Журнал разработки» (FileTextOutlined), PAGE_META entry, dark-theme markdown CSS. WorklogPage tests render real headings and code blocks. All decisions recorded in DECISIONS.md.
 
 ### Frontend SPA implementation (branch `frontend/react-vite`)
 - Real React SPA committed (`aa6ae30`): React 19 + Vite 8 + TS strict, AntD v5 embers theme, TanStack Query, React Router v7; Russian UI / English code.

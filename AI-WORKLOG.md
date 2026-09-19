@@ -217,12 +217,20 @@ Record this plan in project state and relevant context files before proceeding. 
 - добавил и протестировал симулятор порталов
 - с помощью субагентов провел полный ревью бэкенда и нашел несколько важных проблем
 
+## Ошибки агента
+- сделал, чтобы симулятор работал только в проде, хотя это не корректно
+- при настройке тестов установил переменные среды через os.environ.setdefault вместо применения monkeypatch
+
 ## Ключевые промпты
 ```
 Your next task: add a portal populator/simulator. It is a background task that randomly updates some portals every 10 seconds. Changeable values: stability (may increase or decrease), creatures_inside (may decrease or increase). New portals may open with a configurable chance via envvar (default 5% which should be equal to about 1 portal per 3-4 minutes). New portal has completely random values, TTL from 30 seconds to 30 minutes. Write a name generator for worlds and portal names. Also reorder code in routes.portals so that POST /{id} and GET /{id} are nearby.
 ```
 
 # Этап 4. Интеграция
+Интеграция состояла из завершения написания фронтенда, добавления фильтров (которые писались параллельно), тестов для фронтенда и интеграционных тестов. Также был проведен код-ревью бэкенда с помощью gpt-5.6-terra.
+
+## Ключевые промпты
+**доработка фронтенда**
 ```
 Record a couple ideas while we're waiting for backend
 1) AntD must be rewritten to v6 before anything
@@ -231,6 +239,7 @@ Record a couple ideas while we're waiting for backend
 4) When portal is marked as "dismissed", it should temporarily disappear from frontend or be moved towards the end
 ```
 
+**комментарии ревьювера**
 ```
 1. P1: simulator can overwrite a concurrent portal action.
    ~/PycharmProjects/portals-be/backend/app/simulator.py:149 reads mutable portal rows without FOR UPDATE, then commits randomized stability/creatures_count. A simultaneous STABILIZE action (/
@@ -258,6 +267,26 @@ Record a couple ideas while we're waiting for backend
 
    Agent instruction: use Queue(maxsize=1) and skip enqueueing when a refresh is already pending. This preserves the intended “refresh/coalesce” semantics. Add a test that repeated broadcasts leave only
    one pending refresh.
+```
+
+```
+Okay now back to frontend. I found following issues
+1) Websockets throw errors but seem to work (I do see updates every 10 seconds without polling over http):
+Firefox can’t establish a connection to the server at ws://localhost:8000/portals/ws?page=1&items_per_page=20&order_by=risk. useSnapshotWs.ts:48:16
+The connection to ws://localhost:8000/portals/ws?page=1&items_per_page=20&order_by=risk was interrupted while the page was loading.
+2) There's an issue with the table: headers don't fully extend to the end of outer background. Horizontal scroll works
+3) I'm not sure why, but closed portal is displayed on top. It should not be that way, maybe check with backend.
+```
+
+```
+Add new tasks:
+1) Backend: observer must be automatically recalled on portal closure, i.e. closed portals must not have any observers in
+2) Frontend: reset filters button does not work neither in dashboard nor in logs
+3) Frontend: I see some requests to \/health being made, however there's no such endpoint
+4) Frontend: add "deltas" between last recorded stats in table items, top stats and separate stats
+5) Add a line separating scrollable table columns and button column. Also rename "Открыть" to "Детали", "Подробности", "Действия" or similar
+6) Merge "Recall observer" and "Send observer" buttons into one. Make sure it refreshes when portal closes
+7) The earlier stated task of moving the "dismissed" tasks to the end of the list on frontend side is not implemented.
 ```
 
 # Обработанные и покрытые тестами граничные случаи: Auth и Portals
