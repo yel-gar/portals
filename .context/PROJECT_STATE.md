@@ -120,9 +120,14 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 - `routes/portals.py` reordered: `POST /{portal_id}` and `GET /{portal_id}` are now adjacent, declared **after** the static `/log` and `/stats` routes so the int path param never shadows them (this was verified by the previously-passing /log, /stats tests which caught the intermediate wrong order).
 - Tests: `tests/test_simulator.py` (name shapes, new-portal values, delta/clamping, update+spawn, spawn-skip, closed-portal skip, loop ticks, loop survives tick errors, loop logs changed ids), `tests/test_config.py` (+`_as_float` cases), `tests/test_main.py` (lifespan starts/stops the simulator in both `DEBUG` modes and never starts it when `DISABLE_SIMULATOR` is set). 113 pass, coverage 99%.
 
-### Docs closed outside DEBUG (backend)
-- `app/main.py` construction moved into a `create_app()` factory (matches the documented "FastAPI app factory" structure): interactive docs and the OpenAPI schema are switched off in production via the constructor params — `docs_url`/`redoc_url`/`openapi_url` are `None` when `settings.debug` is falsy, `/docs`/`/redoc`/`/openapi.json` otherwise.
-- Tests: `test_docs_served_in_debug` (all three return 200) and `test_docs_closed_outside_debug` (all three return 404) build a fresh app per mode via `create_app()` with monkeypatched settings. 108 pass, coverage 99%.
+### Portal list & action log: filters + ordering (latest batch)
+- `PortalOrder` / `LogOrder` enums in `app/models.py` drive the `order_by` whitelist: `risk` (default), `expires_at`, `creatures`, `name` for portals; `newest` (default) / `oldest` for the log. Unknown values → 422.
+- Portal filters: `closed`, `danger_level`, `has_observer`, `is_marked`, `search` (case-insensitive name/world substring). Log filters: `action`, `portal_id`, `user_id`.
+- Risk/danger SQL expressions extracted from `/stats` into `_risk_expression(now)` / `_danger_bucket_expression(now)` (shared with `/stats`);
+- Default portal ordering: open portals first (closed/expired sink below and keep their own relative order — risk/expiry estimates are meaningless for a closed portal), then risk DESC, expires_at ASC, has_observer DESC, creatures_count DESC, `id ASC` tiebreaker. Open-first prepends every `order_by` mode.
+- All query params mirrored on the WS endpoints (`WS /portals/ws`, `WS /portals/log/ws`) via the shared `_portal_page` / `_action_log_page`.
+- `GET /portals/{id}` — individual portal info (`PortalSchema`), 404 for unknown id; declared after `/log` and `/stats` so the int path param never shadows them.
+- Tests: 17 new (default ordering, order_by variants, tie-breakers, open-before-closed, each portal filter, combined filters, 422 invalid order_by, log filters/ordering, WS-with-filter, portal info incl. 404/422/401). Coverage 99%; mypy/ruff/black clean.
 
 ### Initial superuser bootstrap + STABILIZE rework
 - `INITIAL_SUPERUSER_USERNAME` / `INITIAL_SUPERUSER_PASSWORD` env pair (both or none, lengths validated via shared constants): `app/config.py` `_read_initial_superuser` → `Settings.initial_superuser: tuple[str, str] | None`.

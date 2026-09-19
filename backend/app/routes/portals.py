@@ -114,8 +114,13 @@ def _portal_filter_clauses(
 
 
 def _portal_order_clauses(order_by: PortalOrder, now: datetime) -> list[Any]:
+    # Open portals first: risk and expiry estimates are meaningless for closed
+    # portals (an expired TTL clamps to zero, inflating the risk term), so they
+    # sink below open ones while keeping their own relative order.
+    open_first = case((and_(Portal.is_closed.is_(False), Portal.expires_at > now), 0), else_=1).asc()
     if order_by is PortalOrder.RISK:
         return [
+            open_first,
             _risk_expression(now).desc(),
             Portal.expires_at.asc(),
             Portal.has_observer.desc(),
@@ -123,10 +128,10 @@ def _portal_order_clauses(order_by: PortalOrder, now: datetime) -> list[Any]:
             Portal.id.asc(),
         ]
     if order_by is PortalOrder.EXPIRES_AT:
-        return [Portal.expires_at.asc(), Portal.id.asc()]
+        return [open_first, Portal.expires_at.asc(), Portal.id.asc()]
     if order_by is PortalOrder.CREATURES:
-        return [Portal.creatures_count.desc(), Portal.id.asc()]
-    return [func.lower(Portal.name).asc(), Portal.id.asc()]
+        return [open_first, Portal.creatures_count.desc(), Portal.id.asc()]
+    return [open_first, func.lower(Portal.name).asc(), Portal.id.asc()]
 
 
 def _action_log_filter_clauses(
@@ -312,7 +317,8 @@ async def _notify_action_committed(session: AsyncSession, portal_id: int) -> Non
         "`search` (подстрока в названии или целевом мире, без учёта регистра).\n\n"
         "Сортировка `order_by`: `risk` (по умолчанию — риск DESC, срок истечения ASC, "
         "наблюдатель внутри DESC, существа внутри DESC), `expires_at` (срок истечения ASC), "
-        "`creatures` (существа внутри DESC), `name` (название ASC)."
+        "`creatures` (существа внутри DESC), `name` (название ASC). Во всех режимах "
+        "закрытые/истёкшие порталы выводятся в конце списка — открытые всегда первыми."
     ),
     summary="Список порталов",
 )
