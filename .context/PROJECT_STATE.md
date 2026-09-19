@@ -15,6 +15,12 @@ Backend is complete (M1-M7: foundation, schemas/deps, auth, portal routes + two 
 7. **Frontend implementation** — SPA committed (`aa6ae30`): api layer, snapshot-WS hook, auth, portals table + 720px action modal, log, stats, admin users, RequireAuth/RequireSuperuser, embers theme. ✅
 8. **Tests + docs** — Vitest + Testing Library + MSW (43 tests: format, ApiError/request, useSnapshotWs incl. backoff/4401/pre-accept-1006, PortalModal, PortalsPage live-snapshot atomic replace, Login/Register, AdminUsers), `frontend/README.md`, envvars table refresh. ✅ (backend WS dep + live-WS browser check pending upstream fix)
 
+## Roadmap (awaiting backend PR merge)
+1. **AntD v5 → v6** — first priority once work resumes; must land before new frontend work. Re-verify embers tokens, drop `@ant-design/v5-patch-for-react-19`.
+2. **Linter/formatter/coverage/pre-commit** — prettier + coverage provider installed (`c284243`); ESLint blocked by TS 7 → linter choice pending (see DECISIONS.md).
+3. **Backend filters/ordering** — the incoming backend PR adds filters + ordering for action log and dashboard; frontend queries + controls after merge.
+4. **Marked-portal behavior** — dismissed portals temporarily hide or sink to the end of the list; spec TBD.
+
 ## Review fixes (post M6)
 - `nullable` now set explicitly on every model column.
 - Tests rewritten to be fully async (`pytest-asyncio` + `httpx.AsyncClient`/`ASGITransport`); `httpx2` dependency replaced with `httpx`.
