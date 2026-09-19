@@ -3,6 +3,12 @@ import { TableOutlined } from "@ant-design/icons";
 import { Alert, Button, Card, Skeleton, Space, Typography } from "antd";
 
 import { ApiError } from "../api/client";
+import type { PortalListParams } from "../api/types";
+import {
+  DEFAULT_PORTAL_FILTERS,
+  PortalFiltersBar,
+  type PortalFiltersState
+} from "../components/PortalFiltersBar";
 import { PortalModal } from "../components/PortalModal";
 import { PortalTable } from "../components/PortalTable";
 import { StatCards } from "../components/StatCards";
@@ -12,9 +18,16 @@ import { useReportLiveStatus } from "../live";
 export function PortalsPage() {
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [filters, setFilters] = useState<PortalFiltersState>(DEFAULT_PORTAL_FILTERS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const { query, liveStatus } = usePortalPage(page, itemsPerPage);
+  const params: PortalListParams = { page, itemsPerPage, ...filters };
+  const applyFilters = (patch: Partial<PortalFiltersState>) => {
+    setFilters((prev) => ({ ...prev, ...patch }));
+    setPage(1);
+  };
+
+  const { query, liveStatus } = usePortalPage(params);
   const stats = useStats();
   useReportLiveStatus(liveStatus);
 
@@ -50,18 +63,25 @@ export function PortalsPage() {
             action={<Button onClick={() => void query.refetch()}>Повторить</Button>}
           />
         ) : (
-          <PortalTable
-            portals={portals}
-            loading={query.isPending}
-            page={page}
-            itemsPerPage={itemsPerPage}
-            total={total}
-            onPageChange={(nextPage, nextSize) => {
-              setPage(nextPage);
-              setItemsPerPage(nextSize);
-            }}
-            onOpen={(portal) => setSelectedId(portal.id)}
-          />
+          <>
+            <PortalFiltersBar
+              filters={filters}
+              onChange={applyFilters}
+              onReset={() => applyFilters(DEFAULT_PORTAL_FILTERS)}
+            />
+            <PortalTable
+              portals={portals}
+              loading={query.isPending}
+              page={page}
+              itemsPerPage={itemsPerPage}
+              total={total}
+              onPageChange={(nextPage, nextSize) => {
+                setPage(nextPage);
+                setItemsPerPage(nextSize);
+              }}
+              onOpen={(portal) => setSelectedId(portal.id)}
+            />
+          </>
         )}
       </Card>
 

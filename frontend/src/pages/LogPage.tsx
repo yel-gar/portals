@@ -4,8 +4,13 @@ import { Alert, Button, Card, Space, Table, Tag, Tooltip, Typography } from "ant
 import type { ColumnsType } from "antd/es/table";
 
 import { ApiError } from "../api/client";
-import type { ActionLogEntry } from "../api/types";
+import type { ActionLogEntry, ActionLogParams } from "../api/types";
 import { ACTION_META } from "../constants";
+import {
+  DEFAULT_LOG_FILTERS,
+  LogFiltersBar,
+  type LogFiltersState
+} from "../components/LogFiltersBar";
 import { formatDateTime, formatRelative } from "../format";
 import { useActionLogPage } from "../hooks/usePortalData";
 import { useReportLiveStatus } from "../live";
@@ -13,8 +18,15 @@ import { useReportLiveStatus } from "../live";
 export function LogPage() {
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [filters, setFilters] = useState<LogFiltersState>(DEFAULT_LOG_FILTERS);
 
-  const { query, liveStatus } = useActionLogPage(page, itemsPerPage);
+  const params: ActionLogParams = { page, itemsPerPage, ...filters };
+  const applyFilters = (patch: Partial<LogFiltersState>) => {
+    setFilters((prev) => ({ ...prev, ...patch }));
+    setPage(1);
+  };
+
+  const { query, liveStatus } = useActionLogPage(params);
   useReportLiveStatus(liveStatus);
 
   const entries = query.data?.items ?? [];
@@ -81,29 +93,36 @@ export function LogPage() {
           action={<Button onClick={() => void query.refetch()}>Повторить</Button>}
         />
       ) : (
-        <Table<ActionLogEntry>
-          rowKey="id"
-          columns={columns}
-          dataSource={entries}
-          loading={query.isPending}
-          size="medium"
-          onChange={(pagination) => {
-            const nextPage = pagination.current ?? 1;
-            const nextSize = pagination.pageSize ?? itemsPerPage;
-            if (nextPage !== page || nextSize !== itemsPerPage) {
-              setPage(nextPage);
-              setItemsPerPage(nextSize);
-            }
-          }}
-          pagination={{
-            current: page,
-            pageSize: itemsPerPage,
-            total,
-            showSizeChanger: true,
-            pageSizeOptions: ["10", "20", "50", "100"],
-            showTotal: (count, range) => `${range[0]}–${range[1]} из ${count}`
-          }}
-        />
+        <>
+          <LogFiltersBar
+            filters={filters}
+            onChange={applyFilters}
+            onReset={() => applyFilters(DEFAULT_LOG_FILTERS)}
+          />
+          <Table<ActionLogEntry>
+            rowKey="id"
+            columns={columns}
+            dataSource={entries}
+            loading={query.isPending}
+            size="medium"
+            onChange={(pagination) => {
+              const nextPage = pagination.current ?? 1;
+              const nextSize = pagination.pageSize ?? itemsPerPage;
+              if (nextPage !== page || nextSize !== itemsPerPage) {
+                setPage(nextPage);
+                setItemsPerPage(nextSize);
+              }
+            }}
+            pagination={{
+              current: page,
+              pageSize: itemsPerPage,
+              total,
+              showSizeChanger: true,
+              pageSizeOptions: ["10", "20", "50", "100"],
+              showTotal: (count, range) => `${range[0]}–${range[1]} из ${count}`
+            }}
+          />
+        </>
       )}
     </Card>
   );

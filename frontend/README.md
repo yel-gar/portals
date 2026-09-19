@@ -15,7 +15,7 @@ frontend/
     hooks/          useSnapshotWs (snapshot WebSocket), useLiveSnapshot (запись в кэш Query),
                     usePortalData (страницы + stats), usePortalAction, useAuth
     components/     AppLayout, PortalTable, PortalModal, StatCards, DangerTag, LiveBadge,
-                    AuthShell, RequireAuth/RequireSuperuser
+                    PortalFiltersBar, LogFiltersBar, AuthShell, RequireAuth/RequireSuperuser
     pages/          Login, Register, Portals, Log, Stats, AdminUsers, NotFound
     test/           mocks.ts (MSW handlers), fakeWs.ts (FakeWebSocket), render.tsx
     constants.tsx   только презентационные данные (лейблы, цвета, иконки) — без бизнес-логики
@@ -28,8 +28,11 @@ frontend/
   ошибки 409/422 приходят от сервера и показываются как есть;
 - не хранит токены — аутентификация по httpOnly-куке `session_token` (`credentials: "include"`)
   во всех запросах;
-- не делает client-side сортировку/поиск по таблице — только серверная пагинация
-  (`page`, `items_per_page`, максимум 100).
+- не делает client-side сортировку/фильтрацию/поиск — пагинация и все фильтры
+  (`closed`/`danger_level`/`has_observer`/`is_marked`/`search`/`order_by` для порталов,
+  `action`/`order_by` для журнала) — серверные; один и тот же строитель запроса
+  (`portalListQuery`/`actionLogQuery`) используется для REST и snapshot-URL WS, поэтому
+  оба канала всегда запрашивают одну и ту же отфильтрованную страницу.
 
 ## Live-обновления (snapshot WebSocket)
 

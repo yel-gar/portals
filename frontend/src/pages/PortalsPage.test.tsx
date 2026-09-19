@@ -1,6 +1,7 @@
-import { act, screen } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
+import userEvent from "@testing-library/user-event";
 
 import { PortalsPage } from "./PortalsPage";
 import type { Portal } from "../api/types";
@@ -43,5 +44,46 @@ describe("PortalsPage", () => {
 
     renderWithProviders(<PortalsPage />);
     expect(await screen.findByText("Не удалось загрузить порталы")).toBeInTheDocument();
+  });
+
+  it("passes the chosen sort order to the backend instead of sorting client-side", async () => {
+    const user = userEvent.setup();
+    let captured: string | null = null;
+    server.use(
+      http.get(API_URL("/portals"), ({ request }) => {
+        captured = request.url;
+        return HttpResponse.json(portalPage());
+      })
+    );
+
+    renderWithProviders(<PortalsPage />);
+    await screen.findByText("Портал Альфа");
+
+    await user.click(screen.getByLabelText("Сортировка"));
+    await user.click(await screen.findByText("По алфавиту"));
+
+    await waitFor(() => {
+      expect(new URL(captured!).searchParams.get("order_by")).toBe("name");
+    });
+  });
+
+  it("sends the search text to the backend on submit", async () => {
+    const user = userEvent.setup();
+    let captured: string | null = null;
+    server.use(
+      http.get(API_URL("/portals"), ({ request }) => {
+        captured = request.url;
+        return HttpResponse.json(portalPage());
+      })
+    );
+
+    renderWithProviders(<PortalsPage />);
+    await screen.findByText("Портал Альфа");
+
+    await user.type(screen.getByPlaceholderText("Поиск: название или мир"), "альф{Enter}");
+
+    await waitFor(() => {
+      expect(new URL(captured!).searchParams.get("search")).toBe("альф");
+    });
   });
 });

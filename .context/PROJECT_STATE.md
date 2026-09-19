@@ -8,7 +8,7 @@ Frontend on branch `frontend/react-vite` (merged with master): real React SPA im
 ## Roadmap (frontend, branch `frontend/react-vite`)
 1. **AntD v5 → v6** — done: `antd ^6.6.4` + icons `^6.3.4`, React-19 patch dropped, deprecated APIs migrated (Alert `title`, Table `medium`, Divider `titlePlacement`), embers tokens intact. ✅ (see DECISIONS.md)
 2. **Linter/formatter/coverage/pre-commit** — prettier + coverage provider installed (`c284243`); ESLint blocked by TypeScript 7 → linter choice pending (see DECISIONS.md).
-3. **Filters/ordering UI** — backend landed (`e9cf180`, mirrored on the WS endpoints); frontend must surface filter + ordering controls for the portal table and the action log (server-driven params only, no client-side filtering).
+3. **Filters/ordering UI** — done: server-driven controls on both pages (portals: search/closed/danger-level/observer/mark + sort; log: action + sort). REST and snapshot-WS share one query builder so both fetch the identical filtered page; query keys carry the full params (distinct filter states never share a cache entry); filter changes reset to page 1; search applies on submit. ✅ (see DECISIONS.md)
 4. **`DISABLE_REGISTRATION` frontend part** — backend landed (403 + compose passthrough); frontend must gate the Register page (error message instead of the form) when the envvar reaches the frontend via compose.
 5. **Marked-portal behavior** — dismissed portals temporarily hide or sink to the end of the list; spec TBD.
 

@@ -16,6 +16,34 @@ export type Action =
 
 export type DangerLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
+/** `PortalOrder` (`backend/app/models.py`): server-side portal list sort. */
+export type PortalOrder = "risk" | "expires_at" | "creatures" | "name";
+
+/** `LogOrder`: server-side action-log sort. */
+export type LogOrder = "newest" | "oldest";
+
+/** Query params for `GET /portals` and its snapshot WS (`/portals/ws`). */
+export interface PortalListParams {
+  page: number;
+  itemsPerPage: number;
+  /** `true` = closed/expired, `false` = open, unset = all. */
+  closed?: boolean;
+  dangerLevel?: DangerLevel;
+  hasObserver?: boolean;
+  isMarked?: boolean;
+  /** Case-insensitive substring over name and destination world. */
+  search?: string;
+  orderBy: PortalOrder;
+}
+
+/** Query params for `GET /portals/log` and its snapshot WS (`/portals/log/ws`). */
+export interface ActionLogParams {
+  page: number;
+  itemsPerPage: number;
+  action?: Action;
+  orderBy: LogOrder;
+}
+
 /** `PortalSchema`. */
 export interface Portal {
   id: number;

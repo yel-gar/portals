@@ -40,6 +40,7 @@ export function detailToMessage(detail: unknown, fallback: string): string {
 }
 
 type QueryValue = string | number | boolean | null | undefined;
+export type { QueryValue };
 
 function withQuery(path: string, query?: Record<string, QueryValue>): string {
   if (!query) {

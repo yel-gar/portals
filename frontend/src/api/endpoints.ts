@@ -1,5 +1,15 @@
-import { request } from "./client";
-import type { Action, ActionLogPage, Credentials, Portal, PortalPage, Stats, UserOut } from "./types";
+import { request, type QueryValue } from "./client";
+import type {
+  Action,
+  ActionLogPage,
+  ActionLogParams,
+  Credentials,
+  Portal,
+  PortalListParams,
+  PortalPage,
+  Stats,
+  UserOut
+} from "./types";
 
 export const authApi = {
   me: () => request<UserOut>("/auth/me"),
@@ -8,18 +18,37 @@ export const authApi = {
   register: (body: Credentials) => request<UserOut>("/auth/register", { method: "POST", body })
 };
 
-export interface PageParams {
-  page: number;
-  itemsPerPage: number;
+/**
+ * Full query-string mapping for the portal list — shared by the REST call and
+ * the snapshot WS URL so both always request the exact same filtered page.
+ * `undefined`/`null` values are dropped by the client, `""` filters nothing.
+ */
+export function portalListQuery(params: PortalListParams): Record<string, QueryValue> {
+  return {
+    page: params.page,
+    items_per_page: params.itemsPerPage,
+    closed: params.closed,
+    danger_level: params.dangerLevel,
+    has_observer: params.hasObserver,
+    is_marked: params.isMarked,
+    search: params.search || undefined,
+    order_by: params.orderBy
+  };
 }
 
-function pageQuery({ page, itemsPerPage }: PageParams) {
-  return { page, items_per_page: itemsPerPage };
+/** Same shared mapping for the action log (REST + snapshot WS). */
+export function actionLogQuery(params: ActionLogParams): Record<string, QueryValue> {
+  return {
+    page: params.page,
+    items_per_page: params.itemsPerPage,
+    action: params.action,
+    order_by: params.orderBy
+  };
 }
 
 export const portalsApi = {
-  list: (params: PageParams) => request<PortalPage>("/portals", { query: pageQuery(params) }),
-  log: (params: PageParams) => request<ActionLogPage>("/portals/log", { query: pageQuery(params) }),
+  list: (params: PortalListParams) => request<PortalPage>("/portals", { query: portalListQuery(params) }),
+  log: (params: ActionLogParams) => request<ActionLogPage>("/portals/log", { query: actionLogQuery(params) }),
   stats: () => request<Stats>("/portals/stats"),
   /** Execute an action; the backend validates it and records it in the action log. */
   action: (portalId: number, action: Action) =>

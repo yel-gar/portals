@@ -133,3 +133,8 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 - Deprecated APIs migrated: `Alert.message` → `title` (4 call sites), `Table size="middle"` → `"medium"` (portal table, log, admin users), `Divider` title alignment `orientation="left"` → `titlePlacement="left"` (v6 `orientation` now means the divider's horizontal/vertical direction), and the no-longer-needed `marginInlineEnd: 0` override dropped from `DangerTag` (v6 removed the default trailing Tag margin).
 - Embers theme tokens in `theme.ts` compile unchanged; `app.css` contains no internal `.ant-*` DOM selectors, so the v6 DOM reshuffle needed no style adjustments.
 - Post-migration gates green: `npm run typecheck`, 43/43 Vitest tests, `npm run build` (antd bundle ~36 kB smaller).
+
+## Frontend: filters & ordering (2026-09)
+- Portal table and action log controls map 1:1 onto backend query params — portals: `closed`, `danger_level`, `has_observer`, `is_marked`, `search`, `order_by`; log: `action`, `order_by`. No client-side filtering/sorting; the backend stays the single source of truth.
+- `portalListQuery` / `actionLogQuery` (`api/endpoints.ts`) are shared by the REST call and the snapshot WS URL, so both channels always request the identical filtered page; cache query keys carry the full params object, so two filter states never share a cache entry, and the snapshot WS replaces data under the key it was requested with.
+- Filter changes re-point the snapshot WS (the hook reconnects on URL change) and reset pagination to page 1. The search box applies on submit (Enter/button) via a local draft — no request per keystroke. The log filter lists all 8 actions (`ALL_ACTIONS`); the modal-specific `ACTION_ORDER` is unchanged.

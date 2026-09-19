@@ -61,6 +61,18 @@ export const ACTION_META: Record<Action, ActionMeta> = {
   WARN_CREATURES: { label: "Предупредить существ", color: "volcano", Icon: WarningOutlined }
 };
 
+/** Every action the backend can log — the full `Action` enum, used by the log filter. */
+export const ALL_ACTIONS: Action[] = [
+  "DISMISS",
+  "STABILIZE",
+  "SEND_OBSERVER",
+  "RECALL_OBSERVER",
+  "CLOSE",
+  "MARK",
+  "UNMARK",
+  "WARN_CREATURES"
+];
+
 /** Order in which actions are offered in the portal detail modal. */
 export const ACTION_ORDER: Action[] = [
   "DISMISS",

@@ -1,8 +1,8 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { websocketUrl } from "../api/client";
-import { portalsApi } from "../api/endpoints";
-import type { ActionLogPage, PortalPage, Stats } from "../api/types";
+import { actionLogQuery, portalsApi, portalListQuery } from "../api/endpoints";
+import type { ActionLogPage, ActionLogParams, PortalListParams, PortalPage, Stats } from "../api/types";
 import { useLiveSnapshot } from "./useLiveSnapshot";
 
 /**
@@ -14,41 +14,45 @@ import { useLiveSnapshot } from "./useLiveSnapshot";
 const REFRESH_INTERVAL_MS = 30_000;
 const STATS_REFRESH_INTERVAL_MS = 20_000;
 
-export const portalPageKey = (page: number, itemsPerPage: number) =>
-  ["portals", "page", page, itemsPerPage] as const;
+/**
+ * Query keys carry the full params object: two different filter/order states
+ * never share a cache entry, and the snapshot WS writes under the same key it
+ * was requested with. TanStack Query hashes objects structurally, so a new
+ * object with equal values dedupes to the same key.
+ */
+export const portalPageKey = (params: PortalListParams) => ["portals", "page", params] as const;
 
-export const actionLogPageKey = (page: number, itemsPerPage: number) =>
-  ["portals", "log", page, itemsPerPage] as const;
+export const actionLogPageKey = (params: ActionLogParams) => ["portals", "log", params] as const;
 
 export const statsKey = ["portals", "stats"] as const;
 
-export function usePortalPage(page: number, itemsPerPage: number) {
+export function usePortalPage(params: PortalListParams) {
   const query = useQuery<PortalPage>({
-    queryKey: portalPageKey(page, itemsPerPage),
-    queryFn: () => portalsApi.list({ page, itemsPerPage }),
+    queryKey: portalPageKey(params),
+    queryFn: () => portalsApi.list(params),
     placeholderData: keepPreviousData,
     refetchInterval: REFRESH_INTERVAL_MS
   });
 
   const liveStatus = useLiveSnapshot<PortalPage>(
-    websocketUrl("/portals/ws", { page, items_per_page: itemsPerPage }),
-    portalPageKey(page, itemsPerPage)
+    websocketUrl("/portals/ws", portalListQuery(params)),
+    portalPageKey(params)
   );
 
   return { query, liveStatus };
 }
 
-export function useActionLogPage(page: number, itemsPerPage: number) {
+export function useActionLogPage(params: ActionLogParams) {
   const query = useQuery<ActionLogPage>({
-    queryKey: actionLogPageKey(page, itemsPerPage),
-    queryFn: () => portalsApi.log({ page, itemsPerPage }),
+    queryKey: actionLogPageKey(params),
+    queryFn: () => portalsApi.log(params),
     placeholderData: keepPreviousData,
     refetchInterval: REFRESH_INTERVAL_MS
   });
 
   const liveStatus = useLiveSnapshot<ActionLogPage>(
-    websocketUrl("/portals/log/ws", { page, items_per_page: itemsPerPage }),
-    actionLogPageKey(page, itemsPerPage)
+    websocketUrl("/portals/log/ws", actionLogQuery(params)),
+    actionLogPageKey(params)
   );
 
   return { query, liveStatus };
