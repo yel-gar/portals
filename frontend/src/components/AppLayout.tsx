@@ -26,6 +26,11 @@ const PAGE_META: PageMeta[] = [
   },
   { path: "/stats", title: "Статистика", subtitle: "Сводка по порталам лаборатории" },
   {
+    path: "/worklog",
+    title: "Журнал разработки",
+    subtitle: "AI-WORKLOG.md — история разработки проекта",
+  },
+  {
     path: "/admin/users",
     title: "Администрирование",
     subtitle: "Управление пользователями — только для суперпользователя",
@@ -45,12 +50,19 @@ export function AppLayout() {
   const location = useLocation();
   const meta = usePageMeta(location.pathname);
   const LogoIcon = LOGO_ICON;
-  const { portals: PortalsIcon, log: LogIcon, stats: StatsIcon, admin: AdminIcon } = NAV_ICONS;
+  const {
+    portals: PortalsIcon,
+    log: LogIcon,
+    stats: StatsIcon,
+    worklog: WorklogIcon,
+    admin: AdminIcon,
+  } = NAV_ICONS;
 
   const navItems = [
     { key: "/portals", icon: <PortalsIcon />, label: "Порталы" },
     { key: "/log", icon: <LogIcon />, label: "Журнал действий" },
     { key: "/stats", icon: <StatsIcon />, label: "Статистика" },
+    { key: "/worklog", icon: <WorklogIcon />, label: "Журнал разработки" },
     ...(user?.is_superuser
       ? [{ key: "/admin/users", icon: <AdminIcon />, label: "Администрирование" }]
       : []),

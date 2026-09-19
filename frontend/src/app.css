@@ -259,3 +259,143 @@ body {
 .portals-table-bleed {
   margin-inline: -24px;
 }
+
+/* Divider between the scrollable data columns and the fixed action column. */
+.portal-table-actions-sep {
+  border-inline-start: 1px solid rgba(255, 138, 51, 0.28);
+}
+
+/* Numeric table cells: the progress bar / tag plus a delta badge side by side. */
+.portal-cell-numeric {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.portal-cell-numeric > .ant-progress {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-cell-numeric--center {
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* Rendered AI-WORKLOG.md: block elements on the dark embers theme. */
+.worklog-markdown {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--page-fg);
+}
+
+.worklog-markdown h1,
+.worklog-markdown h2,
+.worklog-markdown h3,
+.worklog-markdown h4 {
+  color: var(--logo-fg);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.worklog-markdown h1 {
+  font-size: 22px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--nav-border);
+}
+
+.worklog-markdown h2 {
+  font-size: 18px;
+  margin-top: 28px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--nav-border);
+}
+
+.worklog-markdown h3 {
+  font-size: 16px;
+  margin-top: 20px;
+}
+
+.worklog-markdown h4 {
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+.worklog-markdown p {
+  margin: 8px 0;
+}
+
+.worklog-markdown strong {
+  color: var(--logo-fg);
+}
+
+.worklog-markdown a {
+  color: var(--accent-2);
+}
+
+.worklog-markdown ul,
+.worklog-markdown ol {
+  padding-inline-start: 22px;
+  margin: 8px 0;
+}
+
+.worklog-markdown li {
+  margin: 4px 0;
+}
+
+.worklog-markdown code {
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  color: #ffd9a3;
+  background: rgba(255, 138, 51, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.worklog-markdown pre {
+  background: #1a1008;
+  border: 1px solid var(--nav-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+
+.worklog-markdown pre code {
+  background: transparent;
+  padding: 0;
+  color: #f0dcc0;
+}
+
+.worklog-markdown blockquote {
+  margin: 10px 0;
+  padding: 6px 12px;
+  border-inline-start: 3px solid var(--accent-1);
+  color: var(--nav-fg-muted);
+  background: rgba(255, 106, 0, 0.06);
+  border-radius: 0 6px 6px 0;
+}
+
+.worklog-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+}
+
+.worklog-markdown th,
+.worklog-markdown td {
+  border: 1px solid var(--nav-border);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.worklog-markdown th {
+  background: rgba(255, 138, 51, 0.08);
+  color: var(--logo-fg);
+}
+
+.worklog-markdown hr {
+  border: none;
+  border-top: 1px solid var(--nav-border);
+  margin: 16px 0;
+}

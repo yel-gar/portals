@@ -164,7 +164,15 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
       <Row gutter={[12, 12]}>
         {ACTION_ORDER.map((entry) => {
           const resolved: Action =
-            entry === "MARK" ? (portal.is_marked ? "UNMARK" : "MARK") : entry;
+            entry === "MARK"
+              ? portal.is_marked
+                ? "UNMARK"
+                : "MARK"
+              : entry === "SEND_OBSERVER"
+                ? portal.has_observer
+                  ? "RECALL_OBSERVER"
+                  : "SEND_OBSERVER"
+                : entry;
           const meta = ACTION_META[resolved];
           const { Icon } = meta;
           const danger = DANGER_ACTIONS.has(resolved);

@@ -14,8 +14,18 @@ export interface PortalFiltersState {
   orderBy: PortalOrder;
 }
 
+/**
+ * The fully-cleared filter state. The optional keys are listed explicitly (as
+ * `undefined`) so a reset replaces them instead of spreading stale values over
+ * the previous state — `onReset` must not silently keep a filter the operator
+ * already cleared.
+ */
 export const DEFAULT_PORTAL_FILTERS: PortalFiltersState = {
   search: "",
+  closed: undefined,
+  dangerLevel: undefined,
+  hasObserver: undefined,
+  isMarked: undefined,
   orderBy: "risk",
 };
 

@@ -12,7 +12,8 @@ import {
 import { PortalModal } from "../components/PortalModal";
 import { PortalTable } from "../components/PortalTable";
 import { StatCards } from "../components/StatCards";
-import { usePortalPage, useStats } from "../hooks/usePortalData";
+import { portalPageKey, statsKey, usePortalPage, useStats } from "../hooks/usePortalData";
+import { useSnapshotBaseline } from "../hooks/useSnapshotBaseline";
 import { useReportLiveStatus } from "../live";
 
 export function PortalsPage() {
@@ -32,6 +33,13 @@ export function PortalsPage() {
   const { query, liveStatus } = usePortalPage(params);
   const stats = useStats();
   useReportLiveStatus(liveStatus);
+  // Placeholders (`keepPreviousData` from a previous scope) are excluded, so the
+  // delta baseline never mixes snapshots from different pages/filters.
+  const prevPage = useSnapshotBaseline(
+    portalPageKey(params),
+    query.isPlaceholderData ? undefined : query.data,
+  );
+  const prevStats = useSnapshotBaseline(statsKey, stats.isPlaceholderData ? undefined : stats.data);
 
   const portals = query.data?.items ?? [];
   const total = query.data?.total ?? 0;
@@ -47,7 +55,7 @@ export function PortalsPage() {
   return (
     <>
       {stats.data ? (
-        <StatCards stats={stats.data} />
+        <StatCards stats={stats.data} prevStats={prevStats} />
       ) : stats.isError ? (
         <Alert type="warning" showIcon title="Статистика недоступна" />
       ) : (
@@ -81,6 +89,7 @@ export function PortalsPage() {
             <div className="portals-table-bleed">
               <PortalTable
                 portals={portals}
+                prevPortals={prevPage?.items}
                 loading={query.isPending}
                 page={page}
                 itemsPerPage={itemsPerPage}

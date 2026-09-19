@@ -1,10 +1,12 @@
 import { EyeOutlined } from "@ant-design/icons";
 import { Button, Progress, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { useMemo } from "react";
 
 import type { Portal } from "../api/types";
 import { formatDateTime, formatRelative, formatTimeLeft } from "../format";
 import { useNow } from "../hooks/useNow";
+import { DeltaIndicator } from "./DeltaIndicator";
 import { DangerTag, RiskValue } from "./DangerTag";
 import { MarkedTag } from "./MarkedTag";
 
@@ -17,6 +19,8 @@ function stabilityColor(value: number): string {
 
 interface PortalTableProps {
   portals: Portal[];
+  /** The `items` of the previous page snapshot — per-row deltas live here. */
+  prevPortals?: Portal[];
   loading: boolean;
   page: number;
   itemsPerPage: number;
@@ -27,6 +31,7 @@ interface PortalTableProps {
 
 export function PortalTable({
   portals,
+  prevPortals,
   loading,
   page,
   itemsPerPage,
@@ -36,6 +41,18 @@ export function PortalTable({
 }: PortalTableProps) {
   // Re-render on a clock so «истекает» countdowns and «назад» strings stay fresh.
   const now = useNow();
+  // Snapshots may reorder or add rows; deltas are only meaningful per portal id.
+  const prevById = useMemo(
+    () => new Map(prevPortals?.map((portal) => [portal.id, portal]) ?? []),
+    [prevPortals],
+  );
+  const delta = (
+    portal: Portal,
+    pick: (prev: Portal, current: Portal) => number,
+  ): number | null => {
+    const prev = prevById.get(portal.id);
+    return prev ? pick(prev, portal) : null;
+  };
 
   const columns: ColumnsType<Portal> = [
     {
@@ -65,44 +82,78 @@ export function PortalTable({
     {
       title: "Энергия",
       key: "energy",
-      width: 140,
-      render: (_, portal) => (
-        <Progress percent={portal.energy_level} size="small" format={(value) => value} />
-      ),
+      width: 150,
+      render: (_, portal) => {
+        const value = delta(portal, (prev, current) => current.energy_level - prev.energy_level);
+        return (
+          <div className="portal-cell-numeric">
+            <Progress percent={portal.energy_level} size="small" format={(v) => v} />
+            {value !== null && <DeltaIndicator value={value} polarity="good-when-down" />}
+          </div>
+        );
+      },
     },
     {
       title: "Стабильность",
       key: "stability",
-      width: 140,
-      render: (_, portal) => (
-        <Progress
-          percent={portal.stability}
-          size="small"
-          strokeColor={stabilityColor(portal.stability)}
-          format={(value) => value}
-        />
-      ),
+      width: 150,
+      render: (_, portal) => {
+        const value = delta(portal, (prev, current) => current.stability - prev.stability);
+        return (
+          <div className="portal-cell-numeric">
+            <Progress
+              percent={portal.stability}
+              size="small"
+              strokeColor={stabilityColor(portal.stability)}
+              format={(v) => v}
+            />
+            {value !== null && <DeltaIndicator value={value} polarity="good-when-up" />}
+          </div>
+        );
+      },
     },
     {
       title: "Существа",
       key: "creatures",
       width: 100,
       align: "center",
-      render: (_, portal) =>
-        portal.creatures_count > 0 ? (
-          <Tag color="geekblue">{portal.creatures_count}</Tag>
-        ) : (
-          <Typography.Text type="secondary">—</Typography.Text>
-        ),
+      render: (_, portal) => {
+        const value = delta(
+          portal,
+          (prev, current) => current.creatures_count - prev.creatures_count,
+        );
+        return (
+          <div className="portal-cell-numeric portal-cell-numeric--center">
+            {portal.creatures_count > 0 ? (
+              <Tag color="geekblue">{portal.creatures_count}</Tag>
+            ) : (
+              <Typography.Text type="secondary">—</Typography.Text>
+            )}
+            {value !== null && <DeltaIndicator value={value} polarity="good-when-down" />}
+          </div>
+        );
+      },
     },
     {
       title: "Риск",
       key: "risk",
-      width: 90,
+      width: 100,
       align: "center",
-      render: (_, portal) => (
-        <RiskValue value={portal.risk_factor} level={portal.danger_level} strong />
-      ),
+      render: (_, portal) => {
+        const value = delta(portal, (prev, current) => current.risk_factor - prev.risk_factor);
+        return (
+          <div className="portal-cell-numeric portal-cell-numeric--center">
+            <RiskValue value={portal.risk_factor} level={portal.danger_level} strong />
+            {value !== null && (
+              <DeltaIndicator
+                value={value}
+                polarity="good-when-down"
+                format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`}
+              />
+            )}
+          </div>
+        );
+      },
     },
     {
       title: "Опасность",
@@ -155,6 +206,10 @@ export function PortalTable({
       width: 100,
       fixed: "right",
       align: "center",
+      // A 1px divider between the scrollable data columns and the fixed action
+      // column: the cell (header and body) gets a start border via CSS.
+      onCell: () => ({ className: "portal-table-actions-sep" }),
+      onHeaderCell: () => ({ className: "portal-table-actions-sep" }),
       render: (_, portal) => (
         <Button
           type="link"
@@ -164,7 +219,7 @@ export function PortalTable({
             onOpen(portal);
           }}
         >
-          Открыть
+          Детали
         </Button>
       ),
     },

@@ -26,6 +26,7 @@ export const OPEN_PORTAL: Portal = {
   has_observer: true,
   last_update: "2026-09-19T11:55:00Z",
   expires_at: "2026-09-19T14:00:00Z",
+  dismissed_until: null,
   risk_factor: 0.41,
   danger_level: "MEDIUM",
 };
@@ -42,6 +43,7 @@ export const CLOSED_PORTAL: Portal = {
   has_observer: false,
   last_update: "2026-09-18T20:00:00Z",
   expires_at: "2026-09-18T20:00:00Z",
+  dismissed_until: null,
   risk_factor: 0.12,
   danger_level: "LOW",
 };

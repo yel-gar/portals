@@ -110,6 +110,63 @@ describe("PortalsPage", () => {
     });
   });
 
+  it("reset clears every filter instead of keeping stale ones", async () => {
+    const user = userEvent.setup();
+    let captured: string | null = null;
+    server.use(
+      http.get(API_URL("/portals"), ({ request }) => {
+        captured = request.url;
+        return HttpResponse.json(portalPage());
+      }),
+    );
+
+    renderWithProviders(<PortalsPage />);
+    await screen.findByText("Портал Альфа");
+
+    await user.click(screen.getByLabelText("Состояние"));
+    await user.click(await screen.findByText("Закрытые"));
+    await waitFor(() => {
+      expect(new URL(captured!).searchParams.get("closed")).toBe("true");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Сбросить" }));
+
+    await waitFor(() => {
+      const params = new URL(captured!).searchParams;
+      expect(params.has("closed")).toBe(false);
+      expect(params.has("danger_level")).toBe(false);
+      expect(params.has("has_observer")).toBe(false);
+      expect(params.has("is_marked")).toBe(false);
+      expect(params.has("search")).toBe(false);
+      expect(params.get("order_by")).toBe("risk");
+    });
+  });
+
+  it("shows per-row deltas from the previous snapshot", async () => {
+    renderWithProviders(<PortalsPage />);
+    expect(await screen.findByText("Портал Альфа")).toBeInTheDocument();
+
+    const socket = FakeWebSocket.instances[0];
+    expect(socket).toBeDefined();
+    act(() => socket.open());
+
+    // The second frame of the same snapshot scope: energy +3, stability −20,
+    // creatures +1, risk +0.04 → four delta badges appear.
+    const changed: Portal = {
+      ...OPEN_PORTAL,
+      energy_level: 85,
+      stability: 44,
+      creatures_count: 4,
+      risk_factor: 0.45,
+    };
+    act(() => socket.message(JSON.stringify(portalPage([changed, CLOSED_PORTAL], 1, 20))));
+
+    expect(await screen.findByText("+3")).toBeInTheDocument();
+    expect(screen.getByText("-20")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.getByText("+0.04")).toBeInTheDocument();
+  });
+
   it("opens the portal modal when a row is clicked", async () => {
     const user = userEvent.setup();
 
@@ -136,7 +193,32 @@ describe("PortalsPage", () => {
 
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("Портал Альфа")).toBeInTheDocument();
+    // OPEN_PORTAL carries an observer, so the merged toggle reads «отозвать».
+    expect(within(dialog).getByText("Отозвать наблюдателя")).toBeInTheDocument();
+  });
+
+  it("refreshes the observer toggle when the portal closes over the socket", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(<PortalsPage />);
+    await user.click(await screen.findByText("Портал Альфа"));
+    expect(
+      within(await screen.findByRole("dialog")).getByText("Отозвать наблюдателя"),
+    ).toBeInTheDocument();
+
+    // The same portal closes (server auto-recalls the observer): the snapshot
+    // arrives over WS, and the merged toggle must flip to «отправить».
+    const socket = FakeWebSocket.instances[0];
+    expect(socket).toBeDefined();
+    act(() => socket.open());
+    const closed: Portal = { ...OPEN_PORTAL, closed: true, has_observer: false };
+    act(() => socket.message(JSON.stringify(portalPage([closed, CLOSED_PORTAL], 1, 20))));
+
+    // Cache writes are batched by TanStack Query, so the modal must be awaited
+    // with `findBy*` (polling) rather than queried synchronously.
+    const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Отправить наблюдателя")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Отозвать наблюдателя")).not.toBeInTheDocument();
   });
 
   it("keeps the modal open when a filter change empties the page", async () => {

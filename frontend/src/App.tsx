@@ -9,6 +9,7 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { PortalsPage } from "./pages/PortalsPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { StatsPage } from "./pages/StatsPage";
+import { WorklogPage } from "./pages/WorklogPage";
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/portals" element={<PortalsPage />} />
         <Route path="/log" element={<LogPage />} />
         <Route path="/stats" element={<StatsPage />} />
+        <Route path="/worklog" element={<WorklogPage />} />
         <Route
           path="/admin/users"
           element={

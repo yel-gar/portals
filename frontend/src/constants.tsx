@@ -4,6 +4,7 @@ import {
   DashboardOutlined,
   EyeOutlined,
   FieldTimeOutlined,
+  FileTextOutlined,
   FlagFilled,
   FlagOutlined,
   LineChartOutlined,
@@ -73,12 +74,16 @@ export const ALL_ACTIONS: Action[] = [
   "WARN_CREATURES",
 ];
 
-/** Order in which actions are offered in the portal detail modal. */
+/**
+ * Order in which actions are offered in the portal detail modal. RECALL_OBSERVER
+ * is intentionally absent: the «Наблюдатель» entry is a toggle resolved from
+ * `portal.has_observer` (send when empty, recall when present) — the two
+ * directions stay distinct in the action log only.
+ */
 export const ACTION_ORDER: Action[] = [
   "DISMISS",
   "STABILIZE",
   "SEND_OBSERVER",
-  "RECALL_OBSERVER",
   "CLOSE",
   "MARK",
   "WARN_CREATURES",
@@ -94,6 +99,7 @@ export const NAV_ICONS = {
   portals: DashboardOutlined,
   log: UnorderedListOutlined,
   stats: BarChartOutlined,
+  worklog: FileTextOutlined,
   admin: SettingOutlined,
 };
 

@@ -23,10 +23,11 @@ describe("PortalModal", () => {
     // Danger tag renders in the title and in the descriptions row.
     expect(screen.getAllByText("Средний").length).toBeGreaterThanOrEqual(1);
 
+    // OPEN_PORTAL has an observer inside, so the merged observer toggle reads
+    // «Отозвать наблюдателя»; RECALL_OBSERVER is folded into SEND_OBSERVER.
     const actionLabels = [
       "Оставить открытым",
       "Стабилизировать",
-      "Отправить наблюдателя",
       "Отозвать наблюдателя",
       "Закрыть",
       "Отметить",
@@ -36,6 +37,15 @@ describe("PortalModal", () => {
     // up the ru_RU aria-label «Закрыть» and would collide with the action button.
     const buttons = await Promise.all(actionLabels.map((label) => screen.findByText(label)));
     expect(buttons).toHaveLength(actionLabels.length);
+    expect(screen.queryByText("Отправить наблюдателя")).not.toBeInTheDocument();
+  });
+
+  it("flips the observer toggle label when the portal has no observer", async () => {
+    renderModal({ ...OPEN_PORTAL, has_observer: false });
+    expect(
+      await screen.findByRole("button", { name: /Отправить наблюдателя/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Отозвать наблюдателя/ })).not.toBeInTheDocument();
   });
 
   it("flips the mark button label for an already-marked portal", async () => {

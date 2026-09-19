@@ -9,7 +9,8 @@ export interface LogFiltersState {
   orderBy: LogOrder;
 }
 
-export const DEFAULT_LOG_FILTERS: LogFiltersState = { orderBy: "newest" };
+/** Fully-cleared log filter state — `action` is listed explicitly so a reset clears it. */
+export const DEFAULT_LOG_FILTERS: LogFiltersState = { action: undefined, orderBy: "newest" };
 
 const ORDER_OPTIONS: Array<{ value: LogOrder; label: string }> = [
   { value: "newest", label: "Сначала новые" },

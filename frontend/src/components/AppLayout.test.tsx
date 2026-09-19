@@ -24,6 +24,7 @@ describe("AppLayout", () => {
     expect((await screen.findAllByText("Порталы")).length).toBeGreaterThan(0);
     expect(screen.getByText("Журнал действий")).toBeInTheDocument();
     expect(screen.getByText("Статистика")).toBeInTheDocument();
+    expect(screen.getByText("Журнал разработки")).toBeInTheDocument();
     expect(screen.queryByText("Администрирование")).not.toBeInTheDocument();
     expect(
       screen.getByText("Живая таблица лаборатории — обновляется по WebSocket"),

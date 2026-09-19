@@ -59,6 +59,8 @@ export interface Portal {
   last_update: string;
   /** ISO 8601 UTC timestamp. */
   expires_at: string;
+  /** ISO 8601 UTC timestamp while the portal is parked by DISMISS, else null. */
+  dismissed_until: string | null;
   risk_factor: number;
   danger_level: DangerLevel;
 }

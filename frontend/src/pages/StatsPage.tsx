@@ -1,13 +1,25 @@
 import { Alert, Card, Col, Progress, Row, Skeleton, Typography, theme } from "antd";
 
+import type { DangerLevel } from "../api/types";
 import { DANGER_META, DANGER_ORDER } from "../constants";
 import { toPercent } from "../format";
-import { useStats } from "../hooks/usePortalData";
+import { statsKey, useStats } from "../hooks/usePortalData";
+import { useSnapshotBaseline } from "../hooks/useSnapshotBaseline";
+import { DeltaIndicator, type DeltaPolarity } from "../components/DeltaIndicator";
 import { StatCards } from "../components/StatCards";
+
+/** What a growing bucket count means for the lab, per danger level. */
+const DANGER_DELTA_POLARITY: Record<DangerLevel, DeltaPolarity> = {
+  LOW: "good-when-up",
+  MEDIUM: "neutral",
+  HIGH: "good-when-down",
+  CRITICAL: "good-when-down",
+};
 
 export function StatsPage() {
   const { token } = theme.useToken();
   const stats = useStats();
+  const prevStats = useSnapshotBaseline(statsKey, stats.isPlaceholderData ? undefined : stats.data);
 
   if (stats.isError) {
     return <Alert type="error" showIcon title="Не удалось загрузить статистику" />;
@@ -18,10 +30,11 @@ export function StatsPage() {
 
   const data = stats.data;
   const avgPercent = Math.round(data.avg_risk * 100);
+  const avgRiskDelta = prevStats ? data.avg_risk - prevStats.avg_risk : null;
 
   return (
     <>
-      <StatCards stats={data} />
+      <StatCards stats={data} prevStats={prevStats} />
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={14}>
@@ -32,6 +45,7 @@ export function StatsPage() {
             {DANGER_ORDER.map((level) => {
               const count = data.danger_levels[level] ?? 0;
               const percent = toPercent(count, data.open);
+              const levelDelta = prevStats ? count - (prevStats.danger_levels[level] ?? 0) : null;
               return (
                 <div key={level} style={{ marginBottom: 14 }}>
                   <div
@@ -40,6 +54,14 @@ export function StatsPage() {
                     <span>{DANGER_META[level].label}</span>
                     <Typography.Text type="secondary">
                       {count} шт · {percent}%
+                      {levelDelta !== null && (
+                        <span style={{ marginInlineStart: 6 }}>
+                          <DeltaIndicator
+                            value={levelDelta}
+                            polarity={DANGER_DELTA_POLARITY[level]}
+                          />
+                        </span>
+                      )}
                     </Typography.Text>
                   </div>
                   <Progress
@@ -70,6 +92,15 @@ export function StatsPage() {
                 )}
               />
             </div>
+            {avgRiskDelta !== null && (
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+                <DeltaIndicator
+                  value={avgRiskDelta}
+                  polarity="good-when-down"
+                  format={(value) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}`}
+                />
+              </div>
+            )}
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Средний риск считается на сервере по энергии, стабильности, числу существ и
               оставшемуся времени жизни порталов.

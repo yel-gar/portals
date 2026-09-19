@@ -50,4 +50,32 @@ describe("LogPage", () => {
       expect(new URL(captured!).searchParams.get("action")).toBe("CLOSE");
     });
   });
+
+  it("reset clears the action filter instead of keeping it", async () => {
+    const user = userEvent.setup();
+    let captured: string | null = null;
+    server.use(
+      http.get(API_URL("/portals/log"), ({ request }) => {
+        captured = request.url;
+        return HttpResponse.json({ items: [], page: 1, items_per_page: 20, total: 0 });
+      }),
+    );
+
+    renderWithProviders(<LogPage />);
+    await screen.findByTestId("log-filters");
+
+    await user.click(screen.getByLabelText("Действие"));
+    await user.click(await screen.findByText("Закрыть"));
+    await waitFor(() => {
+      expect(new URL(captured!).searchParams.get("action")).toBe("CLOSE");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Сбросить" }));
+
+    await waitFor(() => {
+      const params = new URL(captured!).searchParams;
+      expect(params.has("action")).toBe(false);
+      expect(params.get("order_by")).toBe("newest");
+    });
+  });
 });
