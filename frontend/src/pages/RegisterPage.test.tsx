@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { Route, Routes } from "react-router-dom";
 
@@ -18,6 +18,8 @@ const renderRegister = () =>
   );
 
 describe("RegisterPage", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it("registers, logs straight in and lands on the portals page", async () => {
     const user = userEvent.setup();
     let registerBody: unknown = null;
@@ -51,5 +53,23 @@ describe("RegisterPage", () => {
     await user.click(screen.getByRole("button", { name: "Зарегистрироваться" }));
 
     expect(await screen.findByText("Пользователь с таким именем уже существует")).toBeInTheDocument();
+  });
+
+  it("hides the form and shows the backend message when registration is disabled", async () => {
+    vi.stubEnv("VITE_DISABLE_REGISTRATION", "1");
+    const register = vi.fn();
+    server.use(
+      http.post(API_URL("/auth/register"), async ({ request }) => {
+        register();
+        await request.json();
+        return HttpResponse.json(DEMO_USER, { status: 201 });
+      })
+    );
+
+    renderRegister();
+
+    expect(await screen.findByText("Регистрация отключена")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Зарегистрироваться" })).not.toBeInTheDocument();
+    expect(register).not.toHaveBeenCalled();
   });
 });

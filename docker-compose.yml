@@ -45,6 +45,7 @@ services:
       context: ./frontend
       args:
         BACKEND_URL: ${BACKEND_URL:-}
+        DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-0}
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:80"

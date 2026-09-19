@@ -9,9 +9,10 @@ services:
       context: ./frontend
       target: dev
     environment:
-      # Runtime value so HMR picks up .env edits after a restart; the package
-      # name is baked into the client by Vite.
+      # Runtime values so HMR picks up .env edits after a restart; the package
+      # names are baked into the client by Vite.
       VITE_BACKEND_URL: ${BACKEND_URL:-}
+      VITE_DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-0}
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules

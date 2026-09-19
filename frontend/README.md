@@ -57,6 +57,7 @@ frontend/
 | ----------------- | ----------------------- | ----------------------- |
 | `BACKEND_URL`     | compose; build-arg в `Dockerfile` (prod) / runtime env (dev) | `http://localhost:8000` |
 | `VITE_BACKEND_URL`| собирается в бандл как base origin API (dev — runtime)       | `http://localhost:8000` |
+| `VITE_DISABLE_REGISTRATION` | устанавливается compose из `DISABLE_REGISTRATION` (build-arg в prod, runtime env в dev); когда истинно, страница регистрации показывает «Регистрация отключена» вместо формы | `0` |
 | `FRONTEND_PORT`   | host-порт контейнера фронтенда (см. корневой README)         | `3000`                  |
 
 При пустом `VITE_BACKEND_URL` клиент обращается к собственному origin (за reverse proxy).

@@ -1,10 +1,11 @@
-import { App as AntApp, Button, Form, Input } from "antd";
+import { App as AntApp, Alert, Button, Form, Input } from "antd";
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import { ApiError } from "../api/client";
 import type { Credentials } from "../api/types";
 import { useMe, useRegister } from "../hooks/useAuth";
+import { isRegistrationDisabled } from "../env";
 import { AuthShell } from "../components/AuthShell";
 
 /**
@@ -20,6 +21,15 @@ export function RegisterPage() {
 
   if (user) {
     return <Navigate to="/portals" replace />;
+  }
+
+  // Mirrors the backend's own 403 — the signup form must not exist here at all.
+  if (isRegistrationDisabled()) {
+    return (
+      <AuthShell title="Регистрация" footer={<Link to="/login">Войти</Link>}>
+        <Alert type="error" showIcon title="Регистрация отключена" />
+      </AuthShell>
+    );
   }
 
   const onFinish = (values: Credentials) => {
