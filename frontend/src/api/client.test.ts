@@ -24,6 +24,16 @@ describe("detailToMessage", () => {
     );
   });
 
+  it("skips non-validation entries inside an error list", () => {
+    const detail = [
+      { loc: ["body", "username"], msg: "Слишком коротко", type: "string_too_short" },
+      "не объект",
+      null,
+      42,
+    ];
+    expect(detailToMessage(detail, "fallback")).toBe("body.username: Слишком коротко");
+  });
+
   it("falls back for unknown shapes", () => {
     expect(detailToMessage({ weird: true }, "fallback")).toBe("fallback");
     expect(detailToMessage(null, "fallback")).toBe("fallback");

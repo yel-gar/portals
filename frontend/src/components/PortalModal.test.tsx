@@ -32,10 +32,9 @@ describe("PortalModal", () => {
       "Отметить",
       "Предупредить существ",
     ];
-    // antd prepends the icon's aria-label to the button's accessible name.
-    const buttons = await Promise.all(
-      actionLabels.map((label) => screen.findByRole("button", { name: new RegExp(label) })),
-    );
+    // Query by visible text, not role name: the modal's close (X) button picks
+    // up the ru_RU aria-label «Закрыть» and would collide with the action button.
+    const buttons = await Promise.all(actionLabels.map((label) => screen.findByText(label)));
     expect(buttons).toHaveLength(actionLabels.length);
   });
 
@@ -71,7 +70,9 @@ describe("PortalModal", () => {
     );
 
     renderModal();
-    await user.click(await screen.findByRole("button", { name: /Закрыть/ }));
+    const closeAction = (await screen.findByText("Закрыть")).closest("button");
+    expect(closeAction).not.toBeNull();
+    await user.click(closeAction!);
 
     expect(await screen.findByText("Портал уже закрыт")).toBeInTheDocument();
   });

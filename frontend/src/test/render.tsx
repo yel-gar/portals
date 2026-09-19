@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntApp, ConfigProvider } from "antd";
+import ruRU from "antd/locale/ru_RU";
 import { MemoryRouter } from "react-router-dom";
 
 import { LiveStatusProvider } from "../live";
@@ -24,7 +25,7 @@ export function renderWithProviders(ui: ReactElement, options: RenderOptions = {
   });
 
   const tree = (
-    <ConfigProvider theme={embersTheme}>
+    <ConfigProvider theme={embersTheme} locale={ruRU}>
       <AntApp>
         <QueryClientProvider client={queryClient}>
           <LiveStatusProvider>

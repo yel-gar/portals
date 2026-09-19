@@ -47,7 +47,16 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       include: ["src/**"],
-      exclude: ["src/test/**", "src/main.tsx", "src/vite-env.d.ts"],
+      // Plumbing/entry points with no meaningful unit-test surface: the app
+      // root (wired in main.tsx), global styles, and pure type definitions.
+      exclude: [
+        "src/test/**",
+        "src/main.tsx",
+        "src/vite-env.d.ts",
+        "src/App.tsx",
+        "src/app.css",
+        "src/api/types.ts",
+      ],
     },
   },
 });

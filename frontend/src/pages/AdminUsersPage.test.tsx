@@ -69,4 +69,40 @@ describe("AdminUsersPage", () => {
     expect(await screen.findByText("Пользователь удалён")).toBeInTheDocument();
     expect(deletedId).toBe(1);
   });
+
+  it("changes a user password", async () => {
+    const user = userEvent.setup();
+    let captured: { id: string; body: { password: string } } | null = null;
+    server.use(
+      http.get(API_URL("/admin/users"), () => HttpResponse.json([DEMO_USER])),
+      http.post(API_URL("/admin/users/:id/set-password"), async ({ request, params }) => {
+        captured = {
+          id: String(params.id),
+          body: (await request.json()) as { password: string },
+        };
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    renderAdmin();
+    await user.click(await screen.findByRole("button", { name: /Сменить пароль/ }));
+
+    const dialog = await screen.findByRole("dialog");
+    await user.type(await within(dialog).findByLabelText("Новый пароль"), "fresh-pass-1");
+    await user.click(within(dialog).getByRole("button", { name: /Сохранить/ }));
+
+    expect(await screen.findByText("Пароль изменён")).toBeInTheDocument();
+    expect(captured).toEqual({ id: "1", body: { password: "fresh-pass-1" } });
+  });
+
+  it("offers a retry button when the user list fails to load", async () => {
+    server.use(
+      http.get(API_URL("/admin/users"), () =>
+        HttpResponse.json({ detail: "База данных недоступна" }, { status: 500 }),
+      ),
+    );
+
+    renderAdmin();
+    expect(await screen.findByText("Повторить загрузку")).toBeInTheDocument();
+  });
 });

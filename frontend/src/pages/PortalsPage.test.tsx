@@ -109,4 +109,44 @@ describe("PortalsPage", () => {
       expect(new URL(captured!).searchParams.get("search")).toBe("альф");
     });
   });
+
+  it("opens the portal modal when a row is clicked", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(<PortalsPage />);
+    await user.click(await screen.findByText("Портал Альфа"));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Портал Альфа")).toBeInTheDocument();
+  });
+
+  it("applies pagination changes to the backend query", async () => {
+    const user = userEvent.setup();
+    let captured: string | null = null;
+    server.use(
+      http.get(API_URL("/portals"), ({ request }) => {
+        captured = request.url;
+        return HttpResponse.json(portalPage());
+      }),
+    );
+
+    renderWithProviders(<PortalsPage />);
+    await screen.findByText("Портал Альфа");
+
+    // Locale-agnostic: open the size-changer select in the pagination options,
+    // then pick the option whose value parses to 10.
+    const sizeSelect = document.querySelector(".ant-pagination-options .ant-select");
+    expect(sizeSelect).not.toBeNull();
+    await user.click(sizeSelect as HTMLElement);
+
+    const option = [...document.querySelectorAll(".ant-select-item-option")].find(
+      (el) => parseInt(el.getAttribute("title") ?? "", 10) === 10,
+    );
+    expect(option).toBeDefined();
+    await user.click(option as HTMLElement);
+
+    await waitFor(() => {
+      expect(new URL(captured!).searchParams.get("items_per_page")).toBe("10");
+    });
+  });
 });
