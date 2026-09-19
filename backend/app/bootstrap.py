@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .models import User
-from .security import hash_password
+from .security import hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,10 @@ async def ensure_initial_superuser(
 
     Superusers whose name differs from ``username`` are deleted (their login
     sessions cascade via FK, action log rows get ``user_id`` SET NULL). An
-    existing superuser with the exact name is kept as-is — its password is
-    never reset. A regular user holding the configured name aborts startup.
+    existing superuser with the exact name is kept; if its stored hash no
+    longer matches ``password`` (the env var changed), the hash is replaced
+    with the new one. A regular user holding the configured name aborts
+    startup.
     """
     async with session_factory() as session:
         existing = await session.scalar(select(User).where(User.username == username))
@@ -34,6 +36,9 @@ async def ensure_initial_superuser(
         if existing is None:
             session.add(User(username=username, password_hash=hash_password(password), is_superuser=True))
             logger.info("Создан начальный суперпользователь username=%s", username)
-        else:
+        elif verify_password(password, existing.password_hash):
             logger.info("Начальный суперпользователь username=%s уже существует", username)
+        else:
+            existing.password_hash = hash_password(password)
+            logger.info("Пароль начального суперпользователя username=%s обновлён", username)
         await session.commit()

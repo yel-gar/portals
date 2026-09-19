@@ -83,6 +83,7 @@ class Settings:
     session_ttl_days: int = SESSION_TTL_DAYS
     initial_superuser: tuple[str, str] | None = None
     disable_registration: bool = False
+    disable_simulator: bool = False
     portal_open_chance: float = SIMULATOR_OPEN_CHANCE_DEFAULT
 
     @property
@@ -98,6 +99,7 @@ def load_settings() -> Settings:
         debug=_as_bool(os.getenv("DEBUG")),
         initial_superuser=_read_initial_superuser(),
         disable_registration=_as_bool(os.getenv("DISABLE_REGISTRATION")),
+        disable_simulator=_as_bool(os.getenv("DISABLE_SIMULATOR")),
         portal_open_chance=_as_float(
             os.getenv("PORTAL_OPEN_CHANCE"), SIMULATOR_OPEN_CHANCE_DEFAULT, name="PORTAL_OPEN_CHANCE"
         ),
