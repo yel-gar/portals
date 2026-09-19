@@ -10,7 +10,28 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    sourcemap: false
+    sourcemap: false,
+    // antd is intentionally one long-lived vendor chunk; keep the warning quiet.
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) {
+            return undefined;
+          }
+          if (id.includes("antd") || id.includes("@ant-design")) {
+            return "antd";
+          }
+          if (id.includes("@tanstack")) {
+            return "query";
+          }
+          if (id.includes("react")) {
+            return "react";
+          }
+          return "vendor";
+        }
+      }
+    }
   },
   test: {
     environment: "jsdom",

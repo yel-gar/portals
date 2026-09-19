@@ -2,13 +2,17 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ConfigProvider } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import ruRU from "antd/locale/ru_RU";
 
 import App from "./App";
+import { LiveStatusProvider } from "./live";
 import { embersTheme } from "./theme";
 
 import "antd/dist/reset.css";
+// Ant Design v5 targets React 16–18; this official patch adapts its static
+// APIs (message/Modal waves) to React 19. Must load before any antd component.
+import "@ant-design/v5-patch-for-react-19";
 import "./app.css";
 
 const queryClient = new QueryClient({
@@ -29,11 +33,15 @@ if (!container) {
 createRoot(container).render(
   <StrictMode>
     <ConfigProvider theme={embersTheme} locale={ruRU}>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </QueryClientProvider>
+      <AntApp>
+        <QueryClientProvider client={queryClient}>
+          <LiveStatusProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </LiveStatusProvider>
+        </QueryClientProvider>
+      </AntApp>
     </ConfigProvider>
   </StrictMode>
 );

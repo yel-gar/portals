@@ -166,12 +166,29 @@ body {
   color: var(--live-fg);
 }
 
+.app-live--open {
+  color: var(--live-fg);
+}
+
+.app-live--connecting,
+.app-live--reconnecting {
+  color: #faad14;
+}
+
+.app-live--unauthorized {
+  color: #ff4d4f;
+}
+
 .app-live-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: currentColor;
   animation: app-pulse 1.6s ease-in-out infinite;
+}
+
+.app-live--unauthorized .app-live-dot {
+  animation: none;
 }
 
 @keyframes app-pulse {
@@ -212,4 +229,26 @@ body {
 .auth-card {
   width: 100%;
   max-width: 380px;
+}
+
+.auth-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--logo-fg);
+}
+
+/* Full-page spinner while the session is being checked. */
+.app-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.portal-inline-progress {
+  font-variant-numeric: tabular-nums;
 }
