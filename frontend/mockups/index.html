@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Макет «Угли» — Лаборатория порталов</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: #0e0905;
+        color: #f6e7d3;
+        padding: 40px 24px;
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 26px;
+      }
+      p.lead {
+        margin: 0 0 28px;
+        color: #b09372;
+        line-height: 1.5;
+      }
+      .card {
+        background: #171008;
+        border: 1px solid rgba(255, 138, 51, 0.14);
+        border-radius: 14px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+      }
+      .preview {
+        height: 110px;
+        border-radius: 10px;
+        overflow: hidden;
+        display: flex;
+        border: 1px solid rgba(255, 138, 51, 0.12);
+      }
+      .preview .nav {
+        width: 34%;
+        background: linear-gradient(180deg, #150d05, #0a0603);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px;
+      }
+      .preview .nav i {
+        height: 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.18);
+      }
+      .preview .nav i:first-child {
+        background: #ff6a00;
+        width: 60%;
+      }
+      .preview .body {
+        flex: 1;
+        background: #0e0905;
+        padding: 10px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+      .preview .body i {
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 5px;
+        height: 20px;
+      }
+      .preview .body i:first-child {
+        grid-column: 1 / -1;
+        background: #ff6a00;
+      }
+      .card h3 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .card p {
+        margin: 0;
+        color: #b09372;
+        font-size: 13.5px;
+        line-height: 1.5;
+      }
+      .palette {
+        display: flex;
+        gap: 6px;
+      }
+      .palette span {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      .card a {
+        display: block;
+        text-align: center;
+        padding: 11px 12px;
+        border-radius: 9px;
+        background: #ff6a00;
+        color: #1a0d03;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .card a:hover {
+        background: #ff8c1a;
+      }
+      .note {
+        margin-top: 26px;
+        font-size: 13px;
+        color: #b09372;
+        line-height: 1.6;
+        background: #171008;
+        border: 1px solid rgba(255, 138, 51, 0.14);
+        border-radius: 12px;
+        padding: 14px 18px;
+      }
+      .note code {
+        background: rgba(255, 138, 51, 0.12);
+        color: #ffbf80;
+        border-radius: 5px;
+        padding: 1px 6px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Макет «Угли»</h1>
+      <p class="lead">
+        Выбранная тема оформления «Лаборатории порталов»: тёмный интерфейс с огненно-оранжевым акцентом. Макет —
+        статичная страница-ориентир; реальный фронтенд (React + Vite + Ant Design) реализует эту палитру.
+      </p>
+
+      <div class="card">
+        <div class="preview">
+          <div class="nav"><i></i><i></i><i></i><i></i></div>
+          <div class="body"><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <h3>Угли</h3>
+        <p>
+          Боковая панель слева, почти чёрный тёплый фон, оранжевый акцент и мягкое свечение логотипа. Карточка
+          портала открывается модальным окном; иконки статистики окрашены по смыслу.
+        </p>
+        <div class="palette">
+          <span style="background: #0e0905"></span>
+          <span style="background: #ff6a00"></span>
+          <span style="background: #171008"></span>
+          <span style="background: #ffb347"></span>
+        </div>
+        <a href="themes/embers.html">Открыть макет →</a>
+      </div>
+
+      <div class="note">
+        Макет собран на Ant Design по CDN и делит рендерер <code>shared/app.compiled.js</code> (plain-JS сборка
+        <code>shared/app.js</code>, пересобрать: <code>node build.js</code>). Страницы открываются прямо с диска
+        (<code>file://</code>). Дополнительные виды — параметрами URL: <code>?page=log</code>,
+        <code>?page=stats</code>, <code>?portal=&lt;id&gt;</code>.
+      </div>
+    </div>
+  </body>
+</html>

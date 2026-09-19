@@ -1,0 +1,261 @@
+/* Embers chrome: sidebar, header, topline, page background.
+   AntD owns component surfaces (tokens in `theme.ts`); these rules cover the
+   layout areas AntD does not theme. */
+
+:root {
+  --page-bg: #0e0905;
+  --page-fg: #f6e7d3;
+  --accent-1: #ff6a00;
+  --accent-2: #ffb347;
+  --nav-bg: linear-gradient(180deg, #150d05 0%, #0a0603 100%);
+  --nav-fg: #e9d3b8;
+  --nav-fg-muted: #a07f5c;
+  --nav-border: rgba(255, 138, 51, 0.14);
+  --logo-fg: #fff3e6;
+  --header-bg: #120b07;
+  --header-fg: #f2dfc9;
+  --header-fg-muted: #a38662;
+  --header-border: rgba(255, 138, 51, 0.12);
+  --footer-fg: #7d6244;
+  --live-fg: #5ee08a;
+  --live-glow: rgba(94, 224, 138, 0.4);
+  --topline-h: 3px;
+  --topline-bg: linear-gradient(90deg, #ff4d00, #ff8c00, #ffc46b);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--page-fg);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(1100px 480px at 72% -10%, rgba(255, 106, 0, 0.1), transparent 62%),
+    radial-gradient(800px 400px at 8% 110%, rgba(255, 61, 0, 0.06), transparent 60%), var(--page-bg);
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: row;
+}
+
+.app-sider {
+  width: 238px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--nav-bg);
+  border-right: 1px solid var(--nav-border);
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  color: var(--logo-fg);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  border-bottom: 1px solid var(--nav-border);
+}
+
+.app-logo-icon {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ffad33, #ff4d00);
+  color: #fff;
+  font-size: 16px;
+  box-shadow: 0 0 24px rgba(255, 106, 0, 0.55);
+}
+
+.app-nav {
+  flex: 1;
+  padding: 14px 10px;
+  overflow: auto;
+}
+
+.app-userbox {
+  padding: 14px 16px;
+  border-top: 1px solid var(--nav-border);
+}
+
+.app-userbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-user-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--nav-fg);
+}
+
+.app-user-role {
+  font-size: 12px;
+  color: var(--nav-fg-muted);
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-topline {
+  height: var(--topline-h);
+  background: var(--topline-bg);
+  flex: none;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 60px;
+  padding: 10px 24px;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+}
+
+.app-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--header-fg);
+}
+
+.app-subtitle {
+  font-size: 12px;
+  color: var(--header-fg-muted);
+  margin-top: 2px;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--live-fg);
+}
+
+.app-live--open {
+  color: var(--live-fg);
+}
+
+.app-live--connecting,
+.app-live--reconnecting {
+  color: #faad14;
+}
+
+.app-live--unauthorized {
+  color: #ff4d4f;
+}
+
+.app-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: app-pulse 1.6s ease-in-out infinite;
+}
+
+.app-live--unauthorized .app-live-dot {
+  animation: none;
+}
+
+@keyframes app-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 var(--live-glow);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+.app-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-footer {
+  text-align: center;
+  padding: 14px;
+  font-size: 12px;
+  color: var(--footer-fg);
+  border-top: 1px solid var(--header-border);
+}
+
+/* Centered shell for unauthenticated pages (login/registration). */
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+}
+
+.auth-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--logo-fg);
+}
+
+/* Full-page spinner while the session is being checked. */
+.app-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.portal-inline-progress {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The portals table spans the card edge-to-edge: the antd Card body pads by
+   24px per side, which made the solid header band visibly stop short of the
+   card background. The filters bar above stays inside the padded area. */
+.portals-table-bleed {
+  margin-inline: -24px;
+}

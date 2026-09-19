@@ -87,4 +87,68 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 
 ## Future ideas (not yet implemented)
 - Background tasks that update portal data should also produce `portal_changes` notifications (the trigger-based producer is a later alternative to in-route `pg_notify`).
-- A frontend is not built yet; the API and WebSocket endpoints are backend-only for now.
+
+## Frontend: lint/format pipeline — oxlint + Prettier (2026-09)
+- **Linter: oxlint** (`^1.83.0`). ESLint was rejected earlier because TypeScript 7 ships no JS compiler API and typescript-eslint peers on TS <6.1.0. Config `.oxlintrc.json` (JSON auto-discovered; the experimental `oxlint.config.mjs` was not picked up by auto-discovery): plugins `react`, categories `correctness`+`suspicious` error and `perf` warn; the whole ESLint `style` category stays off — Prettier owns style.
+- Per-project rule tuning: `react/react-in-jsx-scope` off (Vite automatic JSX runtime), `react/jsx-max-depth` off (default max 2 is unfit for antd forms), `react/no-unstable-nested-components` `["error", { allowAsProps: true }]` (antd render-props like `Progress format`).
+- **Formatter: Prettier** (3.9.8, already a devDep). `.prettierrc.json` = `{ "printWidth": 100 }` (project already used double quotes + semicolons + trailing commas, Prettier defaults); `.prettierignore` = `node_modules`, `dist`, `coverage`, `mockups`, `package-lock.json`, `*.tsbuildinfo`.
+- **Strictness**: `lint` runs `oxlint --deny-warnings .` (warnings fail), so the codebase is kept at 0 warnings 0 errors (117 rules). First pass fixed real findings: MSW callback `({ request })` shadowing the imported `request` helper (renamed to `req`), `await` in a test loop (switched to `Promise.all`), and the search-draft sync effect in `PortalFiltersBar` (rebuilt with React's recommended key-remount pattern instead of a `setState`-in-effect).
+- **Coverage**: `@vitest/coverage-v8`, provider v8, reporters `text`+`lcov` (`coverage/lcov.info` uploads to CI), excludes `src/test/**`, `src/main.tsx`, `src/vite-env.d.ts`. Baseline: 76.55 % statements / 76.71 % lines across 52 tests. No hard `fail_under` gate (mirrors the backend coverage workflow).
+- **Pre-commit**: two frontend hooks in the existing `local` repo — `prettier (frontend)` (`npm --prefix frontend run format`) and `oxlint (frontend)` (`npm --prefix frontend run lint:fix`), both `files: ^frontend/` + `pass_filenames: false`, exactly mirroring the backend hook pattern.
+- **CI**: `.github/workflows/frontend-ci.yml` (matrix: `format:check`, `lint`, `typecheck`, `build` + a `tests (vitest)` job; `actions/setup-node@v4` with Node 24 — parity with `frontend/Dockerfile` — and npm cache) and `.github/workflows/frontend-coverage.yml` (test+coverage, uploads `frontend/coverage/lcov.info` artifact), both gated on `frontend/**` changes like the backend workflows.
+- npm scripts added: `lint`, `lint:fix`, `format`, `format:check`, `coverage`.
+
+## Frontend: marked portals — badge only (2026-09)
+- Decided with the user: marked portals get **no ordering change** from the frontend. Neither a client-side "hide" nor "sink to end" (both would require presentation logic that must not exist client-side); the backend's `is_marked` filter/ordering params are already surfaceable if the user wants them later.
+- The frontend shows a prominent «Отмечено» badge on marked portal rows (`components/MarkedTag.tsx`, orange Tag with the MARK action's `FlagFilled` icon + tooltip, «Отмечено» capitalized). Replaced the previous tiny lowercase "отмечен" tag; it remains the only client-side treatment of marked portals.
+
+## Frontend stack
+- The frontend is a **React SPA scaffolded with Vite**, TypeScript in strict mode, with **no SSR/SSG** (no Next.js). Rationale: the app is an authenticated dashboard where everything interesting arrives live in the browser via WebSockets, so server-side rendering buys nothing and would only add machinery (RSC, cookie forwarding, "use client" everywhere) without payoff.
+- The FastAPI backend stays the single source of truth. The frontend consumes JSON HTTP + the two snapshot WebSocket endpoints (`/portals/ws`, `/portals/log/ws`); each WS push is a complete page snapshot and replaces the previous server state atomically.
+- Auth stays cookie-based in the browser: the backend's httpOnly session cookie is handled by the browser automatically (Secure unless `DEBUG`); the frontend never stores the token itself. Across subdomains this works because the two subdomains share a site (SameSite=Lax cookies are sent same-site).
+- `frontend/` file layout is still to be agreed with the user at scaffold time (structure changes are coordinated with the user).
+- Frontend work happens on branch `frontend/react-vite`; the API/WS endpoints are no longer "backend-only" — see the frontend decision above.
+
+## Frontend design choices (confirmed with user)
+- UI components: **Ant Design** (Table, Tag, Modal, Form, message/notification).
+- UI language: **Russian labels, English code** (identifiers, comments, types in English; all user-visible strings in Russian, consistent with the backend's Russian `BadAction` messages).
+- Server state: **TanStack Query** for REST (portals list, log, stats, auth); live updates via a small custom WebSocket hook that replaces the page snapshot on every push — the backend sends complete snapshots, so state is swapped atomically, never merged.
+- Routing: **React Router** (v7).
+- Package manager: **npm**.
+- Serving: the backend is hosted on a **separate subdomain** from the frontend. The frontend receives the backend origin via `BACKEND_URL`, passed through docker compose in **both development and production**, and baked into the build for all API/WS calls (compose maps it to a Vite-exposed env var, e.g. `VITE_BACKEND_URL`). CORS on the backend already allows the frontend origin via `FRONTEND_URL`.
+- Local development runs the frontend with **auto-reload** through docker compose overrides (bind-mounted workdir + Vite dev server with HMR), mirroring the backend's `docker-compose.override.yml.dev` → `docker-compose.override.yml` pattern.
+
+## Frontend theme: «Угли» (embers) — chosen design
+- Chosen from six AntD mockups (`frontend/mockups/`). Dark sidebar theme, fiery orange accent:
+  - AntD tokens: `darkAlgorithm`; seed `colorPrimary #ff6a00`, `colorBgLayout #0e0905`, `colorBgContainer #171008`, `colorBgElevated #1e1409`, `borderRadius 10`.
+  - Chrome CSS variables: sidebar `linear-gradient(180deg, #150d05, #0a0603)`, header `#120b07`, 3px topline gradient `#ff4d00 → #ff8c00 → #ffc46b`, logo gradient `#ffad33 → #ff4d00` with ember glow, live dot `#5ee08a`.
+  - Page background: `#0e0905` with two faint radial ember glows.
+- Portal detail opens in a centered AntD **Modal** (720px, actions 3 per row), not a drawer (user request).
+- Stat-card icons are colored semantically: total = theme accent, open = green `#52c41a`, closed = gray `#8c8c8c`, marked = orange `#fa8c16`, observer = cyan `#13c2c2`, avg risk = live danger color.
+- The mockup stays in `frontend/mockups/` (embers only) as the design reference; the real app re-implements the look with AntD tokens + CSS variables, not mockup code.
+
+## Frontend file layout (agreed at scaffold time)
+- `frontend/src/`:
+  - `main.tsx` (entry, providers), `App.tsx` (router config + guards)
+  - `theme.ts` — AntD dark theme from the embers palette
+  - `api/` — `types.ts` (TS mirrors of backend schemas/enums), `client.ts` (fetch wrapper, `credentials: "include"`, base from `VITE_BACKEND_URL`), `auth.ts`, `portals.ts`, `ws.ts` (WebSocket URL builder)
+  - `hooks/` — `useSnapshotWs.ts` (atomic snapshot replacement + reconnect), `useAuth.ts` (me/login/logout/register), TanStack query hooks for portals/log/stats
+  - `components/` — `AppLayout.tsx` (sidebar + header + userbox + topline), `StatCards.tsx`, `PortalTable.tsx`, `PortalModal.tsx`, shared bits
+  - `pages/` — `LoginPage.tsx`, `PortalListPage.tsx`, `LogPage.tsx`, `StatsPage.tsx`, `AdminPage.tsx`
+- Dev server runs Vite on port 80 inside the container (host `FRONTEND_PORT`, default 3000) so the prod/dev host port never differs; `VITE_BACKEND_URL` is baked at build (prod) or injected at runtime (dev override).
+- Frontend tests: Vitest + React Testing Library + MSW for API mocking (added at test milestone).
+
+## Frontend: Ant Design v5 → v6 (migrated 2026-09)
+- `antd ^6.6.4` + `@ant-design/icons ^6.3.4` installed; `@ant-design/v5-patch-for-react-19` removed — v6 supports React 19 natively (React >= 18 required; we are on React 19.3).
+- Deprecated APIs migrated: `Alert.message` → `title` (4 call sites), `Table size="middle"` → `"medium"` (portal table, log, admin users), `Divider` title alignment `orientation="left"` → `titlePlacement="left"` (v6 `orientation` now means the divider's horizontal/vertical direction), and the no-longer-needed `marginInlineEnd: 0` override dropped from `DangerTag` (v6 removed the default trailing Tag margin).
+- Embers theme tokens in `theme.ts` compile unchanged; `app.css` contains no internal `.ant-*` DOM selectors, so the v6 DOM reshuffle needed no style adjustments.
+- Post-migration gates green: `npm run typecheck`, 43/43 Vitest tests, `npm run build` (antd bundle ~36 kB smaller).
+
+## Frontend: filters & ordering (2026-09)
+- Portal table and action log controls map 1:1 onto backend query params — portals: `closed`, `danger_level`, `has_observer`, `is_marked`, `search`, `order_by`; log: `action`, `order_by`. No client-side filtering/sorting; the backend stays the single source of truth.
+- `portalListQuery` / `actionLogQuery` (`api/endpoints.ts`) are shared by the REST call and the snapshot WS URL, so both channels always request the identical filtered page; cache query keys carry the full params object, so two filter states never share a cache entry, and the snapshot WS replaces data under the key it was requested with.
+- Filter changes re-point the snapshot WS (the hook reconnects on URL change) and reset pagination to page 1. The search box applies on submit (Enter/button) via a local draft — no request per keystroke. The log filter lists all 8 actions (`ALL_ACTIONS`); the modal-specific `ACTION_ORDER` is unchanged.
+
+## Frontend: `DISABLE_REGISTRATION` gating (2026-09)
+- Wired exactly like `BACKEND_URL`/`VITE_BACKEND_URL`: both Dockerfile stages (build + dev) map `DISABLE_REGISTRATION` → `VITE_DISABLE_REGISTRATION` (build arg baked in prod, runtime env in the dev override — both the `.dev` template and the local copy updated).
+- `RegisterPage` reads it lazily (`env.ts` `isRegistrationDisabled`, truthy = not empty/`0`/`false`) and renders the backend's own 403 message «Регистрация отключена» instead of the form; the registration API is never attempted. Documented in the frontend README envvars table; the root README row now covers the frontend behaviour too.

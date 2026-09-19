@@ -29,13 +29,29 @@ services:
       POSTGRES_PORT: 5432
       INITIAL_SUPERUSER_USERNAME: ${INITIAL_SUPERUSER_USERNAME:-}
       INITIAL_SUPERUSER_PASSWORD: ${INITIAL_SUPERUSER_PASSWORD:-}
+      BACKEND_URL: ${BACKEND_URL:-}
+      FRONTEND_URL: ${FRONTEND_URL:-}
+      DEBUG: ${DEBUG:-0}
       DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-0}
+      DISABLE_SIMULATOR: ${DISABLE_SIMULATOR:-0}
       PORTAL_OPEN_CHANCE: ${PORTAL_OPEN_CHANCE:-0.05}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: ${BACKEND_URL:-}
+        DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-0}
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:

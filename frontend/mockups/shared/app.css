@@ -1,0 +1,294 @@
+/* Base styles shared by all mock themes. The color scheme is injected per theme
+   page via CSS variables defined in frontend/mockups/themes/*.html.
+   Real dashboard will use AntD tokens only; these classes are mockup-only. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg, #f0f4f9);
+  color: var(--page-fg, #1c2430);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mock-app {
+  min-height: 100vh;
+  display: flex;
+  /* AntD's own .ant-layout rule sets flex-direction: column; the shell must
+     lay the sidebar out to the LEFT of the main column, not above it. */
+  flex-direction: row;
+}
+
+/* Thin accent strip drawn above the header (optional per theme) */
+.mock-topline {
+  height: var(--topline-h, 0px);
+  background: var(--topline-bg, transparent);
+  flex: none;
+}
+
+/* ---- Sidebar layout ---- */
+.mock-sider {
+  width: 238px;
+  flex: none;
+  background: var(--nav-bg, #0d2137);
+  color: var(--nav-fg, #b8c9dd);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--nav-border, rgba(255, 255, 255, 0.08));
+}
+
+.mock-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  color: var(--logo-fg, #fff);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  border-bottom: 1px solid var(--nav-border, rgba(255, 255, 255, 0.08));
+}
+
+.mock-logo-icon {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--logo-bg, linear-gradient(135deg, var(--accent-1, #1d6ff2), var(--accent-2, #5aa2ff)));
+  color: #fff;
+  font-size: 16px;
+  box-shadow: var(--logo-glow, none);
+}
+
+.mock-nav {
+  flex: 1;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+}
+
+.mock-nav--horizontal {
+  flex-direction: row;
+  padding: 0;
+  gap: 4px;
+  align-items: center;
+}
+
+.mock-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: var(--nav-fg, #b8c9dd);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mock-nav--horizontal .mock-nav-item {
+  width: auto;
+}
+
+.mock-nav-item:hover {
+  background: var(--nav-item-hover, rgba(255, 255, 255, 0.07));
+}
+
+.mock-nav-item--active {
+  background: var(--nav-item-active-bg, rgba(255, 255, 255, 0.12));
+  color: var(--nav-item-active-fg, #fff);
+  font-weight: 600;
+}
+
+.mock-nav-item--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mock-nav-icon {
+  font-size: 16px;
+  display: inline-flex;
+}
+
+.mock-nav-badge {
+  margin-left: auto;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--nav-badge-bg, rgba(255, 255, 255, 0.12));
+}
+
+.mock-userbox {
+  padding: 14px 16px;
+  border-top: 1px solid var(--nav-border, rgba(255, 255, 255, 0.08));
+}
+
+.mock-userbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mock-user-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--nav-fg, #b8c9dd);
+}
+
+.mock-user-role {
+  font-size: 12px;
+  color: var(--nav-fg-muted, rgba(255, 255, 255, 0.55));
+}
+
+.mock-userbox .ant-btn {
+  margin-top: 12px;
+}
+
+/* ---- Right column / header ---- */
+.mock-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 60px;
+  padding: 10px 24px;
+  background: var(--header-bg, #fff);
+  border-bottom: 1px solid var(--header-border, #e6ebf2);
+  color: var(--header-fg, #1f2a3a);
+}
+
+.mock-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--header-fg, #1f2a3a);
+}
+
+.mock-subtitle {
+  font-size: 12px;
+  color: var(--header-fg-muted, #8a94a6);
+  margin-top: 2px;
+}
+
+.mock-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mock-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--live-fg, #0aa06e);
+}
+
+.mock-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: mock-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes mock-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 var(--live-glow, rgba(10, 160, 110, 0.45));
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+.mock-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mock-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mock-toolbar-spacer {
+  flex: 1;
+}
+
+.mock-footer {
+  text-align: center;
+  padding: 14px;
+  font-size: 12px;
+  color: var(--footer-fg, #8a94a6);
+  border-top: 1px solid var(--header-border, #e6ebf2);
+}
+
+/* ---- Top-nav layout (theme "Лаборатория") ---- */
+.mock-topnav {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  min-height: 62px;
+  padding: 10px 24px;
+  background: var(--nav-bg, #fff);
+  border-bottom: 1px solid var(--nav-border, #e3ebe5);
+}
+
+.mock-topnav .mock-logo {
+  border-bottom: none;
+  padding: 0;
+}
+
+.mock-topnav .mock-nav {
+  flex: 1;
+}
+
+.mock-topnav-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--nav-fg, #33453d);
+}
+
+/* Small helper for inline progress in the drawer */
+.mock-inline-progress {
+  width: 130px;
+  display: inline-block;
+  vertical-align: middle;
+}
