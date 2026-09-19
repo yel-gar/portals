@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { Result, Spin } from "antd";
+import { Button, Result, Spin } from "antd";
 
 import { useMe } from "../hooks/useAuth";
 
 /** Gate behind a valid session; unauthenticated visitors go to the login page. */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { data: user, isLoading, isError } = useMe();
+  const { data: user, isLoading, isError, refetch } = useMe();
   const location = useLocation();
 
   if (isLoading) {
@@ -22,6 +22,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
         status="error"
         title="Не удалось проверить сессию"
         subTitle="Проверьте, что сервер доступен, и попробуйте снова."
+        extra={<Button onClick={() => void refetch()}>Повторить</Button>}
       />
     );
   }
