@@ -1,6 +1,6 @@
 import pytest
 
-from app.config import _as_bool, _build_database_url, _read_initial_superuser
+from app.config import _as_bool, _as_float, _build_database_url, _read_initial_superuser
 
 
 def test_as_bool_default() -> None:
@@ -13,6 +13,31 @@ def test_as_bool_truthy_and_falsy() -> None:
         assert _as_bool(value) is True
     for value in ("0", "false", "off", "n", "whatever"):
         assert _as_bool(value) is False
+
+
+def test_as_float_parses_valid_values() -> None:
+    assert _as_float("0.05", 0.1, name="PORTAL_OPEN_CHANCE") == 0.05
+    assert _as_float("1", 0.1, name="PORTAL_OPEN_CHANCE") == 1.0
+    assert _as_float("0", 0.1, name="PORTAL_OPEN_CHANCE") == 0.0
+    assert _as_float(" 0.5 ", 0.1, name="PORTAL_OPEN_CHANCE") == 0.5
+
+
+def test_as_float_unset_or_blank_returns_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert _as_float(None, 0.1, name="PORTAL_OPEN_CHANCE") == 0.1
+    assert _as_float("", 0.1, name="PORTAL_OPEN_CHANCE") == 0.1
+    assert _as_float("   ", 0.1, name="PORTAL_OPEN_CHANCE") == 0.1
+
+
+def test_as_float_rejects_non_numeric() -> None:
+    with pytest.raises(RuntimeError, match="PORTAL_OPEN_CHANCE"):
+        _as_float("abc", 0.1, name="PORTAL_OPEN_CHANCE")
+
+
+def test_as_float_rejects_out_of_range() -> None:
+    with pytest.raises(RuntimeError, match="PORTAL_OPEN_CHANCE"):
+        _as_float("-0.1", 0.1, name="PORTAL_OPEN_CHANCE")
+    with pytest.raises(RuntimeError, match="PORTAL_OPEN_CHANCE"):
+        _as_float("1.5", 0.1, name="PORTAL_OPEN_CHANCE")
 
 
 def test_build_database_url_prefers_override(monkeypatch: pytest.MonkeyPatch) -> None:

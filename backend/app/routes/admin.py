@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 
 from ..deps import DbSession, get_superuser
-from ..models import User
+from ..models import LoginSession, User
 from ..schemas import PasswordChangeSchema, UserOutSchema, UserRegisterSchema
 from ..security import hash_password
 
@@ -40,7 +41,11 @@ async def create_user(data: UserRegisterSchema, session: DbSession) -> User:
         raise HTTPException(status.HTTP_409_CONFLICT, "Пользователь с таким именем уже существует")
     user = User(username=data.username, password_hash=hash_password(data.password))
     session.add(user)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Пользователь с таким именем уже существует") from exc
     await session.refresh(user)
     logger.info("Администратор создал пользователя username=%s id=%d", user.username, user.id)
     return user
@@ -84,7 +89,7 @@ async def delete_user(user_id: int, session: DbSession) -> None:
         status.HTTP_404_NOT_FOUND: {"description": "Пользователь не найден"},
         status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Пароль не удовлетворяет требованиям длины"},
     },
-    description="Смена пароля пользователя. Длина пароля валидируется схемой.",
+    description="Смена пароля пользователя. Все его сессии завершаются. Длина пароля валидируется схемой.",
     summary="Сменить пароль",
 )
 async def set_password(data: PasswordChangeSchema, user_id: int, session: DbSession) -> None:
@@ -92,5 +97,6 @@ async def set_password(data: PasswordChangeSchema, user_id: int, session: DbSess
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Пользователь не найден")
     user.password_hash = hash_password(data.password)
+    await session.execute(delete(LoginSession).where(LoginSession.user_id == user.id))
     await session.commit()
     logger.info("Администратор сменил пароль пользователю id=%d", user_id)
