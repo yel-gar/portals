@@ -222,6 +222,44 @@ Record this plan in project state and relevant context files before proceeding. 
 Your next task: add a portal populator/simulator. It is a background task that randomly updates some portals every 10 seconds. Changeable values: stability (may increase or decrease), creatures_inside (may decrease or increase). New portals may open with a configurable chance via envvar (default 5% which should be equal to about 1 portal per 3-4 minutes). New portal has completely random values, TTL from 30 seconds to 30 minutes. Write a name generator for worlds and portal names. Also reorder code in routes.portals so that POST /{id} and GET /{id} are nearby.
 ```
 
+# Этап 4. Интеграция
+```
+Record a couple ideas while we're waiting for backend
+1) AntD must be rewritten to v6 before anything
+2) Linter, formatter, coverage checker and pre-commit hooks must be configured
+3) New backend will introduce filters and ordering for action logs and dashboard. Frontend needs to support it
+4) When portal is marked as "dismissed", it should temporarily disappear from frontend or be moved towards the end
+```
+
+```
+1. P1: simulator can overwrite a concurrent portal action.
+   ~/PycharmProjects/portals-be/backend/app/simulator.py:149 reads mutable portal rows without FOR UPDATE, then commits randomized stability/creatures_count. A simultaneous STABILIZE action (/
+   home/exenifix/PycharmProjects/portals-be/backend/app/routes/portals.py:527) does lock its row, but may commit before the simulator’s stale object is flushed, allowing the simulator to overwrite the
+   action’s new stability.
+
+   Agent instruction: lock the simulator’s selected open portals with with_for_update() before changing them, and add a two-session concurrency test proving a simultaneous STABILIZE cannot be lost.
+
+2. P1: DISABLE_REGISTRATION does not reach the deployed backend.
+   The new setting is documented in ~/PycharmProjects/portals-be/.env.example:16 and read in ~/PycharmProjects/portals-be/backend/app/config.py:100, but ~/
+   PycharmProjects/portals-be/docker-compose.yml:23 does not pass it to the backend service. Setting it in the project .env therefore still leaves public registration enabled in Docker deployment.
+
+   Agent instruction: add DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-0} to the backend service environment and verify the rendered Compose configuration includes it.
+
+3. P2: listener recovery can make shutdown wait up to 30 seconds.
+   When reconnection fails, UpdateHub._supervise (~/PycharmProjects/portals-be/backend/app/notifications.py:73) sleeps with exponential backoff. stop() (~/PycharmProjects/portals-
+   be/backend/app/notifications.py:86) sets a flag but does not cancel or interrupt that sleep, then awaits the supervisor. After a failed reconnect, application shutdown can exceed the Docker grace
+   period.
+
+   Agent instruction: make the supervisor promptly cancellable during stop() and add a test that stops a hub while its reconnect attempt is backing off.
+
+4. P2: simulator notifications can grow WebSocket subscriber queues without bound.
+   UpdateHub.broadcast (~/PycharmProjects/portals-be/backend/app/notifications.py:115) puts one item per event into unbounded queues. The simulator emits one notification per changed portal
+   every tick, so a slow client or slow snapshot query can accumulate an arbitrarily large queue.
+
+   Agent instruction: use Queue(maxsize=1) and skip enqueueing when a refresh is already pending. This preserves the intended “refresh/coalesce” semantics. Add a test that repeated broadcasts leave only
+   one pending refresh.
+```
+
 # Обработанные и покрытые тестами граничные случаи: Auth и Portals
 
 ## Auth (регистрация / вход / выход / me / сессии, включая администрирование пользователей)
