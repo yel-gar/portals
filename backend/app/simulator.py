@@ -146,11 +146,12 @@ async def simulate_once(session: AsyncSession, *, open_chance: float | None = No
     changed_ids: set[int] = set()
     now = utc_now()
 
-    # Lock the rows with SELECT ... FOR UPDATE so a concurrent portal action
-    # (which also locks its row) can never be overwritten by this stale snapshot:
-    # if the action commits first, the blocked select re-reads the fresh values
-    # and the random deltas are applied on top of the action's result.
-    stmt = select(Portal).where(Portal.is_closed.is_(False), Portal.expires_at > now).with_for_update()
+    # Lock the rows with SELECT ... FOR UPDATE SKIP LOCKED. The lock prevents a
+    # concurrent portal action from being overwritten by this snapshot (the tick
+    # only modifies rows it locked itself), while SKIP LOCKED means a portal that
+    # is being acted on right now is simply skipped — the tick returns promptly
+    # instead of blocking the action, and can update that portal on a later tick.
+    stmt = select(Portal).where(Portal.is_closed.is_(False), Portal.expires_at > now).with_for_update(skip_locked=True)
     open_portals = (await session.scalars(stmt)).all()
     for portal in open_portals:
         if random.random() < SIMULATOR_UPDATE_CHANCE:
