@@ -12,8 +12,8 @@ Object.defineProperty(window, "matchMedia", {
     removeListener: () => {},
     addEventListener: () => {},
     removeEventListener: () => {},
-    dispatchEvent: () => false
-  })
+    dispatchEvent: () => false,
+  }),
 });
 
 class ResizeObserverStub {
@@ -24,5 +24,5 @@ class ResizeObserverStub {
 
 Object.defineProperty(globalThis, "ResizeObserver", {
   writable: true,
-  value: ResizeObserverStub
+  value: ResizeObserverStub,
 });

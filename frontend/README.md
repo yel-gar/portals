@@ -24,6 +24,7 @@ frontend/
 ```
 
 Бэкенд — единственный источник истины. Фронтенд:
+
 - не считает риск/уровень опасности и не проверяет допустимость действий — оценки и
   ошибки 409/422 приходят от сервера и показываются как есть;
 - не хранит токены — аутентификация по httpOnly-куке `session_token` (`credentials: "include"`)
@@ -44,6 +45,7 @@ frontend/
 `expires_at`. Что приходит позже — REST или WS-кадр — просто побеждает.
 
 `useSnapshotWs` (обёртка `useLiveSnapshot`):
+
 - переподключается с экспоненциальной задержкой (1 c → 15 c) при неожиданном закрытии;
 - код закрытия **4401** после accept трактует как «сессия истекла»;
 - закрытие **до** завершения рукопожатия (бэкенд отклоняет мёртвую куку HTTP-403, а браузер
@@ -53,12 +55,12 @@ frontend/
 
 ## Переменные окружения
 
-| Переменная        | Где используется        | Пример                  |
-| ----------------- | ----------------------- | ----------------------- |
-| `BACKEND_URL`     | compose; build-arg в `Dockerfile` (prod) / runtime env (dev) | `http://localhost:8000` |
-| `VITE_BACKEND_URL`| собирается в бандл как base origin API (dev — runtime)       | `http://localhost:8000` |
-| `VITE_DISABLE_REGISTRATION` | устанавливается compose из `DISABLE_REGISTRATION` (build-arg в prod, runtime env в dev); когда истинно, страница регистрации показывает «Регистрация отключена» вместо формы | `0` |
-| `FRONTEND_PORT`   | host-порт контейнера фронтенда (см. корневой README)         | `3000`                  |
+| Переменная                  | Где используется                                                                                                                                                             | Пример                  |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `BACKEND_URL`               | compose; build-arg в `Dockerfile` (prod) / runtime env (dev)                                                                                                                 | `http://localhost:8000` |
+| `VITE_BACKEND_URL`          | собирается в бандл как base origin API (dev — runtime)                                                                                                                       | `http://localhost:8000` |
+| `VITE_DISABLE_REGISTRATION` | устанавливается compose из `DISABLE_REGISTRATION` (build-arg в prod, runtime env в dev); когда истинно, страница регистрации показывает «Регистрация отключена» вместо формы | `0`                     |
+| `FRONTEND_PORT`             | host-порт контейнера фронтенда (см. корневой README)                                                                                                                         | `3000`                  |
 
 При пустом `VITE_BACKEND_URL` клиент обращается к собственному origin (за reverse proxy).
 
@@ -77,10 +79,20 @@ frontend/
 ## Проверки
 
 ```bash
-npm run typecheck   # tsc -b --noEmit
-npm run test:run    # vitest run (jsdom)
-npm run build       # tsc -b && vite build
+npm run lint          # oxlint (correctness/suspicious error, perf warn; warnings fail)
+npm run format:check  # prettier --check
+npm run typecheck     # tsc -b --noEmit
+npm run test:run      # vitest run (jsdom)
+npm run coverage      # vitest run --coverage (v8: text + lcov → coverage/lcov.info)
+npm run build         # tsc -b && vite build
 ```
+
+- Pre-commit (из корня репозитория) прогоняет `prettier --write` и `oxlint --fix` по
+  изменённым `frontend/**` файлам (те же паттерны, что и бэкенд-хуки).
+- Конфиги: `.oxlintrc.json` (плагин react, ESLint-style `style` выключен — за стиль
+  отвечает Prettier), `.prettierrc.json` (`printWidth: 100`), `.prettierignore`.
+- CI: `.github/workflows/frontend-ci.yml` (format/lint/typecheck/build + vitest, Node 24)
+  и `frontend-coverage.yml` (загрузка `coverage/lcov.info` как артефакт).
 
 - MSW перехватывает HTTP (handlers — в `src/test/mocks.ts`); пути обработчиков задаются
   абсолютными, т.к. path-only паттерны не матчатся против чужого origin в текущей версии MSW.

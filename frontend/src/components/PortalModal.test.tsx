@@ -23,18 +23,20 @@ describe("PortalModal", () => {
     // Danger tag renders in the title and in the descriptions row.
     expect(screen.getAllByText("Средний").length).toBeGreaterThanOrEqual(1);
 
-    for (const label of [
+    const actionLabels = [
       "Оставить открытым",
       "Стабилизировать",
       "Отправить наблюдателя",
       "Отозвать наблюдателя",
       "Закрыть",
       "Отметить",
-      "Предупредить существ"
-    ]) {
-      // antd prepends the icon's aria-label to the button's accessible name.
-      expect(await screen.findByRole("button", { name: new RegExp(label) })).toBeInTheDocument();
-    }
+      "Предупредить существ",
+    ];
+    // antd prepends the icon's aria-label to the button's accessible name.
+    const buttons = await Promise.all(
+      actionLabels.map((label) => screen.findByRole("button", { name: new RegExp(label) })),
+    );
+    expect(buttons).toHaveLength(actionLabels.length);
   });
 
   it("flips the mark button label for an already-marked portal", async () => {
@@ -50,7 +52,7 @@ describe("PortalModal", () => {
       http.post(API_URL("/portals/:id"), ({ request }) => {
         requestedAction = new URL(request.url).searchParams.get("action");
         return HttpResponse.json(OPEN_PORTAL);
-      })
+      }),
     );
 
     renderModal();
@@ -64,8 +66,8 @@ describe("PortalModal", () => {
     const user = userEvent.setup();
     server.use(
       http.post(API_URL("/portals/:id"), () =>
-        HttpResponse.json({ detail: "Портал уже закрыт" }, { status: 409 })
-      )
+        HttpResponse.json({ detail: "Портал уже закрыт" }, { status: 409 }),
+      ),
     );
 
     renderModal();

@@ -16,14 +16,14 @@ export const embersTheme: ThemeConfig = {
     colorBgElevated: "#1e1409",
     borderRadius: 10,
     fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif'
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
   },
   components: {
     Layout: {
       bodyBg: "#0e0905",
       headerBg: "#120b07",
       headerHeight: 60,
-      headerPadding: "0 24px"
+      headerPadding: "0 24px",
     },
     Menu: {
       darkItemBg: "transparent",
@@ -33,7 +33,7 @@ export const embersTheme: ThemeConfig = {
       darkItemSelectedBg: "rgba(255, 122, 26, 0.2)",
       darkItemSelectedColor: "#ffd9ab",
       itemMarginInline: 0,
-      itemBorderRadius: 8
-    }
-  }
+      itemBorderRadius: 8,
+    },
+  },
 };

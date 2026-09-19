@@ -25,13 +25,18 @@ export function StatsPage() {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={14}>
-          <Card title="Распределение по уровню опасности" extra={<Typography.Text type="secondary">открытые порталы</Typography.Text>}>
+          <Card
+            title="Распределение по уровню опасности"
+            extra={<Typography.Text type="secondary">открытые порталы</Typography.Text>}
+          >
             {DANGER_ORDER.map((level) => {
               const count = data.danger_levels[level] ?? 0;
               const percent = toPercent(count, data.open);
               return (
                 <div key={level} style={{ marginBottom: 14 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <div
+                    style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}
+                  >
                     <span>{DANGER_META[level].label}</span>
                     <Typography.Text type="secondary">
                       {count} шт · {percent}%
@@ -47,8 +52,8 @@ export function StatsPage() {
               );
             })}
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Общее число порталов — {data.total}, из них открыто {data.open}, закрыто {data.closed}. Уровни опасности
-              и средний риск рассчитываются сервером по открытым порталам.
+              Общее число порталов — {data.total}, из них открыто {data.open}, закрыто {data.closed}
+              . Уровни опасности и средний риск рассчитываются сервером по открытым порталам.
             </Typography.Text>
           </Card>
         </Col>
@@ -66,8 +71,8 @@ export function StatsPage() {
               />
             </div>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Средний риск считается на сервере по энергии, стабильности, числу существ и оставшемуся времени жизни
-              порталов.
+              Средний риск считается на сервере по энергии, стабильности, числу существ и
+              оставшемуся времени жизни порталов.
             </Typography.Text>
           </Card>
         </Col>

@@ -14,7 +14,7 @@ const renderLogin = () =>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/portals" element={<div>portals-stub</div>} />
     </Routes>,
-    { initialEntries: ["/login"] }
+    { initialEntries: ["/login"] },
   );
 
 describe("LoginPage", () => {
@@ -25,7 +25,7 @@ describe("LoginPage", () => {
       http.post(API_URL("/auth/login"), async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(DEMO_USER);
-      })
+      }),
     );
 
     renderLogin();
@@ -41,8 +41,8 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     server.use(
       http.post(API_URL("/auth/login"), () =>
-        HttpResponse.json({ detail: "Неверное имя пользователя или пароль" }, { status: 401 })
-      )
+        HttpResponse.json({ detail: "Неверное имя пользователя или пароль" }, { status: 401 }),
+      ),
     );
 
     renderLogin();
@@ -61,7 +61,7 @@ describe("LoginPage", () => {
         submit();
         await request.json();
         return HttpResponse.json(DEMO_USER);
-      })
+      }),
     );
 
     renderLogin();

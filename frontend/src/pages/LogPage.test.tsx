@@ -18,12 +18,12 @@ describe("LogPage", () => {
       portal_id: 3,
       action: "STABILIZE" as const,
       timestamp: "2026-09-19T11:50:00Z",
-      user: { id: 1, username: "demo", is_superuser: false }
+      user: { id: 1, username: "demo", is_superuser: false },
     };
     server.use(
       http.get(API_URL("/portals/log"), () =>
-        HttpResponse.json({ items: [entry], page: 1, items_per_page: 20, total: 1 })
-      )
+        HttpResponse.json({ items: [entry], page: 1, items_per_page: 20, total: 1 }),
+      ),
     );
 
     renderWithProviders(<LogPage />);
@@ -37,7 +37,7 @@ describe("LogPage", () => {
       http.get(API_URL("/portals/log"), ({ request }) => {
         captured = request.url;
         return HttpResponse.json({ items: [], page: 1, items_per_page: 20, total: 0 });
-      })
+      }),
     );
 
     renderWithProviders(<LogPage />);

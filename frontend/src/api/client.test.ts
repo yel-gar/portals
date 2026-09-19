@@ -12,11 +12,15 @@ describe("detailToMessage", () => {
 
   it("joins 422 validation errors with their field paths", () => {
     const detail = [
-      { loc: ["body", "password"], msg: "String should have at least 8 characters", type: "string_too_short" },
-      { loc: ["body"], msg: "Какое-то поле обязано быть", type: "missing" }
+      {
+        loc: ["body", "password"],
+        msg: "String should have at least 8 characters",
+        type: "string_too_short",
+      },
+      { loc: ["body"], msg: "Какое-то поле обязано быть", type: "missing" },
     ];
     expect(detailToMessage(detail, "fallback")).toBe(
-      "body.password: String should have at least 8 characters; body: Какое-то поле обязано быть"
+      "body.password: String should have at least 8 characters; body: Какое-то поле обязано быть",
     );
   });
 
@@ -30,10 +34,10 @@ describe("request", () => {
   it("resolves JSON bodies and sends cookies", async () => {
     let sawCredentials: RequestCredentials | null = null;
     server.use(
-      http.get(API_URL("/portals"), ({ request }) => {
-        sawCredentials = request.credentials;
+      http.get(API_URL("/portals"), ({ request: req }) => {
+        sawCredentials = req.credentials;
         return HttpResponse.json({ items: [], page: 1, items_per_page: 20, total: 0 });
-      })
+      }),
     );
 
     const body = await request<{ total: number }>("/portals");
@@ -44,10 +48,10 @@ describe("request", () => {
   it("serializes query parameters and drops empty ones", async () => {
     let captured: string | null = null;
     server.use(
-      http.get(API_URL("/portals"), ({ request }) => {
-        captured = request.url;
+      http.get(API_URL("/portals"), ({ request: req }) => {
+        captured = req.url;
         return HttpResponse.json({});
-      })
+      }),
     );
     await request("/portals", { query: { page: 2, items_per_page: 20, filter: undefined } });
     expect(captured).toContain("page=2");
@@ -57,11 +61,15 @@ describe("request", () => {
 
   it("throws ApiError with the Russian detail", async () => {
     server.use(
-      http.post(API_URL("/portals/7"), () => HttpResponse.json({ detail: "Действие недопустимо" }, { status: 409 }))
+      http.post(API_URL("/portals/7"), () =>
+        HttpResponse.json({ detail: "Действие недопустимо" }, { status: 409 }),
+      ),
     );
-    const error = await request("/portals/7", { method: "POST", query: { action: "CLOSE" }, body: {} }).catch(
-      (e: unknown) => e
-    );
+    const error = await request("/portals/7", {
+      method: "POST",
+      query: { action: "CLOSE" },
+      body: {},
+    }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ApiError);
     if (error instanceof ApiError) {
       expect(error.status).toBe(409);
@@ -71,7 +79,10 @@ describe("request", () => {
 
   it("renders a readable message for plain status text without a JSON body", async () => {
     server.use(
-      http.get(API_URL("/portals"), () => new HttpResponse(null, { status: 500, statusText: "Internal Server Error" }))
+      http.get(
+        API_URL("/portals"),
+        () => new HttpResponse(null, { status: 500, statusText: "Internal Server Error" }),
+      ),
     );
     const error = await request("/portals").catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ApiError);
@@ -90,7 +101,7 @@ describe("request", () => {
 describe("websocketUrl", () => {
   it("upgrades http to ws preserving path and query", () => {
     expect(websocketUrl("/portals/ws", { page: 1, items_per_page: 20 })).toBe(
-      "ws://localhost:8000/portals/ws?page=1&items_per_page=20"
+      "ws://localhost:8000/portals/ws?page=1&items_per_page=20",
     );
   });
 });

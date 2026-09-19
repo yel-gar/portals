@@ -31,14 +31,24 @@ export function LoginPage() {
         navigate(from, { replace: true });
       },
       onError: (error) => {
-        message.error(error instanceof ApiError ? error.message : "Не удалось войти: сервер недоступен");
-      }
+        message.error(
+          error instanceof ApiError ? error.message : "Не удалось войти: сервер недоступен",
+        );
+      },
     });
   };
 
   return (
-    <AuthShell title="Вход" footer={<Link to="/register">Нет учётной записи? Зарегистрироваться</Link>}>
-      <Form<Credentials> layout="vertical" requiredMark={false} onFinish={onFinish} disabled={login.isPending}>
+    <AuthShell
+      title="Вход"
+      footer={<Link to="/register">Нет учётной записи? Зарегистрироваться</Link>}
+    >
+      <Form<Credentials>
+        layout="vertical"
+        requiredMark={false}
+        onFinish={onFinish}
+        disabled={login.isPending}
+      >
         <Form.Item
           name="username"
           label="Имя пользователя"
@@ -46,7 +56,11 @@ export function LoginPage() {
         >
           <Input prefix={<UserOutlined />} autoComplete="username" autoFocus />
         </Form.Item>
-        <Form.Item name="password" label="Пароль" rules={[{ required: true, message: "Введите пароль" }]}>
+        <Form.Item
+          name="password"
+          label="Пароль"
+          rules={[{ required: true, message: "Введите пароль" }]}
+        >
           <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />
         </Form.Item>
         <Form.Item style={{ marginBottom: 0 }}>

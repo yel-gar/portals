@@ -13,8 +13,8 @@ describe("portalListQuery", () => {
         hasObserver: true,
         isMarked: false,
         search: "альф",
-        orderBy: "name"
-      })
+        orderBy: "name",
+      }),
     ).toEqual({
       page: 2,
       items_per_page: 10,
@@ -23,7 +23,7 @@ describe("portalListQuery", () => {
       has_observer: true,
       is_marked: false,
       search: "альф",
-      order_by: "name"
+      order_by: "name",
     });
   });
 
@@ -36,19 +36,23 @@ describe("portalListQuery", () => {
       has_observer: undefined,
       is_marked: undefined,
       search: undefined,
-      order_by: "risk"
+      order_by: "risk",
     });
-    expect(portalListQuery({ page: 1, itemsPerPage: 20, search: "", orderBy: "creatures" }).search).toBeUndefined();
+    expect(
+      portalListQuery({ page: 1, itemsPerPage: 20, search: "", orderBy: "creatures" }).search,
+    ).toBeUndefined();
   });
 });
 
 describe("actionLogQuery", () => {
   it("maps log params to backend query names", () => {
-    expect(actionLogQuery({ page: 3, itemsPerPage: 50, action: "CLOSE", orderBy: "oldest" })).toEqual({
+    expect(
+      actionLogQuery({ page: 3, itemsPerPage: 50, action: "CLOSE", orderBy: "oldest" }),
+    ).toEqual({
       page: 3,
       items_per_page: 50,
       action: "CLOSE",
-      order_by: "oldest"
+      order_by: "oldest",
     });
   });
 

@@ -13,7 +13,7 @@ export const DEFAULT_LOG_FILTERS: LogFiltersState = { orderBy: "newest" };
 
 const ORDER_OPTIONS: Array<{ value: LogOrder; label: string }> = [
   { value: "newest", label: "Сначала новые" },
-  { value: "oldest", label: "Сначала старые" }
+  { value: "oldest", label: "Сначала старые" },
 ];
 
 interface LogFiltersBarProps {

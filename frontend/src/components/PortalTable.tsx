@@ -30,7 +30,7 @@ export function PortalTable({
   itemsPerPage,
   total,
   onPageChange,
-  onOpen
+  onOpen,
 }: PortalTableProps) {
   const columns: ColumnsType<Portal> = [
     {
@@ -52,20 +52,22 @@ export function PortalTable({
             )}
           </div>
         </div>
-      )
+      ),
     },
     {
       title: "Мир назначения",
       dataIndex: "destination_world",
       key: "world",
       width: 200,
-      ellipsis: true
+      ellipsis: true,
     },
     {
       title: "Энергия",
       key: "energy",
       width: 140,
-      render: (_, portal) => <Progress percent={portal.energy_level} size="small" format={(value) => value} />
+      render: (_, portal) => (
+        <Progress percent={portal.energy_level} size="small" format={(value) => value} />
+      ),
     },
     {
       title: "Стабильность",
@@ -78,7 +80,7 @@ export function PortalTable({
           strokeColor={stabilityColor(portal.stability)}
           format={(value) => value}
         />
-      )
+      ),
     },
     {
       title: "Существа",
@@ -90,20 +92,22 @@ export function PortalTable({
           <Tag color="geekblue">{portal.creatures_count}</Tag>
         ) : (
           <Typography.Text type="secondary">—</Typography.Text>
-        )
+        ),
     },
     {
       title: "Риск",
       key: "risk",
       width: 90,
       align: "center",
-      render: (_, portal) => <RiskValue value={portal.risk_factor} level={portal.danger_level} strong />
+      render: (_, portal) => (
+        <RiskValue value={portal.risk_factor} level={portal.danger_level} strong />
+      ),
     },
     {
       title: "Опасность",
       key: "danger",
       width: 130,
-      render: (_, portal) => <DangerTag level={portal.danger_level} />
+      render: (_, portal) => <DangerTag level={portal.danger_level} />,
     },
     {
       title: "Наблюдатель",
@@ -117,7 +121,7 @@ export function PortalTable({
           </Tag>
         ) : (
           <Typography.Text type="secondary">—</Typography.Text>
-        )
+        ),
     },
     {
       title: "Истекает",
@@ -127,8 +131,10 @@ export function PortalTable({
         portal.closed ? (
           <Tag color="red">закрыт</Tag>
         ) : (
-          <Tooltip title={formatDateTime(portal.expires_at)}>{formatTimeLeft(portal.expires_at)}</Tooltip>
-        )
+          <Tooltip title={formatDateTime(portal.expires_at)}>
+            {formatTimeLeft(portal.expires_at)}
+          </Tooltip>
+        ),
     },
     {
       title: "Обновлено",
@@ -138,7 +144,7 @@ export function PortalTable({
         <Tooltip title={formatDateTime(portal.last_update)}>
           <Typography.Text type="secondary">{formatRelative(portal.last_update)}</Typography.Text>
         </Tooltip>
-      )
+      ),
     },
     {
       title: "",
@@ -157,8 +163,8 @@ export function PortalTable({
         >
           Открыть
         </Button>
-      )
-    }
+      ),
+    },
   ];
 
   return (
@@ -171,7 +177,7 @@ export function PortalTable({
       scroll={{ x: 1450 }}
       onRow={(portal) => ({
         style: { cursor: "pointer" },
-        onClick: () => onOpen(portal)
+        onClick: () => onOpen(portal),
       })}
       pagination={{
         current: page,
@@ -179,7 +185,7 @@ export function PortalTable({
         total,
         showSizeChanger: true,
         pageSizeOptions: ["10", "20", "50", "100"],
-        showTotal: (count, range) => `${range[0]}–${range[1]} из ${count}`
+        showTotal: (count, range) => `${range[0]}–${range[1]} из ${count}`,
       }}
       onChange={(pagination) => {
         const nextPage = pagination.current ?? 1;

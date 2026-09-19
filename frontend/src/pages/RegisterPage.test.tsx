@@ -14,7 +14,7 @@ const renderRegister = () =>
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/portals" element={<div>portals-stub</div>} />
     </Routes>,
-    { initialEntries: ["/register"] }
+    { initialEntries: ["/register"] },
   );
 
 describe("RegisterPage", () => {
@@ -27,7 +27,7 @@ describe("RegisterPage", () => {
       http.post(API_URL("/auth/register"), async ({ request }) => {
         registerBody = await request.json();
         return HttpResponse.json(DEMO_USER, { status: 201 });
-      })
+      }),
     );
 
     renderRegister();
@@ -43,8 +43,11 @@ describe("RegisterPage", () => {
     const user = userEvent.setup();
     server.use(
       http.post(API_URL("/auth/register"), () =>
-        HttpResponse.json({ detail: "Пользователь с таким именем уже существует" }, { status: 409 })
-      )
+        HttpResponse.json(
+          { detail: "Пользователь с таким именем уже существует" },
+          { status: 409 },
+        ),
+      ),
     );
 
     renderRegister();
@@ -52,7 +55,9 @@ describe("RegisterPage", () => {
     await user.type(screen.getByLabelText("Пароль"), "some-password-1");
     await user.click(screen.getByRole("button", { name: "Зарегистрироваться" }));
 
-    expect(await screen.findByText("Пользователь с таким именем уже существует")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Пользователь с таким именем уже существует"),
+    ).toBeInTheDocument();
   });
 
   it("hides the form and shows the backend message when registration is disabled", async () => {
@@ -63,7 +68,7 @@ describe("RegisterPage", () => {
         register();
         await request.json();
         return HttpResponse.json(DEMO_USER, { status: 201 });
-      })
+      }),
     );
 
     renderRegister();

@@ -16,7 +16,7 @@ import {
   ThunderboltOutlined,
   UnlockOutlined,
   UnorderedListOutlined,
-  WarningOutlined
+  WarningOutlined,
 } from "@ant-design/icons";
 
 import type { Action, DangerLevel } from "./api/types";
@@ -39,7 +39,7 @@ export const DANGER_META: Record<DangerLevel, DangerMeta> = {
   LOW: { label: "Низкий", color: "green", hex: "#52c41a" },
   MEDIUM: { label: "Средний", color: "gold", hex: "#faad14" },
   HIGH: { label: "Высокий", color: "volcano", hex: "#fa541c" },
-  CRITICAL: { label: "Критический", color: "magenta", hex: "#eb2f96" }
+  CRITICAL: { label: "Критический", color: "magenta", hex: "#eb2f96" },
 };
 
 export const DANGER_ORDER: DangerLevel[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
@@ -58,7 +58,7 @@ export const ACTION_META: Record<Action, ActionMeta> = {
   RECALL_OBSERVER: { label: "Отозвать наблюдателя", color: "purple", Icon: RollbackOutlined },
   MARK: { label: "Отметить", color: "orange", Icon: FlagFilled },
   UNMARK: { label: "Снять отметку", color: "gold", Icon: FlagOutlined },
-  WARN_CREATURES: { label: "Предупредить существ", color: "volcano", Icon: WarningOutlined }
+  WARN_CREATURES: { label: "Предупредить существ", color: "volcano", Icon: WarningOutlined },
 };
 
 /** Every action the backend can log — the full `Action` enum, used by the log filter. */
@@ -70,7 +70,7 @@ export const ALL_ACTIONS: Action[] = [
   "CLOSE",
   "MARK",
   "UNMARK",
-  "WARN_CREATURES"
+  "WARN_CREATURES",
 ];
 
 /** Order in which actions are offered in the portal detail modal. */
@@ -81,7 +81,7 @@ export const ACTION_ORDER: Action[] = [
   "RECALL_OBSERVER",
   "CLOSE",
   "MARK",
-  "WARN_CREATURES"
+  "WARN_CREATURES",
 ];
 
 /** Primary (filled) actions in the modal. */
@@ -94,7 +94,7 @@ export const NAV_ICONS = {
   portals: DashboardOutlined,
   log: UnorderedListOutlined,
   stats: BarChartOutlined,
-  admin: SettingOutlined
+  admin: SettingOutlined,
 };
 
 export const STAT_ICONS = {
@@ -103,7 +103,7 @@ export const STAT_ICONS = {
   closed: LockOutlined,
   marked: FlagOutlined,
   withObserver: EyeOutlined,
-  avgRisk: LineChartOutlined
+  avgRisk: LineChartOutlined,
 };
 
 export const LOGO_ICON = ThunderboltOutlined;

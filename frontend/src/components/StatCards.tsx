@@ -24,7 +24,12 @@ export function StatCards({ stats }: { stats: Stats }) {
     { key: "closed", title: "Закрыто", value: stats.closed, color: "#8c8c8c" },
     { key: "marked", title: "Отмечено", value: stats.marked, color: "#fa8c16" },
     { key: "withObserver", title: "С наблюдателем", value: stats.with_observer, color: "#13c2c2" },
-    { key: "avgRisk", title: "Средний риск", value: stats.avg_risk.toFixed(2), color: token.colorPrimary }
+    {
+      key: "avgRisk",
+      title: "Средний риск",
+      value: stats.avg_risk.toFixed(2),
+      color: token.colorPrimary,
+    },
   ];
 
   return (

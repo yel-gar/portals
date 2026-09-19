@@ -30,7 +30,13 @@ describe("PortalsPage", () => {
     expect(socket).toBeDefined();
     act(() => socket.open());
 
-    const gamma: Portal = { ...OPEN_PORTAL, id: 9, name: "Портал Гамма", risk_factor: 0.9, danger_level: "CRITICAL" };
+    const gamma: Portal = {
+      ...OPEN_PORTAL,
+      id: 9,
+      name: "Портал Гамма",
+      risk_factor: 0.9,
+      danger_level: "CRITICAL",
+    };
     act(() => socket.message(JSON.stringify(portalPage([gamma], 1, 20))));
 
     // Atomic replacement: the new page snapshot wins, the old rows are gone.
@@ -40,7 +46,11 @@ describe("PortalsPage", () => {
   });
 
   it("shows an error banner when the portals request fails", async () => {
-    server.use(http.get(API_URL("/portals"), () => HttpResponse.json({ detail: "Сервер сломался" }, { status: 500 })));
+    server.use(
+      http.get(API_URL("/portals"), () =>
+        HttpResponse.json({ detail: "Сервер сломался" }, { status: 500 }),
+      ),
+    );
 
     renderWithProviders(<PortalsPage />);
     expect(await screen.findByText("Не удалось загрузить порталы")).toBeInTheDocument();
@@ -53,7 +63,7 @@ describe("PortalsPage", () => {
       http.get(API_URL("/portals"), ({ request }) => {
         captured = request.url;
         return HttpResponse.json(portalPage());
-      })
+      }),
     );
 
     renderWithProviders(<PortalsPage />);
@@ -74,7 +84,7 @@ describe("PortalsPage", () => {
       http.get(API_URL("/portals"), ({ request }) => {
         captured = request.url;
         return HttpResponse.json(portalPage());
-      })
+      }),
     );
 
     renderWithProviders(<PortalsPage />);

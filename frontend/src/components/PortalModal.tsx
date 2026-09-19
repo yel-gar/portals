@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { EyeOutlined } from "@ant-design/icons";
-import { App as AntApp, Button, Col, Descriptions, Divider, Modal, Row, Tag, Typography } from "antd";
+import {
+  App as AntApp,
+  Button,
+  Col,
+  Descriptions,
+  Divider,
+  Modal,
+  Row,
+  Tag,
+  Typography,
+} from "antd";
 
 import { ApiError } from "../api/client";
 import type { Action, Portal } from "../api/types";
@@ -38,13 +48,15 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
         },
         onError: (error) => {
           const text =
-            error instanceof ApiError ? error.message : "Не удалось выполнить действие: сервер недоступен";
+            error instanceof ApiError
+              ? error.message
+              : "Не удалось выполнить действие: сервер недоступен";
           message.error(text);
         },
         onSettled: () => {
           setPending(null);
-        }
-      }
+        },
+      },
     );
   };
 
@@ -83,28 +95,32 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
           {
             key: "energy",
             label: "Энергия",
-            children: <span className="portal-inline-progress">{portal.energy_level}%</span>
+            children: <span className="portal-inline-progress">{portal.energy_level}%</span>,
           },
           {
             key: "stability",
             label: "Стабильность",
-            children: <span className="portal-inline-progress">{portal.stability}%</span>
+            children: <span className="portal-inline-progress">{portal.stability}%</span>,
           },
           {
             key: "risk",
             label: "Риск",
-            children: <RiskValue value={portal.risk_factor} level={portal.danger_level} strong />
+            children: <RiskValue value={portal.risk_factor} level={portal.danger_level} strong />,
           },
-          { key: "danger", label: "Уровень опасности", children: <DangerTag level={portal.danger_level} /> },
+          {
+            key: "danger",
+            label: "Уровень опасности",
+            children: <DangerTag level={portal.danger_level} />,
+          },
           {
             key: "creatures",
             label: "Существа",
-            children: portal.creatures_count > 0 ? `${portal.creatures_count} шт` : "нет"
+            children: portal.creatures_count > 0 ? `${portal.creatures_count} шт` : "нет",
           },
           {
             key: "marked",
             label: "Отметка",
-            children: portal.is_marked ? <Tag color="orange">отмечен</Tag> : "нет"
+            children: portal.is_marked ? <Tag color="orange">отмечен</Tag> : "нет",
           },
           {
             key: "observer",
@@ -115,21 +131,27 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
               </Tag>
             ) : (
               "нет"
-            )
+            ),
           },
           {
             key: "expires",
             label: "Истекает",
-            children: portal.closed ? "портал закрыт" : formatTimeLeft(portal.expires_at)
+            children: portal.closed ? "портал закрыт" : formatTimeLeft(portal.expires_at),
           },
           {
             key: "updated",
             label: "Обновлено",
             children: (
-              <span title={formatDateTime(portal.last_update)}>{formatRelative(portal.last_update)}</span>
-            )
+              <span title={formatDateTime(portal.last_update)}>
+                {formatRelative(portal.last_update)}
+              </span>
+            ),
           },
-          { key: "expires_at", label: "Момент истечения", children: formatDateTime(portal.expires_at) }
+          {
+            key: "expires_at",
+            label: "Момент истечения",
+            children: formatDateTime(portal.expires_at),
+          },
         ]}
       />
 
@@ -138,7 +160,8 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
       </Divider>
       <Row gutter={[12, 12]}>
         {ACTION_ORDER.map((entry) => {
-          const resolved: Action = entry === "MARK" ? (portal.is_marked ? "UNMARK" : "MARK") : entry;
+          const resolved: Action =
+            entry === "MARK" ? (portal.is_marked ? "UNMARK" : "MARK") : entry;
           const meta = ACTION_META[resolved];
           const { Icon } = meta;
           const danger = DANGER_ACTIONS.has(resolved);
@@ -160,8 +183,8 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
         })}
       </Row>
       <Typography.Text type="secondary" style={{ display: "block", marginTop: 14, fontSize: 12 }}>
-        Допустимость действия проверяет сервер. Если оно недопустимо для текущего состояния портала, причина будет
-        показана здесь же.
+        Допустимость действия проверяет сервер. Если оно недопустимо для текущего состояния портала,
+        причина будет показана здесь же.
       </Typography.Text>
     </Modal>
   );

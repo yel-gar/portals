@@ -2,7 +2,13 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { websocketUrl } from "../api/client";
 import { actionLogQuery, portalsApi, portalListQuery } from "../api/endpoints";
-import type { ActionLogPage, ActionLogParams, PortalListParams, PortalPage, Stats } from "../api/types";
+import type {
+  ActionLogPage,
+  ActionLogParams,
+  PortalListParams,
+  PortalPage,
+  Stats,
+} from "../api/types";
 import { useLiveSnapshot } from "./useLiveSnapshot";
 
 /**
@@ -31,12 +37,12 @@ export function usePortalPage(params: PortalListParams) {
     queryKey: portalPageKey(params),
     queryFn: () => portalsApi.list(params),
     placeholderData: keepPreviousData,
-    refetchInterval: REFRESH_INTERVAL_MS
+    refetchInterval: REFRESH_INTERVAL_MS,
   });
 
   const liveStatus = useLiveSnapshot<PortalPage>(
     websocketUrl("/portals/ws", portalListQuery(params)),
-    portalPageKey(params)
+    portalPageKey(params),
   );
 
   return { query, liveStatus };
@@ -47,12 +53,12 @@ export function useActionLogPage(params: ActionLogParams) {
     queryKey: actionLogPageKey(params),
     queryFn: () => portalsApi.log(params),
     placeholderData: keepPreviousData,
-    refetchInterval: REFRESH_INTERVAL_MS
+    refetchInterval: REFRESH_INTERVAL_MS,
   });
 
   const liveStatus = useLiveSnapshot<ActionLogPage>(
     websocketUrl("/portals/log/ws", actionLogQuery(params)),
-    actionLogPageKey(params)
+    actionLogPageKey(params),
   );
 
   return { query, liveStatus };
@@ -63,6 +69,6 @@ export function useStats() {
   return useQuery<Stats>({
     queryKey: statsKey,
     queryFn: portalsApi.stats,
-    refetchInterval: STATS_REFRESH_INTERVAL_MS
+    refetchInterval: STATS_REFRESH_INTERVAL_MS,
   });
 }

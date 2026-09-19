@@ -6,11 +6,7 @@ import { DANGER_META } from "../constants";
 /** Danger level as reported by the backend (`PortalSchema.danger_level`). */
 export function DangerTag({ level }: { level: DangerLevel }) {
   const meta = DANGER_META[level];
-  return (
-    <Tag color={meta.color}>
-      {meta.label}
-    </Tag>
-  );
+  return <Tag color={meta.color}>{meta.label}</Tag>;
 }
 
 interface RiskValueProps {

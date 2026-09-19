@@ -25,7 +25,7 @@ export function useMe() {
       }
     },
     retry: false,
-    staleTime: Infinity
+    staleTime: Infinity,
   });
 }
 
@@ -35,7 +35,7 @@ export function useLogin() {
     mutationFn: (credentials: Credentials) => authApi.login(credentials),
     onSuccess: (user) => {
       queryClient.setQueryData(ME_QUERY_KEY, user);
-    }
+    },
   });
 }
 
@@ -49,7 +49,7 @@ export function useRegister() {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(ME_QUERY_KEY, user);
-    }
+    },
   });
 }
 
@@ -61,6 +61,6 @@ export function useLogout() {
       queryClient.setQueryData(ME_QUERY_KEY, null);
       // Drop every cached page so the next user never sees stale data.
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "me" });
-    }
+    },
   });
 }

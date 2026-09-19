@@ -20,6 +20,6 @@ export function useLiveSnapshot<T>(url: string, queryKey: readonly unknown[]): L
     },
     () => {
       void queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
-    }
+    },
   );
 }

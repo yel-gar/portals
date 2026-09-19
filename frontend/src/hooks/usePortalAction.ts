@@ -17,9 +17,10 @@ export interface PortalActionVariables {
 export function usePortalAction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ portalId, action }: PortalActionVariables) => portalsApi.action(portalId, action),
+    mutationFn: ({ portalId, action }: PortalActionVariables) =>
+      portalsApi.action(portalId, action),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["portals"] });
-    }
+    },
   });
 }

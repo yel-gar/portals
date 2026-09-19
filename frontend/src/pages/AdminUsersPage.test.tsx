@@ -30,7 +30,7 @@ describe("AdminUsersPage", () => {
         const created = { ...DEMO_USER, id: 5, username: body.username };
         users.push(created);
         return HttpResponse.json(created, { status: 201 });
-      })
+      }),
     );
 
     renderAdmin();
@@ -53,7 +53,7 @@ describe("AdminUsersPage", () => {
       http.delete(API_URL("/admin/users/:id"), ({ params }) => {
         deletedId = Number(params.id);
         return new HttpResponse(null, { status: 204 });
-      })
+      }),
     );
 
     renderAdmin();

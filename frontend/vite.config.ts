@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    port: Number(process.env.VITE_DEV_PORT ?? 5173)
+    port: Number(process.env.VITE_DEV_PORT ?? 5173),
   },
   build: {
     outDir: "dist",
@@ -29,9 +29,9 @@ export default defineConfig({
             return "react";
           }
           return "vendor";
-        }
-      }
-    }
+        },
+      },
+    },
   },
   test: {
     environment: "jsdom",
@@ -41,7 +41,13 @@ export default defineConfig({
     env: {
       // Deterministic backend origin: tests talk to MSW handlers by path,
       // while this keeps `websocketUrl`/`BACKEND_URL` stable across machines.
-      VITE_BACKEND_URL: "http://localhost:8000"
-    }
-  }
+      VITE_BACKEND_URL: "http://localhost:8000",
+    },
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      include: ["src/**"],
+      exclude: ["src/test/**", "src/main.tsx", "src/vite-env.d.ts"],
+    },
+  },
 });

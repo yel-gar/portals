@@ -17,9 +17,9 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
-      staleTime: 10_000
-    }
-  }
+      staleTime: 10_000,
+    },
+  },
 });
 
 const container = document.getElementById("root");
@@ -40,5 +40,5 @@ createRoot(container).render(
         </QueryClientProvider>
       </AntApp>
     </ConfigProvider>
-  </StrictMode>
+  </StrictMode>,
 );

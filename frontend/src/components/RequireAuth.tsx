@@ -26,7 +26,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     );
   }
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
+    return (
+      <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />
+    );
   }
   return <>{children}</>;
 }
@@ -35,9 +37,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 export function RequireSuperuser({ children }: { children: ReactNode }) {
   const { data: user } = useMe();
   if (user && !user.is_superuser) {
-    return (
-      <Result status="403" title="403" subTitle="Раздел доступен только суперпользователю." />
-    );
+    return <Result status="403" title="403" subTitle="Раздел доступен только суперпользователю." />;
   }
   return <>{children}</>;
 }

@@ -33,6 +33,21 @@ repos:
         files: ^backend/.*\.py$
         pass_filenames: false
 
+      # --- frontend ---
+      - id: prettier
+        name: prettier (frontend)
+        entry: npm --prefix frontend run format
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
+      - id: oxlint
+        name: oxlint (frontend)
+        entry: npm --prefix frontend run lint:fix
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+
       - id: pytest
         name: pytest (backend)
         entry: poetry -C backend run pytest

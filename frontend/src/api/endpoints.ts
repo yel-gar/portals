@@ -8,14 +8,14 @@ import type {
   PortalListParams,
   PortalPage,
   Stats,
-  UserOut
+  UserOut,
 } from "./types";
 
 export const authApi = {
   me: () => request<UserOut>("/auth/me"),
   login: (body: Credentials) => request<UserOut>("/auth/login", { method: "POST", body }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
-  register: (body: Credentials) => request<UserOut>("/auth/register", { method: "POST", body })
+  register: (body: Credentials) => request<UserOut>("/auth/register", { method: "POST", body }),
 };
 
 /**
@@ -32,7 +32,7 @@ export function portalListQuery(params: PortalListParams): Record<string, QueryV
     has_observer: params.hasObserver,
     is_marked: params.isMarked,
     search: params.search || undefined,
-    order_by: params.orderBy
+    order_by: params.orderBy,
   };
 }
 
@@ -42,17 +42,19 @@ export function actionLogQuery(params: ActionLogParams): Record<string, QueryVal
     page: params.page,
     items_per_page: params.itemsPerPage,
     action: params.action,
-    order_by: params.orderBy
+    order_by: params.orderBy,
   };
 }
 
 export const portalsApi = {
-  list: (params: PortalListParams) => request<PortalPage>("/portals", { query: portalListQuery(params) }),
-  log: (params: ActionLogParams) => request<ActionLogPage>("/portals/log", { query: actionLogQuery(params) }),
+  list: (params: PortalListParams) =>
+    request<PortalPage>("/portals", { query: portalListQuery(params) }),
+  log: (params: ActionLogParams) =>
+    request<ActionLogPage>("/portals/log", { query: actionLogQuery(params) }),
   stats: () => request<Stats>("/portals/stats"),
   /** Execute an action; the backend validates it and records it in the action log. */
   action: (portalId: number, action: Action) =>
-    request<Portal>(`/portals/${portalId}`, { method: "POST", query: { action } })
+    request<Portal>(`/portals/${portalId}`, { method: "POST", query: { action } }),
 };
 
 export const adminApi = {
@@ -60,5 +62,5 @@ export const adminApi = {
   createUser: (body: Credentials) => request<UserOut>("/admin/users", { method: "POST", body }),
   deleteUser: (userId: number) => request<void>(`/admin/users/${userId}`, { method: "DELETE" }),
   setPassword: (userId: number, password: string) =>
-    request<void>(`/admin/users/${userId}/set-password`, { method: "POST", body: { password } })
+    request<void>(`/admin/users/${userId}/set-password`, { method: "POST", body: { password } }),
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button, Input, Select, Space } from "antd";
 
 import type { DangerLevel, PortalOrder } from "../api/types";
@@ -16,14 +16,14 @@ export interface PortalFiltersState {
 
 export const DEFAULT_PORTAL_FILTERS: PortalFiltersState = {
   search: "",
-  orderBy: "risk"
+  orderBy: "risk",
 };
 
 const ORDER_OPTIONS: Array<{ value: PortalOrder; label: string }> = [
   { value: "risk", label: "По риску" },
   { value: "expires_at", label: "Срок истечения" },
   { value: "creatures", label: "Число существ" },
-  { value: "name", label: "По алфавиту" }
+  { value: "name", label: "По алфавиту" },
 ];
 
 interface PortalFiltersBarProps {
@@ -33,31 +33,43 @@ interface PortalFiltersBarProps {
 }
 
 /**
+ * Search box owning its typing draft; commits only on submit (Enter / button).
+ * The parent remounts it via `key` when the server-driven params change, so the
+ * draft needs no props-sync effect.
+ */
+function SearchInput({ value, onSearch }: { value: string; onSearch: (value: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  return (
+    <Input.Search
+      allowClear
+      aria-label="Поиск по названию или миру"
+      placeholder="Поиск: название или мир"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onSearch={(submitted) => onSearch(submitted.trim())}
+      style={{ width: 260 }}
+    />
+  );
+}
+
+/**
  * Server-driven filters/ordering for the portal table. These controls only add
  * query params the backend already supports — no client-side filtering — so the
  * backend remains the single source of truth.
  *
  * The search box keeps a local draft and applies it on submit (Enter / the
  * search button): each keystroke must not trigger a full server round trip and
- * a WebSocket reconnect.
+ * a WebSocket reconnect. The box is remounted via `key` whenever the server
+ * params change externally (reset, back navigation), so its draft always
+ * follows `filters.search` without a sync effect.
  */
 export function PortalFiltersBar({ filters, onChange, onReset }: PortalFiltersBarProps) {
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-
   return (
     <Space wrap size="small" style={{ marginBottom: 16 }} data-testid="portal-filters">
-      <Input.Search
-        allowClear
-        aria-label="Поиск по названию или миру"
-        placeholder="Поиск: название или мир"
-        value={searchDraft}
-        onChange={(event) => setSearchDraft(event.target.value)}
-        onSearch={(value) => onChange({ search: value.trim() })}
-        style={{ width: 260 }}
+      <SearchInput
+        key={filters.search}
+        value={filters.search}
+        onSearch={(value) => onChange({ search: value })}
       />
       <Select
         allowClear
@@ -67,7 +79,7 @@ export function PortalFiltersBar({ filters, onChange, onReset }: PortalFiltersBa
         value={filters.closed}
         options={[
           { value: false, label: "Открытые" },
-          { value: true, label: "Закрытые" }
+          { value: true, label: "Закрытые" },
         ]}
         onChange={(value: boolean | undefined) => onChange({ closed: value })}
       />
@@ -88,7 +100,7 @@ export function PortalFiltersBar({ filters, onChange, onReset }: PortalFiltersBa
         value={filters.hasObserver}
         options={[
           { value: true, label: "С наблюдателем" },
-          { value: false, label: "Без наблюдателя" }
+          { value: false, label: "Без наблюдателя" },
         ]}
         onChange={(value: boolean | undefined) => onChange({ hasObserver: value })}
       />
@@ -100,7 +112,7 @@ export function PortalFiltersBar({ filters, onChange, onReset }: PortalFiltersBa
         value={filters.isMarked}
         options={[
           { value: true, label: "Отмеченные" },
-          { value: false, label: "Не отмеченные" }
+          { value: false, label: "Не отмеченные" },
         ]}
         onChange={(value: boolean | undefined) => onChange({ isMarked: value })}
       />

@@ -15,7 +15,7 @@ function renderProbe(onUnauthorized?: () => void) {
       (snapshot) => {
         captured = snapshot;
       },
-      onUnauthorized
+      onUnauthorized,
     );
     statuses.push(status);
     return (
@@ -32,7 +32,7 @@ function renderProbe(onUnauthorized?: () => void) {
     socket: () => fakeSocket(0),
     sockets: () => FakeWebSocket.instances,
     captured: () => captured,
-    statuses: () => statuses
+    statuses: () => statuses,
   };
 }
 
@@ -62,7 +62,9 @@ describe("useSnapshotWs", () => {
     act(() => fakeSocket(0).open());
     expect(screen.getByTestId("status")).toHaveTextContent("open");
 
-    act(() => fakeSocket(0).message(JSON.stringify({ items: [], page: 1, items_per_page: 20, total: 5 })));
+    act(() =>
+      fakeSocket(0).message(JSON.stringify({ items: [], page: 1, items_per_page: 20, total: 5 })),
+    );
     expect(probe.captured()?.total).toBe(5);
   });
 

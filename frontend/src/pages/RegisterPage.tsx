@@ -39,21 +39,30 @@ export function RegisterPage() {
         navigate("/portals", { replace: true });
       },
       onError: (error) => {
-        message.error(error instanceof ApiError ? error.message : "Не удалось зарегистрироваться: сервер недоступен");
-      }
+        message.error(
+          error instanceof ApiError
+            ? error.message
+            : "Не удалось зарегистрироваться: сервер недоступен",
+        );
+      },
     });
   };
 
   return (
     <AuthShell title="Регистрация" footer={<Link to="/login">Уже есть учётная запись? Войти</Link>}>
-      <Form<Credentials> layout="vertical" requiredMark={false} onFinish={onFinish} disabled={register.isPending}>
+      <Form<Credentials>
+        layout="vertical"
+        requiredMark={false}
+        onFinish={onFinish}
+        disabled={register.isPending}
+      >
         <Form.Item
           name="username"
           label="Имя пользователя"
           extra="От 4 до 64 символов"
           rules={[
             { required: true, message: "Введите имя пользователя" },
-            { min: 4, max: 64, message: "Длина имени — от 4 до 64 символов" }
+            { min: 4, max: 64, message: "Длина имени — от 4 до 64 символов" },
           ]}
         >
           <Input prefix={<UserOutlined />} autoComplete="username" autoFocus />
@@ -64,7 +73,7 @@ export function RegisterPage() {
           extra="От 8 до 128 символов"
           rules={[
             { required: true, message: "Введите пароль" },
-            { min: 8, max: 128, message: "Длина пароля — от 8 до 128 символов" }
+            { min: 8, max: 128, message: "Длина пароля — от 8 до 128 символов" },
           ]}
         >
           <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />

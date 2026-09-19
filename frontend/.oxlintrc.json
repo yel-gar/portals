@@ -1,0 +1,14 @@
+{
+  "plugins": ["react"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn"
+  },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "react/jsx-max-depth": "off",
+    "react/no-unstable-nested-components": ["error", { "allowAsProps": true }]
+  },
+  "ignorePatterns": ["dist/**", "coverage/**", "mockups/**"]
+}

@@ -27,7 +27,7 @@ export const OPEN_PORTAL: Portal = {
   last_update: "2026-09-19T11:55:00Z",
   expires_at: "2026-09-19T14:00:00Z",
   risk_factor: 0.41,
-  danger_level: "MEDIUM"
+  danger_level: "MEDIUM",
 };
 
 export const CLOSED_PORTAL: Portal = {
@@ -43,13 +43,13 @@ export const CLOSED_PORTAL: Portal = {
   last_update: "2026-09-18T20:00:00Z",
   expires_at: "2026-09-18T20:00:00Z",
   risk_factor: 0.12,
-  danger_level: "LOW"
+  danger_level: "LOW",
 };
 
 export function portalPage(
   items: Portal[] = [OPEN_PORTAL, CLOSED_PORTAL],
   page = 1,
-  itemsPerPage = 20
+  itemsPerPage = 20,
 ): PortalPage {
   return { items, page, items_per_page: itemsPerPage, total: items.length };
 }
@@ -61,7 +61,7 @@ export const MOCK_STATS: Stats = {
   marked: 1,
   with_observer: 1,
   danger_levels: { LOW: 0, MEDIUM: 1, HIGH: 0, CRITICAL: 0 },
-  avg_risk: 0.41
+  avg_risk: 0.41,
 };
 
 /**
@@ -81,8 +81,8 @@ export const handlers = [
   http.post(`${BACKEND_ORIGIN}/portals/:id`, () => HttpResponse.json(OPEN_PORTAL)),
   http.get(`${BACKEND_ORIGIN}/portals/stats`, () => HttpResponse.json(MOCK_STATS)),
   http.get(`${BACKEND_ORIGIN}/portals/log`, () =>
-    HttpResponse.json({ items: [], page: 1, items_per_page: 20, total: 0 })
-  )
+    HttpResponse.json({ items: [], page: 1, items_per_page: 20, total: 0 }),
+  ),
 ];
 
 export const server = setupServer(...handlers);

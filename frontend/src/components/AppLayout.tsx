@@ -14,10 +14,22 @@ interface PageMeta {
 }
 
 const PAGE_META: PageMeta[] = [
-  { path: "/portals", title: "Порталы", subtitle: "Живая таблица лаборатории — обновляется по WebSocket" },
-  { path: "/log", title: "Журнал действий", subtitle: "Все действия операторов — поток по WebSocket" },
+  {
+    path: "/portals",
+    title: "Порталы",
+    subtitle: "Живая таблица лаборатории — обновляется по WebSocket",
+  },
+  {
+    path: "/log",
+    title: "Журнал действий",
+    subtitle: "Все действия операторов — поток по WebSocket",
+  },
   { path: "/stats", title: "Статистика", subtitle: "Сводка по порталам лаборатории" },
-  { path: "/admin/users", title: "Администрирование", subtitle: "Управление пользователями — только для суперпользователя" }
+  {
+    path: "/admin/users",
+    title: "Администрирование",
+    subtitle: "Управление пользователями — только для суперпользователя",
+  },
 ];
 
 function usePageMeta(pathname: string): PageMeta {
@@ -39,7 +51,9 @@ export function AppLayout() {
     { key: "/portals", icon: <PortalsIcon />, label: "Порталы" },
     { key: "/log", icon: <LogIcon />, label: "Журнал действий" },
     { key: "/stats", icon: <StatsIcon />, label: "Статистика" },
-    ...(user?.is_superuser ? [{ key: "/admin/users", icon: <AdminIcon />, label: "Администрирование" }] : [])
+    ...(user?.is_superuser
+      ? [{ key: "/admin/users", icon: <AdminIcon />, label: "Администрирование" }]
+      : []),
   ];
 
   const selectedKey =
@@ -53,7 +67,7 @@ export function AppLayout() {
       },
       onError: () => {
         message.error("Не удалось завершить сессию");
-      }
+      },
     });
   };
 
@@ -81,7 +95,9 @@ export function AppLayout() {
             <UserOutlined style={{ fontSize: 20, color: "#ff6a00" }} />
             <div>
               <div className="app-user-name">{user?.username ?? "—"}</div>
-              <div className="app-user-role">{user?.is_superuser ? "Суперпользователь" : "Оператор"}</div>
+              <div className="app-user-role">
+                {user?.is_superuser ? "Суперпользователь" : "Оператор"}
+              </div>
             </div>
           </div>
           <Button

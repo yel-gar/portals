@@ -72,7 +72,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     method,
     credentials: "include",
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body)
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
   if (!response.ok) {

@@ -9,7 +9,7 @@ import { ACTION_META } from "../constants";
 import {
   DEFAULT_LOG_FILTERS,
   LogFiltersBar,
-  type LogFiltersState
+  type LogFiltersState,
 } from "../components/LogFiltersBar";
 import { formatDateTime, formatRelative } from "../format";
 import { useActionLogPage } from "../hooks/usePortalData";
@@ -41,13 +41,13 @@ export function LogPage() {
         <Tooltip title={formatDateTime(entry.timestamp)}>
           <Typography.Text>{formatRelative(entry.timestamp)}</Typography.Text>
         </Tooltip>
-      )
+      ),
     },
     {
       title: "Портал",
       key: "portal",
       width: 160,
-      render: (_, entry) => <Typography.Text strong>#{entry.portal_id}</Typography.Text>
+      render: (_, entry) => <Typography.Text strong>#{entry.portal_id}</Typography.Text>,
     },
     {
       title: "Действие",
@@ -56,22 +56,26 @@ export function LogPage() {
       render: (_, entry) => {
         const meta = ACTION_META[entry.action];
         return <Tag color={meta.color}>{meta.label}</Tag>;
-      }
+      },
     },
     {
       title: "Пользователь",
       key: "user",
       width: 200,
       render: (_, entry) =>
-        entry.user ? entry.user.username : <Typography.Text type="secondary">учётная запись удалена</Typography.Text>
+        entry.user ? (
+          entry.user.username
+        ) : (
+          <Typography.Text type="secondary">учётная запись удалена</Typography.Text>
+        ),
     },
     {
       title: "Запись",
       key: "id",
       width: 100,
       align: "center",
-      render: (_, entry) => <Typography.Text type="secondary">#{entry.id}</Typography.Text>
-    }
+      render: (_, entry) => <Typography.Text type="secondary">#{entry.id}</Typography.Text>,
+    },
   ];
 
   return (
@@ -119,7 +123,7 @@ export function LogPage() {
               total,
               showSizeChanger: true,
               pageSizeOptions: ["10", "20", "50", "100"],
-              showTotal: (count, range) => `${range[0]}–${range[1]} из ${count}`
+              showTotal: (count, range) => `${range[0]}–${range[1]} из ${count}`,
             }}
           />
         </>

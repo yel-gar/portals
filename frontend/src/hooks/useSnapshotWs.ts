@@ -18,7 +18,7 @@ const AUTH_FAILED_CODE = 4401;
 export function useSnapshotWs<T>(
   url: string | null,
   onSnapshot: (snapshot: T) => void,
-  onUnauthorized?: () => void
+  onUnauthorized?: () => void,
 ): LiveStatus {
   const [status, setStatus] = useState<LiveStatus>("connecting");
   const onSnapshotRef = useRef(onSnapshot);

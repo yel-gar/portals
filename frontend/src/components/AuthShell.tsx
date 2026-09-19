@@ -4,7 +4,15 @@ import { Card, Typography } from "antd";
 import { LOGO_ICON } from "../constants";
 
 /** Centered card used by the login and registration pages. */
-export function AuthShell({ title, footer, children }: { title: string; footer?: ReactNode; children: ReactNode }) {
+export function AuthShell({
+  title,
+  footer,
+  children,
+}: {
+  title: string;
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
   const LogoIcon = LOGO_ICON;
   return (
     <div className="auth-page">

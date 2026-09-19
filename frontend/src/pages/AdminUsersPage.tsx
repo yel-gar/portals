@@ -1,6 +1,17 @@
 import { useState } from "react";
 import { DeleteOutlined, KeyOutlined, PlusOutlined } from "@ant-design/icons";
-import { App as AntApp, Button, Card, Form, Input, Modal, Popconfirm, Space, Table, Tag } from "antd";
+import {
+  App as AntApp,
+  Button,
+  Card,
+  Form,
+  Input,
+  Modal,
+  Popconfirm,
+  Space,
+  Table,
+  Tag,
+} from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnsType } from "antd/es/table";
 
@@ -32,7 +43,7 @@ export function AdminUsersPage() {
       createForm.resetFields();
       void queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
     },
-    onError: showError
+    onError: showError,
   });
 
   const deleteUser = useMutation({
@@ -41,7 +52,7 @@ export function AdminUsersPage() {
       message.success("Пользователь удалён");
       void queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
     },
-    onError: showError
+    onError: showError,
   });
 
   const changePassword = useMutation({
@@ -52,7 +63,7 @@ export function AdminUsersPage() {
       setPasswordUser(null);
       passwordForm.resetFields();
     },
-    onError: showError
+    onError: showError,
   });
 
   const columns: ColumnsType<UserOut> = [
@@ -63,7 +74,7 @@ export function AdminUsersPage() {
       key: "role",
       width: 200,
       render: (_, user) =>
-        user.is_superuser ? <Tag color="orange">Суперпользователь</Tag> : <Tag>Оператор</Tag>
+        user.is_superuser ? <Tag color="orange">Суперпользователь</Tag> : <Tag>Оператор</Tag>,
     },
     {
       title: "",
@@ -87,8 +98,8 @@ export function AdminUsersPage() {
             </Button>
           </Popconfirm>
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
   return (
@@ -124,14 +135,19 @@ export function AdminUsersPage() {
         onCancel={() => setCreateOpen(false)}
         onOk={() => createForm.submit()}
       >
-        <Form<Credentials> form={createForm} layout="vertical" requiredMark={false} onFinish={(values) => createUser.mutate(values)}>
+        <Form<Credentials>
+          form={createForm}
+          layout="vertical"
+          requiredMark={false}
+          onFinish={(values) => createUser.mutate(values)}
+        >
           <Form.Item
             name="username"
             label="Имя пользователя"
             extra="От 4 до 64 символов"
             rules={[
               { required: true, message: "Введите имя пользователя" },
-              { min: 4, max: 64, message: "Длина имени — от 4 до 64 символов" }
+              { min: 4, max: 64, message: "Длина имени — от 4 до 64 символов" },
             ]}
           >
             <Input autoComplete="off" />
@@ -142,7 +158,7 @@ export function AdminUsersPage() {
             extra="От 8 до 128 символов"
             rules={[
               { required: true, message: "Введите пароль" },
-              { min: 8, max: 128, message: "Длина пароля — от 8 до 128 символов" }
+              { min: 8, max: 128, message: "Длина пароля — от 8 до 128 символов" },
             ]}
           >
             <Input.Password autoComplete="new-password" />
@@ -175,7 +191,7 @@ export function AdminUsersPage() {
             extra="От 8 до 128 символов"
             rules={[
               { required: true, message: "Введите пароль" },
-              { min: 8, max: 128, message: "Длина пароля — от 8 до 128 символов" }
+              { min: 8, max: 128, message: "Длина пароля — от 8 до 128 символов" },
             ]}
           >
             <Input.Password autoComplete="new-password" />

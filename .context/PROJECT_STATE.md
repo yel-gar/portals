@@ -3,14 +3,14 @@
 ## Current status
 Backend is complete (M1–M7 + follow-ups): magic portals laboratory overseer dashboard API — auth, portal routes with commit-safe actions, two snapshot WebSockets (action log + portal list), stats, admin, plus the merged backend PR: `websockets` dependency (WS endpoints actually serve now), portal simulator with SKIP LOCKED concurrency guard, filters + ordering for portal list and action log, `GET /portals/{id}`, `DISABLE_REGISTRATION`, prompt hub shutdown / bounded subscriber queues, docs closed outside DEBUG. 113 tests, coverage 99 %, mypy/ruff/black clean. Backend runs in docker with seeded dev data.
 
-Frontend on branch `frontend/react-vite` (merged with master): real React SPA implemented — auth (cookie only), live portal table + 720px action modal, action log, stats, admin users — embers theme, 43 Vitest tests, `frontend/README.md`. Live-WS verification against the real backend is now possible (the dependency fix landed); dev containers need a rebuild to pick up the new backend image.
+Frontend on branch `frontend/react-vite` (merged with master): real React SPA implemented — auth (cookie only), live portal table + 720px action modal, action log, stats, admin users — embers theme, 52 Vitest tests, `frontend/README.md`. Full lint/format/coverage pipeline now active (oxlint + Prettier, pre-commit hooks, CI workflows). Live-WS verification against the real backend is still pending a dev-container rebuild with the merged backend image.
 
 ## Roadmap (frontend, branch `frontend/react-vite`)
 1. **AntD v5 → v6** — done: `antd ^6.6.4` + icons `^6.3.4`, React-19 patch dropped, deprecated APIs migrated (Alert `title`, Table `medium`, Divider `titlePlacement`), embers tokens intact. ✅ (see DECISIONS.md)
-2. **Linter/formatter/coverage/pre-commit** — prettier + coverage provider installed (`c284243`); ESLint blocked by TypeScript 7 → linter choice pending (see DECISIONS.md).
+2. **Linter/formatter/coverage/pre-commit** — done: oxlint (react plugin, correctness/suspicious error + perf warn, 0 warnings 0 errors) + Prettier (printWidth 100), `--deny-warnings` strictness, coverage v8 (text + lcov, 76.7 % lines, no hard gate — mirrors backend), pre-commit hooks (format + lint:fix, `^frontend/`), CI workflows `frontend-ci.yml` + `frontend-coverage.yml` (Node 24 parity). ✅ (see DECISIONS.md)
 3. **Filters/ordering UI** — done: server-driven controls on both pages (portals: search/closed/danger-level/observer/mark + sort; log: action + sort). REST and snapshot-WS share one query builder so both fetch the identical filtered page; query keys carry the full params (distinct filter states never share a cache entry); filter changes reset to page 1; search applies on submit. ✅ (see DECISIONS.md)
 4. **`DISABLE_REGISTRATION` frontend part** — done: `VITE_DISABLE_REGISTRATION` wired like `BACKEND_URL` (Dockerfile build/dev stages, compose build args, dev override runtime env both template and local copy); the Register page shows the backend's «Регистрация отключена» instead of the form and never attempts the API call. ✅ (see DECISIONS.md)
-5. **Marked-portal behavior** — dismissed portals temporarily hide or sink to the end of the list; spec TBD.
+5. **Marked-portal behavior** — decided with user: **badge only** («Отмечено» tag in the table, no ordering/hide changes client-side; see DECISIONS.md). Still to be implemented.
 
 ## Current plan (frontend implementation, branch `frontend/react-vite`)
 1. **Prepare** — mockup server shut down; `frontend/mockups/` trimmed to embers theme only. ✅
@@ -79,6 +79,14 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 - Previously recorded decisions respected: no client-side action availability, no client-side search/sort (backend pagination only), embers palette, centered 720px modal.
 - Known frontend bug fixed during testing: `formatTimeLeft` compared hours against a millisecond constant and never reached its days branch.
 - Tests + docs: Vitest + Testing Library + MSW, 43 tests across 8 files (format, ApiError/request, useSnapshotWs, PortalModal, PortalsPage live WS atomic replace, Login/Register, AdminUsers); `frontend/README.md`; absolute MSW handler URLs and FakeWebSocket (jsdom lacks WebSocket/matchMedia) documented. `npm run typecheck` and `npm run build` green.
+
+### Frontend pipeline: oxlint + Prettier + coverage + hooks + CI (branch `frontend/react-vite`)
+- Linter choice confirmed with user: **oxlint** (ESLint blocked by TypeScript 7 — no JS compiler API, typescript-eslint peers <6.1.0). Config `.oxlintrc.json`: react plugin; correctness/suspicious error, perf warn; ESLint `style` off (Prettier owns style); rules tuned: `react-in-jsx-scope` off (automatic JSX runtime), `jsx-max-depth` off, `no-unstable-nested-components` with `allowAsProps` (antd render-props). `--deny-warnings` → 0 findings across 117 rules.
+- First pass fixed real findings: MSW `({ request })` → `({ request: req })` (shadowed the imported `request` helper), test-loop `await` → `Promise.all`, and `PortalFiltersBar` search draft rebuilt with the key-remount pattern (no `setState`-in-effect).
+- Prettier `.prettierrc.json` `printWidth: 100` (double quotes/semis/trailing commas = defaults); `.prettierignore` excludes `node_modules`, `dist`, `coverage`, `mockups`, `package-lock.json`, `*.tsbuildinfo`; whole codebase formatted once.
+- Coverage: v8 provider, `text` + `lcov` reporters, `src/test/**`/`main.tsx`/`vite-env.d.ts` excluded; baseline 76.55 % statements / 76.71 % lines, 52 tests; no hard gate (mirrors backend coverage workflow).
+- Pre-commit: `prettier (frontend)` (`npm --prefix frontend run format`) + `oxlint (frontend)` (`lint:fix`), `files: ^frontend/`, `pass_filenames: false` — identical pattern to the backend hooks.
+- CI: `frontend-ci.yml` (matrix format/lint/typecheck/build + tests job) and `frontend-coverage.yml` (lcov artifact upload), Node 24 via `setup-node@v4` with npm cache (Dockerfile parity), both gated on `frontend/**`.
 
 ### Frontend kickoff (branch `frontend/react-vite`)
 - Stack confirmed with user: React + Vite + TypeScript (strict), SPA without SSR. Recorded in `DECISIONS.md` and a new "Frontend info" section in `AGENTS.md`.
