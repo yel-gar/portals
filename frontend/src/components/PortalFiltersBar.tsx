@@ -45,6 +45,9 @@ function SearchInput({ value, onSearch }: { value: string; onSearch: (value: str
       aria-label="Поиск по названию или миру"
       placeholder="Поиск: название или мир"
       value={draft}
+      // Mirrors the backend cap (`Query(max_length=256)` in the portals list
+      // route): longer input would otherwise produce a raw 422.
+      maxLength={256}
       onChange={(event) => setDraft(event.target.value)}
       onSearch={(submitted) => onSearch(submitted.trim())}
       style={{ width: 260 }}

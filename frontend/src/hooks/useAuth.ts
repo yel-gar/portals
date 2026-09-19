@@ -8,6 +8,18 @@ import type { Credentials, UserOut } from "../api/types";
 export const ME_QUERY_KEY = ["me"] as const;
 
 /**
+ * Thrown by `useRegister` when the account was created but the follow-up
+ * auto-login failed — the user has an account and must sign in manually.
+ */
+export class PostRegisterLoginError extends Error {
+  constructor(cause: unknown) {
+    super("registration succeeded, but the automatic login failed");
+    this.name = "PostRegisterLoginError";
+    this.cause = cause;
+  }
+}
+
+/**
  * Current user. A 401 is a normal "logged out" state, not an error, so the app
  * can route to the login page without an error boundary.
  */
@@ -45,7 +57,13 @@ export function useRegister() {
   return useMutation({
     mutationFn: async (credentials: Credentials) => {
       await authApi.register(credentials);
-      return authApi.login(credentials);
+      try {
+        return await authApi.login(credentials);
+      } catch (error) {
+        // The account exists but the session wasn't established: the caller
+        // must offer a manual sign-in instead of claiming registration failed.
+        throw new PostRegisterLoginError(error);
+      }
     },
     onSuccess: (user) => {
       queryClient.setQueryData(ME_QUERY_KEY, user);

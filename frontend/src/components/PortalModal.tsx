@@ -17,6 +17,7 @@ import type { Action, Portal } from "../api/types";
 import { ACTION_META, ACTION_ORDER, DANGER_ACTIONS, PRIMARY_ACTIONS } from "../constants";
 import { formatDateTime, formatRelative, formatTimeLeft } from "../format";
 import { usePortalAction } from "../hooks/usePortalAction";
+import { useNow } from "../hooks/useNow";
 import { DangerTag, RiskValue } from "./DangerTag";
 
 interface PortalModalProps {
@@ -32,6 +33,8 @@ interface PortalModalProps {
 export function PortalModal({ portal, onClose }: PortalModalProps) {
   const { message } = AntApp.useApp();
   const action = usePortalAction();
+  // Keeps the «истекает» countdown and «назад» strings fresh while the modal is open.
+  const now = useNow();
   const [pending, setPending] = useState<Action | null>(null);
 
   if (portal === null) {
@@ -136,14 +139,14 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
           {
             key: "expires",
             label: "Истекает",
-            children: portal.closed ? "портал закрыт" : formatTimeLeft(portal.expires_at),
+            children: portal.closed ? "портал закрыт" : formatTimeLeft(portal.expires_at, now),
           },
           {
             key: "updated",
             label: "Обновлено",
             children: (
               <span title={formatDateTime(portal.last_update)}>
-                {formatRelative(portal.last_update)}
+                {formatRelative(portal.last_update, now)}
               </span>
             ),
           },

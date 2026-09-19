@@ -4,6 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 
 import type { Portal } from "../api/types";
 import { formatDateTime, formatRelative, formatTimeLeft } from "../format";
+import { useNow } from "../hooks/useNow";
 import { DangerTag, RiskValue } from "./DangerTag";
 import { MarkedTag } from "./MarkedTag";
 
@@ -33,6 +34,9 @@ export function PortalTable({
   onPageChange,
   onOpen,
 }: PortalTableProps) {
+  // Re-render on a clock so «истекает» countdowns and «назад» strings stay fresh.
+  const now = useNow();
+
   const columns: ColumnsType<Portal> = [
     {
       title: "Портал",
@@ -129,7 +133,7 @@ export function PortalTable({
           <Tag color="red">закрыт</Tag>
         ) : (
           <Tooltip title={formatDateTime(portal.expires_at)}>
-            {formatTimeLeft(portal.expires_at)}
+            {formatTimeLeft(portal.expires_at, now)}
           </Tooltip>
         ),
     },
@@ -139,7 +143,9 @@ export function PortalTable({
       width: 150,
       render: (_, portal) => (
         <Tooltip title={formatDateTime(portal.last_update)}>
-          <Typography.Text type="secondary">{formatRelative(portal.last_update)}</Typography.Text>
+          <Typography.Text type="secondary">
+            {formatRelative(portal.last_update, now)}
+          </Typography.Text>
         </Tooltip>
       ),
     },

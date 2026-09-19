@@ -12,10 +12,12 @@ import {
   type LogFiltersState,
 } from "../components/LogFiltersBar";
 import { formatDateTime, formatRelative } from "../format";
+import { useNow } from "../hooks/useNow";
 import { useActionLogPage } from "../hooks/usePortalData";
 import { useReportLiveStatus } from "../live";
 
 export function LogPage() {
+  const now = useNow();
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [filters, setFilters] = useState<LogFiltersState>(DEFAULT_LOG_FILTERS);
@@ -39,7 +41,7 @@ export function LogPage() {
       width: 170,
       render: (_, entry) => (
         <Tooltip title={formatDateTime(entry.timestamp)}>
-          <Typography.Text>{formatRelative(entry.timestamp)}</Typography.Text>
+          <Typography.Text>{formatRelative(entry.timestamp, now)}</Typography.Text>
         </Tooltip>
       ),
     },

@@ -13,6 +13,7 @@ const renderRegister = () =>
     <Routes>
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/portals" element={<div>portals-stub</div>} />
+      <Route path="/login" element={<div>login-stub</div>} />
     </Routes>,
     { initialEntries: ["/register"] },
   );
@@ -37,6 +38,29 @@ describe("RegisterPage", () => {
 
     expect(await screen.findByText("portals-stub")).toBeInTheDocument();
     expect(registerBody).toEqual({ username: "operator", password: "operator-pass-1" });
+  });
+
+  it("sends the user to the login page when the post-registration login fails", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.post(API_URL("/auth/register"), () => HttpResponse.json(DEMO_USER, { status: 201 })),
+      // The account is created, but the session cannot be established.
+      http.post(API_URL("/auth/login"), () =>
+        HttpResponse.json({ detail: "Сессия не создана" }, { status: 401 }),
+      ),
+    );
+
+    renderRegister();
+    await user.type(screen.getByLabelText("Имя пользователя"), "operator");
+    await user.type(screen.getByLabelText("Пароль"), "operator-pass-1");
+    await user.click(screen.getByRole("button", { name: "Зарегистрироваться" }));
+
+    expect(await screen.findByText("login-stub")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Учётная запись создана, но автоматический вход не выполнен. Войдите вручную.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("shows a 409 conflict detail from the server", async () => {

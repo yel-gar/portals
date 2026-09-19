@@ -4,7 +4,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import { ApiError } from "../api/client";
 import type { Credentials } from "../api/types";
-import { useMe, useRegister } from "../hooks/useAuth";
+import { PostRegisterLoginError, useMe, useRegister } from "../hooks/useAuth";
 import { isRegistrationDisabled } from "../env";
 import { AuthShell } from "../components/AuthShell";
 
@@ -39,6 +39,13 @@ export function RegisterPage() {
         navigate("/portals", { replace: true });
       },
       onError: (error) => {
+        if (error instanceof PostRegisterLoginError) {
+          message.warning(
+            "Учётная запись создана, но автоматический вход не выполнен. Войдите вручную.",
+          );
+          navigate("/login", { replace: true });
+          return;
+        }
         message.error(
           error instanceof ApiError
             ? error.message
