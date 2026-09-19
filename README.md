@@ -19,6 +19,7 @@
 | `FRONTEND_URL`     | Frontend origin, added to the CORS allow-list                                  | ``                                  | ❌ |
 | `DEBUG`            | When truthy, session cookies are sent without the `Secure` flag                | `0`                                 | ❌ |
 | `DISABLE_REGISTRATION` | When truthy, `POST /auth/register` returns `403` and public registration is disabled | `0`                          | ❌ |
+| `DISABLE_SIMULATOR` | Backend-only: when truthy, the portal simulator background loop is not started. It runs in every mode (including `DEBUG`) by default; tests/CI set it to keep the DB free of a background writer | `0` | ❌ |
 | `INITIAL_SUPERUSER_USERNAME` | Backend-only: username of the initial superuser created on startup; must be set together with `INITIAL_SUPERUSER_PASSWORD` | — | ❌ |
 | `INITIAL_SUPERUSER_PASSWORD` | Backend-only: password of the initial superuser created on startup; must be set together with `INITIAL_SUPERUSER_USERNAME` | — | ❌ |
 | `PORTAL_OPEN_CHANCE` | Backend-only: chance (0..1) of the portal simulator opening a new portal on each 10-second tick (0.05 ≈ one portal per 3–4 minutes) | `0.05` | ❌ |

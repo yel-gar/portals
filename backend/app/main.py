@@ -36,10 +36,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     logger.info("Запуск каналов оповещений Postgres LISTEN/NOTIFY")
     await portal_update_hub.start(settings.database_url)
     await action_log_hub.start(settings.database_url)
-    # The simulator is skipped in debug mode (unit-test convenience, mirrors the
-    # login rate limiter) so tests never have a background writer mutating tables.
+    # The simulator runs in every mode, including debug, so development builds
+    # get the same live portal activity as production. Automated environments
+    # (tests/CI) opt out with DISABLE_SIMULATOR.
     simulator_task: asyncio.Task[None] | None = None
-    if not settings.debug:
+    if not settings.disable_simulator:
         simulator_task = asyncio.create_task(simulator_loop())
         logger.info("Запуск симулятора порталов")
     logger.info("Приложение запущено")

@@ -11,6 +11,7 @@ os.environ.setdefault("POSTGRES_PORT", "5432")
 os.environ.setdefault("BACKEND_URL", "")
 os.environ.setdefault("FRONTEND_URL", "")
 os.environ.setdefault("DEBUG", "1")
+os.environ.setdefault("DISABLE_SIMULATOR", "1")
 
 import pytest
 from httpx import ASGITransport, AsyncClient
