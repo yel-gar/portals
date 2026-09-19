@@ -1,17 +1,19 @@
 # Project state
 
 ## Current status
-Backend is complete (M1-M7: foundation, schemas/deps, auth, portal routes + two snapshot WebSockets + commit-safe actions, admin, entrypoint/env, tests at 99% coverage) and running in docker with seeded dev data. Frontend development is on branch `frontend/react-vite`: six AntD design mockups were built, the user chose **«Угли» (embers)** — dark sidebar theme with fiery orange accent. The mockups had `file://` loading fixed (renderer precompiled to plain JS), stat icons colored, portal detail as centered **Modal**, and a sidebar-layout flex bug fixed. Now the real React frontend is being implemented on this theme.
+Backend is complete (M1-M7: foundation, schemas/deps, auth, portal routes + two snapshot WebSockets + commit-safe actions, admin, entrypoint/env, tests at 99% coverage) and running in docker with seeded dev data. Frontend work on branch `frontend/react-vite`: the mockups were narrowed to the chosen **«Угли» (embers)** theme, the real React SPA is implemented (auth, live portal table + action modal, action log, stats, admin users), and its test suite + docs are in place. Live verification pending the backend WebSocket dependency fix (see notice below) — REST flows are verified against the live backend.
+
+> ⚠️ **Backend WS notice (not fixable from this worktree):** the runtime backend image lacks a WebSocket protocol library — `backend/pyproject.toml` declares no `websockets`/`wsproto`, so uvicorn's `AutoWebSocketsProtocol` is `None` and `/portals/ws`, `/portals/log/ws` answer `405 Method Not Allowed` on upgrade. The backend owner is fixing it. The frontend is already resilient: `useSnapshotWs` treats a close before the handshake completes as a possible session expiry (backend rejects a dead cookie with HTTP 403 → browser close 1006, not 4401) and re-checks auth, while reconnecting with capped backoff.
 
 ## Current plan (frontend implementation, branch `frontend/react-vite`)
-1. **Prepare** — shut down the mockup HTTP server; trim `frontend/mockups/` to the embers theme only (keep its sources; delete other 5 variants).
-2. **Dockerfile** — multi-stage `frontend/Dockerfile`: `build` (node:24-alpine, `npm ci`, `npm run build`, `BACKEND_URL` baked via `VITE_BACKEND_URL` build arg) → `serve` (nginx:alpine, static + SPA fallback, minimal RAM); plus a `dev` target for the Vite dev server.
-3. **Compose** — add `frontend` service to `docker-compose.yml` (build args + `${FRONTEND_PORT:-3000}:80`); pass `BACKEND_URL`/`FRONTEND_URL`/`DEBUG` into the `backend` service env (CORS + dev cookies were not forwarded before).
-4. **Dev overrides** — extend `docker-compose.override.yml.dev` with a `frontend` dev service (build target `dev`, bind-mount `./frontend`, named `node_modules` volume, runtime `VITE_BACKEND_URL`, Vite on port 80 inside container → printed host port unchanged).
-5. **Copy template** — `docker-compose.override.yml.dev` → `docker-compose.override.yml` (gitignored).
-6. **Backend up + OpenAPI** — `docker compose up -d`, export `/openapi.json` to `/tmp/opencode/openapi.json` (done), smoke-test auth + portals live, seed the dev DB with realistic portals (done).
-7. **Frontend implementation** — React + Vite + TS strict, AntD (dark embers tokens), TanStack Query, snapshot WebSocket hook, React Router v7, Russian UI / English code; pages: login/register, portals table + detail modal with actions, action log, stats, admin users (superuser); live WS snapshots replace state atomically.
-8. **Tests + docs** — Vitest + Testing Library component/unit tests for hooks and key components; frontend README; envvars table refresh; final commit per milestone.
+1. **Prepare** — mockup server shut down; `frontend/mockups/` trimmed to embers theme only. ✅
+2. **Dockerfile** — multi-stage `frontend/Dockerfile`: deps → build (VITE_BACKEND_URL baked) → dev (Vite HMR) → serve (nginx, single worker, SPA fallback). ✅
+3. **Compose** — `frontend` service (build arg `BACKEND_URL`, `${FRONTEND_PORT:-3000}:80`); `BACKEND_URL`/`FRONTEND_URL`/`DEBUG` now forwarded to the `backend` service (CORS + dev cookies). ✅
+4. **Dev overrides** — `frontend` dev service in `docker-compose.override.yml.dev` (target `dev`, bind-mount `./frontend`, named `node_modules` volume, runtime `VITE_BACKEND_URL`), copied to `docker-compose.override.yml`. ✅
+5. **Copy template** — done. ✅
+6. **Backend up + OpenAPI** — compose up, `/openapi.json` exported, HTTP routes smoke-tested, dev DB seeded with 11 portals. ✅
+7. **Frontend implementation** — SPA committed (`aa6ae30`): api layer, snapshot-WS hook, auth, portals table + 720px action modal, log, stats, admin users, RequireAuth/RequireSuperuser, embers theme. ✅
+8. **Tests + docs** — Vitest + Testing Library + MSW (43 tests: format, ApiError/request, useSnapshotWs incl. backoff/4401/pre-accept-1006, PortalModal, PortalsPage live-snapshot atomic replace, Login/Register, AdminUsers), `frontend/README.md`, envvars table refresh. ✅ (backend WS dep + live-WS browser check pending upstream fix)
 
 ## Review fixes (post M6)
 - `nullable` now set explicitly on every model column.
@@ -40,6 +42,17 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 9. **Final** — pre-commit --all-files, full pytest run, doc refresh.
 
 ## Completed milestones
+
+### Frontend SPA implementation (branch `frontend/react-vite`)
+- Real React SPA committed (`aa6ae30`): React 19 + Vite 8 + TS strict, AntD v5 embers theme, TanStack Query, React Router v7; Russian UI / English code.
+- API layer: `types.ts` mirrors backend pydantic schemas; `client.ts` fetch wrapper (`credentials: "include"`, `ApiError` with FastAPI `detail` extraction incl. 422 arrays, `websocketUrl` helper); `endpoints.ts` typed auth/portals/admin calls.
+- Live updates: `useSnapshotWs` → `useLiveSnapshot` writes each WS frame into the same query key as REST (atomic replacement); REST refetch fallback (30 s portals/log, 20 s stats); reconnect with exponential backoff capped at 15 s; 4401 (post-accept) and close-before-open (pre-accept HTTP-403 → 1006) both trigger a `me` re-check so an expired session routes to login; malformed frames ignored.
+- Pages/components: AuthShell (login/register), AppLayout (sidebar + header live badge + refresh), PortalTable (server pagination, click row → modal), PortalModal (720px, 7 actions 3/row, never disabled client-side, 409/422 shown verbatim, MARK/UNMARK toggle), LogPage, StatsPage (danger distribution as share of `open`), AdminUsersPage (+ create/delete/set-password), RequireAuth/RequireSuperuser, NotFound; live status context provider.
+- Auth via httpOnly cookie only; no token storage; `useMe` treats 401 as logged-out (null), login/register seed the `me` cache, logout clears all caches.
+- Previously recorded decisions respected: no client-side action availability, no client-side search/sort (backend pagination only), embers palette, centered 720px modal.
+- Known frontend bug fixed during testing: `formatTimeLeft` compared hours against a millisecond constant and never reached its days branch.
+- Tests + docs: Vitest + Testing Library + MSW, 43 tests across 8 files (format, ApiError/request, useSnapshotWs, PortalModal, PortalsPage live WS atomic replace, Login/Register, AdminUsers); `frontend/README.md`; absolute MSW handler URLs and FakeWebSocket (jsdom lacks WebSocket/matchMedia) documented. `npm run typecheck` and `npm run build` green.
+- Backend WS dependency gap recorded (see Current status notice): needs `websockets` in backend deps; live-WS browser check pending that fix.
 
 ### Frontend kickoff (branch `frontend/react-vite`)
 - Stack confirmed with user: React + Vite + TypeScript (strict), SPA without SSR. Recorded in `DECISIONS.md` and a new "Frontend info" section in `AGENTS.md`.

@@ -34,6 +34,7 @@ export function useSnapshotWs<T>(
       return;
     }
     let disposed = false;
+    let opened = false;
     let socket: WebSocket | null = null;
     let retries = 0;
     let retryTimer: number | undefined;
@@ -43,9 +44,11 @@ export function useSnapshotWs<T>(
         return;
       }
       setStatus(retries === 0 ? "connecting" : "reconnecting");
+      opened = false;
       socket = new WebSocket(url);
 
       socket.onopen = () => {
+        opened = true;
         retries = 0;
         setStatus("open");
       };
@@ -63,9 +66,20 @@ export function useSnapshotWs<T>(
           return;
         }
         if (event.code === AUTH_FAILED_CODE) {
+          // The backend rejects an invalid-session handshake with this code
+          // (post-accept); a rejected handshake (pre-accept) surfaces in the
+          // browser as a plain 1006, caught by the `opened` check below.
           setStatus("unauthorized");
           onUnauthorizedRef.current?.();
           return;
+        }
+        if (!opened) {
+          // Closed before the handshake completed: in practice an expired
+          // session — the backend answers a bad cookie with HTTP 403, which
+          // browsers surface as close 1006 rather than the 4401 the server
+          // requested. Re-check auth; if the session really is gone the app
+          // routes to login, otherwise the reconnect below just continues.
+          onUnauthorizedRef.current?.();
         }
         const delay = Math.min(INITIAL_RETRY_MS * 2 ** retries, MAX_RETRY_MS);
         retries += 1;

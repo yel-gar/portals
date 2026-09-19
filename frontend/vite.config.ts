@@ -36,7 +36,12 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    setupFiles: ["./src/test/setup.ts"],
-    css: false
+    setupFiles: ["./src/test/setup.ts", "./src/test/server.ts"],
+    css: false,
+    env: {
+      // Deterministic backend origin: tests talk to MSW handlers by path,
+      // while this keeps `websocketUrl`/`BACKEND_URL` stable across machines.
+      VITE_BACKEND_URL: "http://localhost:8000"
+    }
   }
 });

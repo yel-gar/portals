@@ -52,8 +52,8 @@ export function formatTimeLeft(iso: string, now: number = Date.now()): string {
     return `через ${m} ${plural(m, "минуту", "минуты", "минут")}`;
   }
   const h = Math.floor(diff / HOUR);
-  const m = Math.round((diff % HOUR) / MINUTE);
-  if (h < DAY) {
+  if (diff < DAY) {
+    const m = Math.round((diff % HOUR) / MINUTE);
     return m ? `через ${h} ч ${m} мин` : `через ${h} ч`;
   }
   const d = Math.floor(diff / DAY);
