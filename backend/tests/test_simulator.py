@@ -54,6 +54,27 @@ class _SequencedRandom:
         return seq[0]
 
 
+class _PhaseGatedSession:
+    """Pause the simulator after its first ``scalars`` call for race tests."""
+
+    def __init__(self, session: AsyncSession, phase_one_done: asyncio.Event, continue_to_lock: asyncio.Event) -> None:
+        self._session = session
+        self._phase_one_done = phase_one_done
+        self._continue_to_lock = continue_to_lock
+        self._first_scalars_call = True
+
+    async def scalars(self, *args: Any, **kwargs: Any) -> Any:
+        result = await self._session.scalars(*args, **kwargs)
+        if self._first_scalars_call:
+            self._first_scalars_call = False
+            self._phase_one_done.set()
+            await self._continue_to_lock.wait()
+        return result
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._session, name)
+
+
 def _portal(**overrides: Any) -> Portal:
     defaults: dict[str, Any] = {
         "name": "Test portal",
@@ -226,6 +247,41 @@ async def test_simulate_once_skips_action_locked_portal(
     assert fresh is not None
     assert fresh.stability == 50
     assert fresh.creatures_count == 0
+
+
+@pytest.mark.asyncio
+async def test_simulate_once_refreshes_candidate_changed_between_phases(
+    create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A candidate action committed after id selection is not overwritten."""
+    portal = await create_portal(stability=30, creatures_count=0)
+    monkeypatch.setattr(simulator, "random", _FakeRandom())
+    monkeypatch.setattr("app.models.random.randint", lambda _a, b: b)
+
+    phase_one_done = asyncio.Event()
+    continue_to_lock = asyncio.Event()
+
+    async def run_sim() -> list[int]:
+        async with get_session_factory()() as raw_session:
+            session = _PhaseGatedSession(raw_session, phase_one_done, continue_to_lock)
+            return await simulator.simulate_once(session, open_chance=0.0)  # type: ignore[arg-type]
+
+    sim_task = asyncio.create_task(run_sim())
+    await asyncio.wait_for(phase_one_done.wait(), timeout=2.0)
+
+    async with get_session_factory()() as action_session:
+        action_portal = await action_session.get(Portal, portal.id, with_for_update=True)
+        assert action_portal is not None
+        action_portal.stabilize()
+        await action_session.commit()
+
+    continue_to_lock.set()
+    assert await sim_task == [portal.id]
+
+    async with get_session_factory()() as session:
+        fresh = await session.get(Portal, portal.id)
+    assert fresh is not None
+    assert fresh.stability == 30 + SIMULATOR_STABILITY_DELTA + 30
 
 
 @pytest.mark.asyncio

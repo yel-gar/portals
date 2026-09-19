@@ -147,11 +147,11 @@ async def simulate_once(session: AsyncSession, *, open_chance: float | None = No
     now = utc_now()
     is_open = and_(Portal.is_closed.is_(False), Portal.expires_at > now)
 
-    # Phase 1 — pick the portals this tick may update with a plain read (no locks,
-    # so no contention is created yet): each open portal becomes a candidate with
+    # Phase 1 — pick ids with a plain read (no locks, and no ORM instances cached
+    # in this session). Each open portal becomes a candidate with
     # SIMULATOR_UPDATE_CHANCE probability.
-    open_portals = (await session.scalars(select(Portal).where(is_open).order_by(Portal.id))).all()
-    candidate_ids = [portal.id for portal in open_portals if random.random() < SIMULATOR_UPDATE_CHANCE]
+    open_portal_ids = (await session.scalars(select(Portal.id).where(is_open).order_by(Portal.id))).all()
+    candidate_ids = [portal_id for portal_id in open_portal_ids if random.random() < SIMULATOR_UPDATE_CHANCE]
 
     # Phase 2 — lock only the candidates (FOR UPDATE SKIP LOCKED), so an action on
     # a non-candidate portal never waits behind this tick. The open predicates are
@@ -165,6 +165,7 @@ async def simulate_once(session: AsyncSession, *, open_chance: float | None = No
             .where(and_(is_open, Portal.id.in_(candidate_ids)))
             .order_by(Portal.id)
             .with_for_update(skip_locked=True)
+            .execution_options(populate_existing=True)
         )
         for portal in (await session.scalars(stmt)).all():
             randomize_stability(portal)
