@@ -20,6 +20,7 @@ Backend is complete (M1-M7: foundation, schemas/deps, auth, portal routes + two 
 2. **Linter/formatter/coverage/pre-commit** — prettier + coverage provider installed (`c284243`); ESLint blocked by TS 7 → linter choice pending (see DECISIONS.md).
 3. **Backend filters/ordering** — the incoming backend PR adds filters + ordering for action log and dashboard; frontend queries + controls after merge.
 4. **Marked-portal behavior** — dismissed portals temporarily hide or sink to the end of the list; spec TBD.
+5. **`DISABLE_REGISTRATION`** — new envvar from the backend PR, passed to the frontend via compose; Register page shows an error message instead of the signup form when truthy. `.env.example` + README table to follow (envvar rule).
 
 ## Review fixes (post M6)
 - `nullable` now set explicitly on every model column.
