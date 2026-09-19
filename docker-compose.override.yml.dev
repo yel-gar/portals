@@ -3,3 +3,19 @@ services:
     volumes:
       - ./backend/app:/app/app
     command: ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      # Runtime value so HMR picks up .env edits after a restart; the package
+      # name is baked into the client by Vite.
+      VITE_BACKEND_URL: ${BACKEND_URL:-}
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
+
+volumes:
+  frontend_node_modules:
