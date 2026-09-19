@@ -86,6 +86,20 @@ def _danger_bucket_expression(now: datetime) -> ColumnElement[str]:
     )
 
 
+def _danger_rank_expression(now: datetime) -> ColumnElement[int]:
+    """Danger level as an integer rank (CRITICAL=3 … LOW=0) for ordering."""
+    risk = _risk_expression(now)
+    return cast(
+        ColumnElement[int],
+        case(
+            (risk <= DANGER_LOW_THRESHOLD, 0),
+            (risk <= DANGER_MEDIUM_THRESHOLD, 1),
+            (risk <= DANGER_HIGH_THRESHOLD, 2),
+            else_=3,
+        ),
+    )
+
+
 def _portal_filter_clauses(
     *,
     closed: bool | None,
@@ -121,7 +135,9 @@ def _portal_order_clauses(order_by: PortalOrder, now: datetime) -> list[Any]:
     if order_by is PortalOrder.RISK:
         return [
             open_first,
-            _risk_expression(now).desc(),
+            # Order by the discrete danger level (CRITICAL first), not the raw
+            # risk value; within a level the earlier expiry wins.
+            _danger_rank_expression(now).desc(),
             Portal.expires_at.asc(),
             Portal.has_observer.desc(),
             Portal.creatures_count.desc(),
@@ -315,8 +331,9 @@ async def _notify_action_committed(session: AsyncSession, portal_id: int) -> Non
         "Фильтры: `closed` (true — только закрытые/истёкшие, false — только открытые), "
         "`danger_level` (LOW/MEDIUM/HIGH/CRITICAL), `has_observer`, `is_marked`, "
         "`search` (подстрока в названии или целевом мире, без учёта регистра).\n\n"
-        "Сортировка `order_by`: `risk` (по умолчанию — риск DESC, срок истечения ASC, "
-        "наблюдатель внутри DESC, существа внутри DESC), `expires_at` (срок истечения ASC), "
+        "Сортировка `order_by`: `risk` (по умолчанию — по уровню опасности DESC: CRITICAL, HIGH, "
+        "MEDIUM, LOW; внутри одного уровня — срок истечения ASC, наблюдатель внутри DESC, "
+        "существа внутри DESC), `expires_at` (срок истечения ASC), "
         "`creatures` (существа внутри DESC), `name` (название ASC). Во всех режимах "
         "закрытые/истёкшие порталы выводятся в конце списка — открытые всегда первыми."
     ),

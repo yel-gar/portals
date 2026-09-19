@@ -142,8 +142,38 @@ async def test_list_portals_default_ordering(
     assert response.status_code == 200, response.text
     items = response.json()["items"]
     assert [item["name"] for item in items] == ["Critical", "Safe"]
-    risks = [item["risk_factor"] for item in items]
-    assert risks == sorted(risks, reverse=True)
+    # The default order is driven by the discrete danger level, not the risk value.
+    assert [item["danger_level"] for item in items] == ["HIGH", "LOW"]
+
+
+@pytest.mark.asyncio
+async def test_list_portals_default_sorts_by_danger_level_not_risk_value(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    """Within a danger level the earlier expiry wins over a higher raw risk."""
+    await _login(client)
+    # Both are HIGH; HighFar has the higher raw risk (~0.70) but expires much
+    # later than HighSoon (~0.62), so danger-level ordering puts HighSoon first.
+    await create_portal(
+        name="HighFar",
+        energy_level=100,
+        stability=0,
+        creatures_count=100_000,
+        expires_at=utc_now() + timedelta(hours=3),
+    )
+    await create_portal(
+        name="HighSoon",
+        energy_level=100,
+        stability=0,
+        creatures_count=8,
+        expires_at=utc_now() + timedelta(minutes=1),
+    )
+
+    response = await client.get("/portals")
+    assert response.status_code == 200, response.text
+    items = response.json()["items"]
+    assert [item["name"] for item in items] == ["HighSoon", "HighFar"]
+    assert [item["danger_level"] for item in items] == ["HIGH", "HIGH"]
 
 
 @pytest.mark.asyncio
