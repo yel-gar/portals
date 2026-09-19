@@ -34,6 +34,7 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 ## Transport / config
 - CORS allows origins from `BACKEND_URL` and `FRONTEND_URL` env vars, `allow_credentials=True`.
 - `DATABASE_URL` env var overrides the URL assembled from `POSTGRES_*` parts.
+- Interactive docs (`/docs`, `/redoc`) and `openapi.json` are disabled when `DEBUG` is off (FastAPI constructor params `docs_url`/`redoc_url`/`openapi_url` set to `None`), so the API surface is not publicly discoverable in production.
 
 ## Testing
 - Tests run against a real PostgreSQL in a `postgres:18-alpine` testcontainers container (per test session), not SQLite, to match the production dialect.

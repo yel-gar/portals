@@ -54,20 +54,29 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await dispose_db()
 
 
-app = FastAPI(
-    title="Portals API",
-    description="Magic portals laboratory overseer dashboard",
-    lifespan=lifespan,
-)
+def create_app() -> FastAPI:
+    _app = FastAPI(
+        title="Portals API",
+        description="Magic portals laboratory overseer dashboard",
+        lifespan=lifespan,
+        # Interactive docs and the OpenAPI schema are dev conveniences; close
+        # them in production (DEBUG off) so the API surface is not publicly
+        # discoverable. Controlled via the FastAPI constructor params.
+        docs_url="/docs" if settings.debug else None,
+        redoc_url="/redoc" if settings.debug else None,
+        openapi_url="/openapi.json" if settings.debug else None,
+    )
+    _app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[origin for origin in (settings.backend_url, settings.frontend_url) if origin],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    _app.include_router(auth.router)
+    _app.include_router(portals.router)
+    _app.include_router(admin.router)
+    return _app
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[origin for origin in (settings.backend_url, settings.frontend_url) if origin],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-app.include_router(auth.router)
-app.include_router(portals.router)
-app.include_router(admin.router)
+app = create_app()

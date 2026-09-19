@@ -1,7 +1,7 @@
 # Project state
 
 ## Current status
-Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: a portal populator/simulator background task (random stability/creatures updates every 10 s, optional spawning of new portals via `PORTAL_OPEN_CHANCE`, fantasy name generators) plus a route reorder in `routes/portals.py` so `POST /{id}` and `GET /{id}` sit next to each other. Tests now cover the simulator, config parsing, and the lifespan wiring: 106 tests, coverage 99%, mypy/ruff/black clean.
+Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: interactive docs (`/docs`, `/redoc`) and the OpenAPI schema (`/openapi.json`) are closed when `DEBUG` is off, via the FastAPI constructor params; app construction refactored into `create_app()` so both modes are testable. 108 tests, coverage 99%, mypy/ruff/black clean.
 
 ## Code review fixes (2026-09)
 Full review is persisted in `.context/REVIEW.md` (CRITICAL/MAJOR/MINOR/NIT findings, commits `c2197eb..6ed37f0`). All CRITICAL + MAJOR findings fixed:
@@ -43,6 +43,10 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 8. **Final** — pre-commit --all-files, full pytest run, doc refresh.
 
 ## Completed milestones
+
+### Docs closed outside DEBUG
+- `app/main.py` construction moved into a `create_app()` factory (matches the documented "FastAPI app factory" structure): interactive docs and the OpenAPI schema are switched off in production via the constructor params — `docs_url`/`redoc_url`/`openapi_url` are `None` when `settings.debug` is falsy, `/docs`/`/redoc`/`/openapi.json` otherwise.
+- Tests: `test_docs_served_in_debug` (all three return 200) and `test_docs_closed_outside_debug` (all three return 404) build a fresh app per mode via `create_app()` with monkeypatched settings. 108 pass, coverage 99%.
 
 ### Portal simulator + route reorder (latest batch)
 - New `app/simulator.py` — background portal populator:

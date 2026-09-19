@@ -1,10 +1,11 @@
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.pool import NullPool
 
 from app.config import Settings
 from app.db import create_all, get_session_factory, init_db
-from app.main import app, lifespan
+from app.main import app, create_app, lifespan
 from app.models import User
 
 
@@ -21,6 +22,36 @@ async def test_lifespan_starts_and_stops_hubs(postgres_url: str, monkeypatch: py
         # lifespan disposes the global engine; restore it for the remaining tests
         init_db(postgres_url, pool_class=NullPool)
         await create_all()
+
+
+@pytest.mark.asyncio
+async def test_docs_served_in_debug(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.main.settings",
+        Settings(
+            database_url="postgresql+asyncpg://placeholder/placeholder", backend_url="", frontend_url="", debug=True
+        ),
+    )
+    transport = ASGITransport(app=create_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        for path in ("/docs", "/redoc", "/openapi.json"):
+            response = await client.get(path)
+            assert response.status_code == 200, path
+
+
+@pytest.mark.asyncio
+async def test_docs_closed_outside_debug(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.main.settings",
+        Settings(
+            database_url="postgresql+asyncpg://placeholder/placeholder", backend_url="", frontend_url="", debug=False
+        ),
+    )
+    transport = ASGITransport(app=create_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        for path in ("/docs", "/redoc", "/openapi.json"):
+            response = await client.get(path)
+            assert response.status_code == 404, path
 
 
 @pytest.mark.asyncio
