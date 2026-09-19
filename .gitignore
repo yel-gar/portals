@@ -7,3 +7,4 @@ __pycache__
 .coverage
 docker-compose.override.yml
 .env
+node_modules
