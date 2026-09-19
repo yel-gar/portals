@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Угли — макет Лаборатории порталов</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ant-design/icons@5/dist/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/antd@5/dist/antd.min.js"></script>
+
+    <script src="../shared/data.js"></script>
+    <link rel="stylesheet" href="../shared/app.css" />
+
+    <script>
+      window.THEME = {
+        name: "Угли",
+        layout: "sidebar",
+        dark: true,
+        colorPrimary: "#ff6a00",
+        bgLayout: "#0e0905",
+        bgContainer: "#171008",
+        bgElevated: "#1e1409",
+        borderRadius: 10
+      };
+    </script>
+
+    <style>
+      :root {
+        --page-bg: #0e0905;
+        --page-fg: #f6e7d3;
+        --accent-1: #ff6a00;
+        --accent-2: #ffb347;
+        --nav-bg: linear-gradient(180deg, #150d05 0%, #0a0603 100%);
+        --nav-fg: #e9d3b8;
+        --nav-fg-muted: #a07f5c;
+        --nav-item-hover: rgba(255, 122, 26, 0.1);
+        --nav-item-active-bg: rgba(255, 122, 26, 0.2);
+        --nav-item-active-fg: #ffd9ab;
+        --nav-border: rgba(255, 138, 51, 0.14);
+        --logo-fg: #fff3e6;
+        --logo-bg: linear-gradient(135deg, #ffad33, #ff4d00);
+        --logo-glow: 0 0 24px rgba(255, 106, 0, 0.55);
+        --nav-badge-bg: rgba(255, 122, 26, 0.28);
+        --header-bg: #120b07;
+        --header-fg: #f2dfc9;
+        --header-fg-muted: #a38662;
+        --header-border: rgba(255, 138, 51, 0.12);
+        --footer-fg: #7d6244;
+        --live-fg: #5ee08a;
+        --live-glow: rgba(94, 224, 138, 0.4);
+        --topline-h: 3px;
+        --topline-bg: linear-gradient(90deg, #ff4d00, #ff8c00, #ffc46b);
+      }
+
+      body {
+        background:
+          radial-gradient(1100px 480px at 72% -10%, rgba(255, 106, 0, 0.1), transparent 62%),
+          radial-gradient(800px 400px at 8% 110%, rgba(255, 61, 0, 0.06), transparent 60%),
+          #0e0905;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="../shared/app.compiled.js"></script>
+  </body>
+</html>
