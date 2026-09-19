@@ -173,14 +173,35 @@ password: length >= 8, <= 128, bring out as constant as well, but keep in mind y
 - обсудил с агентом выбор стека
 - попросил агента сделать тестовые макеты перед началом основной разработки
 - установил способ деплоя приложения: бэкенд и фронтенд на отдельных доменах
+- дал комментарии по поводу макетов - карточка портала изначально отображалась в правом сайдбаре, я указал агенту перенести его в модал
 
 ## Что сделал агент
 - создал тестовые макеты
 - обсудил со мной выбор фреймворка и инструментов
 - написал моки апи для тестирования
+- нашел баг на бэкенде, связанный с вебсокетами и передал его ответственному агенту
 
 ## Проблемы агента
-- агент сильно застрял на этапе создания начальных макетов - у него неправильно работал инструмент записи, поэтому он до бесконечности перезаписывал. Я закрыл сессию и запустил нового агента с другой моделью.
+- Агент сильно застрял на этапе создания начальных макетов - у него неправильно работал инструмент записи, поэтому он до бесконечности перезаписывал. Я закрыл сессию и запустил нового агента с другой моделью.
+- Была ошибка верстки - навигационный сайдбар висел над основной страницей в верхнем левом углу. Агент самостоятельно исправил после указания на проблему.
+- Агент проигнорировал требование изучать схему по `openapi.json`, который экспортирует бэкенд, вместо этого полез изучать исходники бэкенда
+- Агент не смог подключиться по вебсокету к панели и полез траблшутить бэкенд, что было запрещено промптом.
+- Агент выбрал использовать устаревшую версию AntD (v5 вместо v6) и подключил плагин совместимости, хотя можно было написать на v6.
+
+## Ключевые промпты
+Поскольку основное описание проекта и требуемые страницы уже были занесены в контекстные файлы бэкенд-агентом, дополнительных объяснений по поводу дизайна не понадобилось.
+```
+Yes, you can record it. Please start with the implementation. Proceed according to this plan
+1) Shut down server and prepare the frontend directory. You can delete the rest of variants but make sure you don't lose sources for embers theme.
+2) Write a multi-stage dockerfile for build and serve with minimal RAM consumption.
+3) Add `frontend` service to docker-compose.yml. Make sure you pass BACKEND_URL envvar to serve as base url of backend.
+4) Add overrides to docker-compose.override.yml.dev to develop frontend with automatic file refresh.
+5) Copy the .dev template to override file.
+6) Bring backend service up, export the openapi schema for yourself.
+7) Proceed with implementation of frontend.
+8) Make sure to write tests and proper documentation.
+Record this plan in project state and relevant context files before proceeding. Commit each relatively big action. Do not touch backend, if it responds in a weird way simply bring it up. You can test against live backend. You can edit .env file if required.
+```
 
 # Этап 2.1. Доработка бэкенда
 По результатам этапа 2 параллельно с этапом 3 был запущен параллельный агент для исправления проблем с кодом.
@@ -189,6 +210,7 @@ password: length >= 8, <= 128, bring out as constant as well, but keep in mind y
 - настроил для фронтенда и бэкенда параллельные worktrees и исправил проблему с виртуальными окружениями для pre-commit hooks
 - обозначил бэкенд агенту задачу создать возможность фильтрации и сортировки
 - обозначил задачу создать симулятор создания и изменения порталов
+- убрал эндпоинты документации в проде (DEBUG=0)
 
 ## Что сделал агент
 - добавил возможность фильтрации и сортировки и написал тесты под нее
