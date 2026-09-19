@@ -57,6 +57,11 @@ Getting to basic docker setup now. Project itself will be running ultimately thr
 - проверил план агента и внес корректировки
 - провел ревью кода
 
+## Что сделал агент
+- полностью написал код согласно моему ТЗ
+- написал тесты и проверил себя благодаря настроенному на этапе 1 CI
+- провел само-ревью
+
 ## Ошибки агента
 - использовал mock sqlite для тестов, хотя лучше использовать testcontainers, я внес корректировку
 - `nullable` задана почти нигде в моделях БД. По умолчанию колонки nullable, а по ТЗ почти все поля обязательны.
@@ -158,6 +163,101 @@ UserRegisterSchema
 username: length >= 4, <= 64, bring out min length and max length as constant and use it both in db and schema validator
 password: length >= 8, <= 128, bring out as constant as well, but keep in mind you will be storing HASH in database. Hash to be calculated and verified via argon2.
 
+```
+
+# Этап 3. Фронтенд
+Фронтенд создавался небольшими промптами в режиме реального времени с обязательным контролем качества и начальным согласованием макета и стиля.
+
+## Что сделал я
+- предложил варианты фреймворков для фронтенда (Next.js, React)
+- обсудил с агентом выбор стека
+- попросил агента сделать тестовые макеты перед началом основной разработки
+- установил способ деплоя приложения: бэкенд и фронтенд на отдельных доменах
+- дал комментарии по поводу макетов - карточка портала изначально отображалась в правом сайдбаре, я указал агенту перенести его в модал
+
+## Что сделал агент
+- создал тестовые макеты
+- обсудил со мной выбор фреймворка и инструментов
+- написал моки апи для тестирования
+- нашел баг на бэкенде, связанный с вебсокетами и передал его ответственному агенту
+
+## Проблемы агента
+- Агент сильно застрял на этапе создания начальных макетов - у него неправильно работал инструмент записи, поэтому он до бесконечности перезаписывал. Я закрыл сессию и запустил нового агента с другой моделью.
+- Была ошибка верстки - навигационный сайдбар висел над основной страницей в верхнем левом углу. Агент самостоятельно исправил после указания на проблему.
+- Агент проигнорировал требование изучать схему по `openapi.json`, который экспортирует бэкенд, вместо этого полез изучать исходники бэкенда
+- Агент не смог подключиться по вебсокету к панели и полез траблшутить бэкенд, что было запрещено промптом.
+- Агент выбрал использовать устаревшую версию AntD (v5 вместо v6) и подключил плагин совместимости, хотя можно было написать на v6.
+
+## Ключевые промпты
+Поскольку основное описание проекта и требуемые страницы уже были занесены в контекстные файлы бэкенд-агентом, дополнительных объяснений по поводу дизайна не понадобилось.
+```
+Yes, you can record it. Please start with the implementation. Proceed according to this plan
+1) Shut down server and prepare the frontend directory. You can delete the rest of variants but make sure you don't lose sources for embers theme.
+2) Write a multi-stage dockerfile for build and serve with minimal RAM consumption.
+3) Add `frontend` service to docker-compose.yml. Make sure you pass BACKEND_URL envvar to serve as base url of backend.
+4) Add overrides to docker-compose.override.yml.dev to develop frontend with automatic file refresh.
+5) Copy the .dev template to override file.
+6) Bring backend service up, export the openapi schema for yourself.
+7) Proceed with implementation of frontend.
+8) Make sure to write tests and proper documentation.
+Record this plan in project state and relevant context files before proceeding. Commit each relatively big action. Do not touch backend, if it responds in a weird way simply bring it up. You can test against live backend. You can edit .env file if required.
+```
+
+# Этап 2.1. Доработка бэкенда
+По результатам этапа 2 параллельно с этапом 3 был запущен параллельный агент для исправления проблем с кодом.
+
+## Что сделал я
+- настроил для фронтенда и бэкенда параллельные worktrees и исправил проблему с виртуальными окружениями для pre-commit hooks
+- обозначил бэкенд агенту задачу создать возможность фильтрации и сортировки
+- обозначил задачу создать симулятор создания и изменения порталов
+- убрал эндпоинты документации в проде (DEBUG=0)
+
+## Что сделал агент
+- добавил возможность фильтрации и сортировки и написал тесты под нее
+- добавил и протестировал симулятор порталов
+- с помощью субагентов провел полный ревью бэкенда и нашел несколько важных проблем
+
+## Ключевые промпты
+```
+Your next task: add a portal populator/simulator. It is a background task that randomly updates some portals every 10 seconds. Changeable values: stability (may increase or decrease), creatures_inside (may decrease or increase). New portals may open with a configurable chance via envvar (default 5% which should be equal to about 1 portal per 3-4 minutes). New portal has completely random values, TTL from 30 seconds to 30 minutes. Write a name generator for worlds and portal names. Also reorder code in routes.portals so that POST /{id} and GET /{id} are nearby.
+```
+
+# Этап 4. Интеграция
+```
+Record a couple ideas while we're waiting for backend
+1) AntD must be rewritten to v6 before anything
+2) Linter, formatter, coverage checker and pre-commit hooks must be configured
+3) New backend will introduce filters and ordering for action logs and dashboard. Frontend needs to support it
+4) When portal is marked as "dismissed", it should temporarily disappear from frontend or be moved towards the end
+```
+
+```
+1. P1: simulator can overwrite a concurrent portal action.
+   ~/PycharmProjects/portals-be/backend/app/simulator.py:149 reads mutable portal rows without FOR UPDATE, then commits randomized stability/creatures_count. A simultaneous STABILIZE action (/
+   home/exenifix/PycharmProjects/portals-be/backend/app/routes/portals.py:527) does lock its row, but may commit before the simulator’s stale object is flushed, allowing the simulator to overwrite the
+   action’s new stability.
+
+   Agent instruction: lock the simulator’s selected open portals with with_for_update() before changing them, and add a two-session concurrency test proving a simultaneous STABILIZE cannot be lost.
+
+2. P1: DISABLE_REGISTRATION does not reach the deployed backend.
+   The new setting is documented in ~/PycharmProjects/portals-be/.env.example:16 and read in ~/PycharmProjects/portals-be/backend/app/config.py:100, but ~/
+   PycharmProjects/portals-be/docker-compose.yml:23 does not pass it to the backend service. Setting it in the project .env therefore still leaves public registration enabled in Docker deployment.
+
+   Agent instruction: add DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-0} to the backend service environment and verify the rendered Compose configuration includes it.
+
+3. P2: listener recovery can make shutdown wait up to 30 seconds.
+   When reconnection fails, UpdateHub._supervise (~/PycharmProjects/portals-be/backend/app/notifications.py:73) sleeps with exponential backoff. stop() (~/PycharmProjects/portals-
+   be/backend/app/notifications.py:86) sets a flag but does not cancel or interrupt that sleep, then awaits the supervisor. After a failed reconnect, application shutdown can exceed the Docker grace
+   period.
+
+   Agent instruction: make the supervisor promptly cancellable during stop() and add a test that stops a hub while its reconnect attempt is backing off.
+
+4. P2: simulator notifications can grow WebSocket subscriber queues without bound.
+   UpdateHub.broadcast (~/PycharmProjects/portals-be/backend/app/notifications.py:115) puts one item per event into unbounded queues. The simulator emits one notification per changed portal
+   every tick, so a slow client or slow snapshot query can accumulate an arbitrarily large queue.
+
+   Agent instruction: use Queue(maxsize=1) and skip enqueueing when a refresh is already pending. This preserves the intended “refresh/coalesce” semantics. Add a test that repeated broadcasts leave only
+   one pending refresh.
 ```
 
 # Обработанные и покрытые тестами граничные случаи: Auth и Portals

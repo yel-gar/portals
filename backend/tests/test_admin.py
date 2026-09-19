@@ -1,9 +1,13 @@
+import asyncio
 from collections.abc import Awaitable, Callable
+from datetime import timedelta
 
 import pytest
 from httpx import AsyncClient
 
-from app.models import User
+from app.config import settings
+from app.db import get_session_factory
+from app.models import LoginSession, User, utc_now
 
 
 async def _login(client: AsyncClient, username: str = "alice", password: str = "supersecret1") -> None:
@@ -55,6 +59,20 @@ async def test_create_duplicate_user(client: AsyncClient, create_user: Callable[
 
 
 @pytest.mark.asyncio
+async def test_create_user_concurrent_duplicate(
+    client: AsyncClient, create_user: Callable[..., Awaitable[User]]
+) -> None:
+    await create_user("root", "supersecret1", is_superuser=True)
+    await _login(client, username="root")
+
+    first, second = await asyncio.gather(
+        client.post("/admin/users", json={"username": "dupe", "password": "supersecret1"}),
+        client.post("/admin/users", json={"username": "dupe", "password": "supersecret1"}),
+    )
+    assert {first.status_code, second.status_code} == {201, 409}
+
+
+@pytest.mark.asyncio
 async def test_set_password(client: AsyncClient, create_user: Callable[..., Awaitable[User]]) -> None:
     await create_user("root", "supersecret1", is_superuser=True)
     bob = await create_user("bobby", "supersecret1")
@@ -78,6 +96,34 @@ async def test_set_password_missing_user(client: AsyncClient, create_user: Calla
 
     response = await client.post("/admin/users/9999/set-password", json={"password": "newpassword9"})
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_set_password_revokes_target_sessions_but_keeps_own(
+    client: AsyncClient, create_user: Callable[..., Awaitable[User]]
+) -> None:
+    await create_user("root", "supersecret1", is_superuser=True)
+    bob = await create_user("bobby", "supersecret1")
+    bob_token = "b" * 64
+    async with get_session_factory()() as session:
+        session.add(LoginSession(user_id=bob.id, token=bob_token, expires_at=utc_now() + timedelta(hours=1)))
+        await session.commit()
+
+    await _login(client, username="root")
+    root_token = client.cookies.get(settings.session_cookie_name)
+    assert root_token is not None
+
+    response = await client.post(f"/admin/users/{bob.id}/set-password", json={"password": "newpassword9"})
+    assert response.status_code == 204
+
+    # the target user's existing session is revoked
+    client.cookies.set(settings.session_cookie_name, bob_token)
+    me_bob = await client.get("/auth/me")
+    assert me_bob.status_code == 401
+    # the admin's own session is untouched
+    client.cookies.set(settings.session_cookie_name, root_token)
+    me_root = await client.get("/auth/me")
+    assert me_root.status_code == 200
 
 
 @pytest.mark.asyncio

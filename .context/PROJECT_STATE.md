@@ -1,9 +1,16 @@
 # Project state
 
 ## Current status
-Backend is complete (M1-M7: foundation, schemas/deps, auth, portal routes + two snapshot WebSockets + commit-safe actions, admin, entrypoint/env, tests at 99% coverage) and running in docker with seeded dev data. Frontend work on branch `frontend/react-vite`: the mockups were narrowed to the chosen **«Угли» (embers)** theme, the real React SPA is implemented (auth, live portal table + action modal, action log, stats, admin users), and its test suite + docs are in place. Live verification pending the backend WebSocket dependency fix (see notice below) — REST flows are verified against the live backend.
+Backend is complete (M1–M7 + follow-ups): magic portals laboratory overseer dashboard API — auth, portal routes with commit-safe actions, two snapshot WebSockets (action log + portal list), stats, admin, plus the merged backend PR: `websockets` dependency (WS endpoints actually serve now), portal simulator with SKIP LOCKED concurrency guard, filters + ordering for portal list and action log, `GET /portals/{id}`, `DISABLE_REGISTRATION`, prompt hub shutdown / bounded subscriber queues, docs closed outside DEBUG. 113 tests, coverage 99 %, mypy/ruff/black clean. Backend runs in docker with seeded dev data.
 
-> ⚠️ **Backend WS notice (not fixable from this worktree):** the runtime backend image lacks a WebSocket protocol library — `backend/pyproject.toml` declares no `websockets`/`wsproto`, so uvicorn's `AutoWebSocketsProtocol` is `None` and `/portals/ws`, `/portals/log/ws` answer `405 Method Not Allowed` on upgrade. The backend owner is fixing it. The frontend is already resilient: `useSnapshotWs` treats a close before the handshake completes as a possible session expiry (backend rejects a dead cookie with HTTP 403 → browser close 1006, not 4401) and re-checks auth, while reconnecting with capped backoff.
+Frontend on branch `frontend/react-vite` (merged with master): real React SPA implemented — auth (cookie only), live portal table + 720px action modal, action log, stats, admin users — embers theme, 43 Vitest tests, `frontend/README.md`. Live-WS verification against the real backend is now possible (the dependency fix landed); dev containers need a rebuild to pick up the new backend image.
+
+## Roadmap (frontend, branch `frontend/react-vite`)
+1. **AntD v5 → v6** — first priority; must land before new frontend work. Re-verify embers tokens, drop `@ant-design/v5-patch-for-react-19`.
+2. **Linter/formatter/coverage/pre-commit** — prettier + coverage provider installed (`c284243`); ESLint blocked by TypeScript 7 → linter choice pending (see DECISIONS.md).
+3. **Filters/ordering UI** — backend landed (`e9cf180`, mirrored on the WS endpoints); frontend must surface filter + ordering controls for the portal table and the action log (server-driven params only, no client-side filtering).
+4. **`DISABLE_REGISTRATION` frontend part** — backend landed (403 + compose passthrough); frontend must gate the Register page (error message instead of the form) when the envvar reaches the frontend via compose.
+5. **Marked-portal behavior** — dismissed portals temporarily hide or sink to the end of the list; spec TBD.
 
 ## Current plan (frontend implementation, branch `frontend/react-vite`)
 1. **Prepare** — mockup server shut down; `frontend/mockups/` trimmed to embers theme only. ✅
@@ -13,14 +20,27 @@ Backend is complete (M1-M7: foundation, schemas/deps, auth, portal routes + two 
 5. **Copy template** — done. ✅
 6. **Backend up + OpenAPI** — compose up, `/openapi.json` exported, HTTP routes smoke-tested, dev DB seeded with 11 portals. ✅
 7. **Frontend implementation** — SPA committed (`aa6ae30`): api layer, snapshot-WS hook, auth, portals table + 720px action modal, log, stats, admin users, RequireAuth/RequireSuperuser, embers theme. ✅
-8. **Tests + docs** — Vitest + Testing Library + MSW (43 tests: format, ApiError/request, useSnapshotWs incl. backoff/4401/pre-accept-1006, PortalModal, PortalsPage live-snapshot atomic replace, Login/Register, AdminUsers), `frontend/README.md`, envvars table refresh. ✅ (backend WS dep + live-WS browser check pending upstream fix)
+8. **Tests + docs** — Vitest + Testing Library + MSW (43 tests: format, ApiError/request, useSnapshotWs incl. backoff/4401/pre-accept-1006, PortalModal, PortalsPage live-snapshot atomic replace, Login/Register, AdminUsers), `frontend/README.md`, envvars table refresh. ✅ (live-WS browser check against the rebuilt backend — pending container rebuild with the merged image)
 
-## Roadmap (awaiting backend PR merge)
-1. **AntD v5 → v6** — first priority once work resumes; must land before new frontend work. Re-verify embers tokens, drop `@ant-design/v5-patch-for-react-19`.
-2. **Linter/formatter/coverage/pre-commit** — prettier + coverage provider installed (`c284243`); ESLint blocked by TS 7 → linter choice pending (see DECISIONS.md).
-3. **Backend filters/ordering** — the incoming backend PR adds filters + ordering for action log and dashboard; frontend queries + controls after merge.
-4. **Marked-portal behavior** — dismissed portals temporarily hide or sink to the end of the list; spec TBD.
-5. **`DISABLE_REGISTRATION`** — new envvar from the backend PR, passed to the frontend via compose; Register page shows an error message instead of the signup form when truthy. `.env.example` + README table to follow (envvar rule).
+## Concurrency & ops review fixes (latest batch, backend)
+- **Simulator ↔ action race (P1)**: `simulate_once()` picks the portals it may update with a plain read, then locks **only those candidate ids** with `SELECT ... FOR UPDATE SKIP LOCKED`. The locks keep the tick's flush from overwriting a concurrently committed action (it only modifies rows it locked itself); `SKIP LOCKED` skips a candidate being acted on right now (it can be updated on a later tick). The guarantee is directional: an action on a **non-candidate** portal never contends with the tick (its row is never locked, even while the tick holds candidate locks pre-commit), while an action on a candidate the tick locked first waits only for that short transaction. To close the gap *between* the phases (reviewer `9a99419`), phase 1 reads candidate **ids only** (no ORM instances cached in the session's identity map) and phase 2 re-fetches with `.execution_options(populate_existing=True)` — otherwise a candidate action committed between the reads would still be overwritten by the tick's stale cached instance. `test_simulate_once_skips_action_locked_portal` proves the tick returns promptly when its only candidate is action-locked and leaves it untouched; `test_simulate_once_locks_only_candidate_portals` synchronously proves an action on a non-candidate completes while the tick holds its candidate lock; `test_simulate_once_refreshes_candidate_changed_between_phases` proves a candidate action committed between the phases is read fresh (75, not a stale 45).
+- **DISABLE_REGISTRATION not deployed (P1)**: `docker-compose.yml` now passes `DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-0}` to the backend service (verified via `docker compose config`); previously the setting only worked outside docker.
+- **Hub shutdown can stall 30 s (P2)**: `UpdateHub.stop()` now cancels the supervisor task, so a pending reconnect backoff sleep never delays app shutdown; `test_hub_stop_interrupts_reconnect_backoff` stops the hub mid-backoff (base delay patched to 60 s) and asserts stop returns in < 5 s.
+- **Unbounded subscriber queues (P2)**: subscriber queues are `asyncio.Queue(maxsize=1)`; `broadcast()` skips enqueueing when a refresh is already pending — a slow client or slow snapshot query can no longer accumulate arbitrarily many refresh events. `test_hub_broadcast_coalesces_pending_refresh` covers the coalesce-then-refill cycle.
+
+## Code review fixes (2026-09, backend)
+Full review is persisted in `.context/REVIEW.md` (CRITICAL/MAJOR/MINOR/NIT findings, commits `c2197eb..6ed37f0`). All CRITICAL + MAJOR findings fixed:
+- **C1/M1/M8 — WS fixes**: `_hub_snapshot_loop` subscribes before the initial snapshot, coalesces bursts, handles send/query errors (logs, keeps running), cleans up cancelled tasks; handlers authenticate with a short-lived session and open a fresh session per snapshot (no pool pinning).
+- **M2** — `Username`/`Password` Annotated aliases (shared length constants) used in all auth schemas.
+- **M3** — login timing equalizer (`burn_password_verify_time` on unknown username); `security.py` exception syntax fixed and covered by `test_security.py`.
+- **M4** — `app/ratelimit.py` (in-memory sliding window, 5/60 s per IP, disabled in DEBUG) throttles login → 429; `DISABLE_REGISTRATION` disables `/auth/register` → 403; both documented in `.env.example` + README.
+- **M5** — `register`/`create_user` commits wrapped in `IntegrityError` → 409 (race-safe; concurrent-duplicate tests added).
+- **M6** — new `POST /auth/password` revokes all-but-current session; admin set-password revokes all of the target user's sessions.
+- **M7** — `UpdateHub`: idempotent `start()`, robust `stop()`, supervised reconnection with exponential backoff + subscriber wake-up on recovery (real reconnect test via `connection.terminate()`).
+- **M9** — flaky `test_list_portals_filters` de-flaked: Critical portal is expired at creation (TTL clamps to 0 → risk stays >0.9, closed/CRITICAL buckets time-invariant).
+- **M10** — unknown-token tests: HTTP `/auth/me` 401 and WS 4401 for both endpoints (covers `deps.py` unknown-session branch).
+- Risk formula weights/thresholds extracted to `app/constants.py` and referenced by both the Python helper and the SQL expressions.
+- `POST /portals/{id}` `action` query param kept (NIT dismissed by user).
 
 ## Review fixes (post M6)
 - `nullable` now set explicitly on every model column.
@@ -59,7 +79,6 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 - Previously recorded decisions respected: no client-side action availability, no client-side search/sort (backend pagination only), embers palette, centered 720px modal.
 - Known frontend bug fixed during testing: `formatTimeLeft` compared hours against a millisecond constant and never reached its days branch.
 - Tests + docs: Vitest + Testing Library + MSW, 43 tests across 8 files (format, ApiError/request, useSnapshotWs, PortalModal, PortalsPage live WS atomic replace, Login/Register, AdminUsers); `frontend/README.md`; absolute MSW handler URLs and FakeWebSocket (jsdom lacks WebSocket/matchMedia) documented. `npm run typecheck` and `npm run build` green.
-- Backend WS dependency gap recorded (see Current status notice): needs `websockets` in backend deps; live-WS browser check pending that fix.
 
 ### Frontend kickoff (branch `frontend/react-vite`)
 - Stack confirmed with user: React + Vite + TypeScript (strict), SPA without SSR. Recorded in `DECISIONS.md` and a new "Frontend info" section in `AGENTS.md`.
@@ -69,14 +88,38 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 - Design choices confirmed with user and recorded: **Ant Design**, **TanStack Query + snapshot WS hook**, **React Router**, **npm**, **Russian UI / English code**; backend on a separate subdomain with `BACKEND_URL` from compose baked into the frontend build; docker overrides with auto-reload (Vite HMR) for local dev.
 - Next: scaffold `frontend/` (layout to be agreed with user first), then add the compose service and dev override.
 
-### Initial superuser bootstrap + STABILIZE rework (latest batch)
+### Portal list & action log: filters + ordering (merged backend PR)
+- `PortalOrder` / `LogOrder` enums in `app/models.py` drive the `order_by` whitelist: `risk` (default), `expires_at`, `creatures`, `name` for portals; `newest` (default) / `oldest` for the log. Unknown values → 422.
+- Portal filters: `closed`, `danger_level`, `has_observer`, `is_marked`, `search` (case-insensitive name/world substring). Log filters: `action`, `portal_id`, `user_id`.
+- Risk/danger SQL expressions extracted from `/stats` into `_risk_expression(now)` / `_danger_bucket_expression(now)` (shared with `/stats`);
+- Default portal ordering: risk DESC, expires_at ASC, has_observer DESC, creatures_count DESC, `id ASC` tiebreaker.
+- All query params mirrored on the WS endpoints (`WS /portals/ws`, `WS /portals/log/ws`) via the shared `_portal_page` / `_action_log_page`.
+- `GET /portals/{id}` — individual portal info (`PortalSchema`), 404 for unknown id; declared after `/log` and `/stats` so the int path param never shadows them.
+- Tests: 16 new (default ordering, order_by variants, tie-breakers, each portal filter, combined filters, 422 invalid order_by, log filters/ordering, WS-with-filter, portal info incl. 404/422/401). Coverage 99%; mypy/ruff/black clean.
+
+### Portal simulator + route reorder (backend)
+- New `app/simulator.py` — background portal populator:
+  - `simulator_loop()` ticks every `SIMULATOR_TICK_SECONDS` (10 s), started/cancelled in the app lifespan; skipped while `DEBUG` is truthy (mirrors the login rate limiter so tests never have a background writer). Per-tick failures are logged and the loop keeps running; shutdown cancels the task and awaits it.
+  - Each tick picks every open (non-closed, not-expired) portal and with `SIMULATOR_UPDATE_CHANCE` (0.5) nudges `stability` by ±`SIMULATOR_STABILITY_DELTA` (15) and `creatures_count` by ±`SIMULATOR_CREATURES_DELTA` (5), both clamped (`0..100`, creatures also capped at `SIMULATOR_MAX_CREATURES`).
+  - With `settings.portal_open_chance` (`PORTAL_OPEN_CHANCE` env var, default `SIMULATOR_OPEN_CHANCE_DEFAULT = 0.05` ≈ one portal per 3–4 min) a brand-new portal appears: fully random name/world/energy/stability/creatures, `TTL` uniform in `SIMULATOR_PORTAL_TTL_MIN_SECONDS..MAX` (30 s..30 min), unmarked, no observer, open.
+  - Name generators: `world_name()` (syllable composition + ending, e.g. «Альбарион») and `portal_name()` (adjective + noun, 25 % chance of a Roman numeral suffix, e.g. «Шепчущий Коридор IV»), both within the shared `DESTINATION_WORLD_MAX_LENGTH` / `PORTAL_NAME_MAX_LENGTH`.
+  - `simulate_once()` emits `pg_notify` for every changed/spawned portal **inside the same transaction** (new `notify_portal_changed` helper extracted to `app/notifications.py`), so WS subscribers are only woken on a durable commit — the same rule as portal actions.
+- `PORTAL_OPEN_CHANCE` added to `app/config.py` (`_as_float` parser: unset→default, non-numeric or out-of-`0..1` at settings load → fail fast), `docker-compose.yml`, `.env.example` and the README envvars table.
+- `routes/portals.py` reordered: `POST /{portal_id}` and `GET /{portal_id}` are now adjacent, declared **after** the static `/log` and `/stats` routes so the int path param never shadows them (this was verified by the previously-passing /log, /stats tests which caught the intermediate wrong order).
+- Tests: `tests/test_simulator.py` (name shapes, new-portal values, delta/clamping, update+spawn, spawn-skip, closed-portal skip, loop ticks, loop survives tick errors, loop logs changed ids), `tests/test_config.py` (+`_as_float` cases), `tests/test_main.py` (lifespan starts/stops the simulator with `DEBUG` off). 106 pass, coverage 99%.
+
+### Docs closed outside DEBUG (backend)
+- `app/main.py` construction moved into a `create_app()` factory (matches the documented "FastAPI app factory" structure): interactive docs and the OpenAPI schema are switched off in production via the constructor params — `docs_url`/`redoc_url`/`openapi_url` are `None` when `settings.debug` is falsy, `/docs`/`/redoc`/`/openapi.json` otherwise.
+- Tests: `test_docs_served_in_debug` (all three return 200) and `test_docs_closed_outside_debug` (all three return 404) build a fresh app per mode via `create_app()` with monkeypatched settings. 108 pass, coverage 99%.
+
+### Initial superuser bootstrap + STABILIZE rework
 - `INITIAL_SUPERUSER_USERNAME` / `INITIAL_SUPERUSER_PASSWORD` env pair (both or none, lengths validated via shared constants): `app/config.py` `_read_initial_superuser` → `Settings.initial_superuser: tuple[str, str] | None`.
 - New `app/bootstrap.py::ensure_initial_superuser` — runs in the lifespan right after `create_all()`; deletes superusers with a different name (sessions CASCADE, log rows SET NULL), keeps a same-name superuser without resetting its password, fails fast if a regular user holds the configured name.
 - `docker-compose.yml` passes both vars to the backend service; `.env.example` + README envvars table updated.
 - `Portal.stabilize` now adds a random 10-30 to stability (`STABILITY_INCREASE_RAND_RANGE`, new constant) capped at 100, instead of jumping straight to 100; model test updated.
 - Tests: `tests/test_bootstrap.py` (create, delete-different-name incl. cascade/FK-NULL checks, keep-same-name+password, fail-fast), `tests/test_config.py` (+5 env parsing cases), `tests/test_main.py` (lifespan creates superuser).
 
-### Action log WebSocket + commit safety (latest batch)
+### Action log WebSocket + commit safety
 - `Portal.warn_creatures` now sets `creatures_count` to `0` after validating the warning can be issued.
 - `app/notifications.py` generalized: `PortalUpdateHub` → `UpdateHub(channel)`, two module-level instances — `portal_update_hub` (`portal_changes`) and `action_log_hub` (`action_log_changes`); `subscriber_count` property; added `test_hub_idempotent_stop`, broadcast/subscribe tests, NOTIFY tests for both channels.
 - `app/routes/portals.py`:
