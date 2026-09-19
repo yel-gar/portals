@@ -69,18 +69,20 @@ export function PortalsPage() {
               onChange={applyFilters}
               onReset={() => applyFilters(DEFAULT_PORTAL_FILTERS)}
             />
-            <PortalTable
-              portals={portals}
-              loading={query.isPending}
-              page={page}
-              itemsPerPage={itemsPerPage}
-              total={total}
-              onPageChange={(nextPage, nextSize) => {
-                setPage(nextPage);
-                setItemsPerPage(nextSize);
-              }}
-              onOpen={(portal) => setSelectedId(portal.id)}
-            />
+            <div className="portals-table-bleed">
+              <PortalTable
+                portals={portals}
+                loading={query.isPending}
+                page={page}
+                itemsPerPage={itemsPerPage}
+                total={total}
+                onPageChange={(nextPage, nextSize) => {
+                  setPage(nextPage);
+                  setItemsPerPage(nextSize);
+                }}
+                onOpen={(portal) => setSelectedId(portal.id)}
+              />
+            </div>
           </>
         )}
       </Card>

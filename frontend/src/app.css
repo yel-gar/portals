@@ -252,3 +252,10 @@ body {
 .portal-inline-progress {
   font-variant-numeric: tabular-nums;
 }
+
+/* The portals table spans the card edge-to-edge: the antd Card body pads by
+   24px per side, which made the solid header band visibly stop short of the
+   card background. The filters bar above stays inside the padded area. */
+.portals-table-bleed {
+  margin-inline: -24px;
+}
