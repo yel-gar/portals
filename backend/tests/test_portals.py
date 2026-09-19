@@ -171,7 +171,8 @@ async def test_list_portals_default_tiebreakers(
     client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
 ) -> None:
     await _login(client)
-    # equal risk (both expired, TTL clamped to zero): earlier expiry wins
+    # equal risk (both expired, TTL clamped to zero): open-first sinks expired
+    # portals below open ones, then earlier expiry wins within the group
     await create_portal(name="Older", energy_level=50, stability=50, expires_at=utc_now() - timedelta(hours=3))
     await create_portal(name="Newer", energy_level=50, stability=50, expires_at=utc_now() - timedelta(hours=1))
     # equal risk (same TTL): portal with observer inside wins
@@ -191,7 +192,25 @@ async def test_list_portals_default_tiebreakers(
     response = await client.get("/portals")
     assert response.status_code == 200, response.text
     names = [item["name"] for item in response.json()["items"]]
-    assert names == ["Older", "Newer", "WithObserver", "WithoutObserver"]
+    assert names == ["WithObserver", "WithoutObserver", "Older", "Newer"]
+
+
+@pytest.mark.asyncio
+async def test_list_portals_open_before_closed(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    await _login(client)
+    # A closed portal computes a high risk (its TTL clamps to zero inside the
+    # formula) but must still sink below any open portal — risk is only
+    # meaningful while a portal is open, mirroring /stats.
+    await create_portal(name="ClosedRisky", energy_level=100, stability=0, creatures_count=10, is_closed=True)
+    await create_portal(name="OpenSafe", energy_level=0, stability=100, creatures_count=0)
+
+    for order_by in ("risk", "expires_at"):
+        response = await client.get("/portals", params={"order_by": order_by})
+        assert response.status_code == 200, response.text
+        names = [item["name"] for item in response.json()["items"]]
+        assert names == ["OpenSafe", "ClosedRisky"]
 
 
 @pytest.mark.asyncio
