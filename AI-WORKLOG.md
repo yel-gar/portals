@@ -71,7 +71,6 @@ Getting to basic docker setup now. Project itself will be running ultimately thr
 Дополнительно найдено в ходе исправлений:
 - `httpx2` — непонятный пакет в dev-зависимостях, заменён на `httpx`.
 - в `app/security.py` был синтаксический ошибочный `except InvalidHashError, VerifyMismatchError:` (Python 2), из-за чего модуль не импортировался.
-- Исправление выше оказалось преждевременным: на момент код-ревью (2026-09) в `app/security.py` всё ещё стоял `except InvalidHashError, VerifyMismatchError:` (работает только на Python 3.14, PEP 758). По-настоящему исправлено на `except (InvalidHashError, VerifyMismatchError)` в рамках batch-иcправлений код-ревью, покрыто тестом в `tests/test_security.py`.
 
 ### Ключевые промпты
 **начальный промпт**
