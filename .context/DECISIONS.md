@@ -69,3 +69,23 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 - Package manager: **npm**.
 - Serving: the backend is hosted on a **separate subdomain** from the frontend. The frontend receives the backend origin via `BACKEND_URL`, passed through docker compose in **both development and production**, and baked into the build for all API/WS calls (compose maps it to a Vite-exposed env var, e.g. `VITE_BACKEND_URL`). CORS on the backend already allows the frontend origin via `FRONTEND_URL`.
 - Local development runs the frontend with **auto-reload** through docker compose overrides (bind-mounted workdir + Vite dev server with HMR), mirroring the backend's `docker-compose.override.yml.dev` → `docker-compose.override.yml` pattern.
+
+## Frontend theme: «Угли» (embers) — chosen design
+- Chosen from six AntD mockups (`frontend/mockups/`). Dark sidebar theme, fiery orange accent:
+  - AntD tokens: `darkAlgorithm`; seed `colorPrimary #ff6a00`, `colorBgLayout #0e0905`, `colorBgContainer #171008`, `colorBgElevated #1e1409`, `borderRadius 10`.
+  - Chrome CSS variables: sidebar `linear-gradient(180deg, #150d05, #0a0603)`, header `#120b07`, 3px topline gradient `#ff4d00 → #ff8c00 → #ffc46b`, logo gradient `#ffad33 → #ff4d00` with ember glow, live dot `#5ee08a`.
+  - Page background: `#0e0905` with two faint radial ember glows.
+- Portal detail opens in a centered AntD **Modal** (720px, actions 3 per row), not a drawer (user request).
+- Stat-card icons are colored semantically: total = theme accent, open = green `#52c41a`, closed = gray `#8c8c8c`, marked = orange `#fa8c16`, observer = cyan `#13c2c2`, avg risk = live danger color.
+- The mockup stays in `frontend/mockups/` (embers only) as the design reference; the real app re-implements the look with AntD tokens + CSS variables, not mockup code.
+
+## Frontend file layout (agreed at scaffold time)
+- `frontend/src/`:
+  - `main.tsx` (entry, providers), `App.tsx` (router config + guards)
+  - `theme.ts` — AntD dark theme from the embers palette
+  - `api/` — `types.ts` (TS mirrors of backend schemas/enums), `client.ts` (fetch wrapper, `credentials: "include"`, base from `VITE_BACKEND_URL`), `auth.ts`, `portals.ts`, `ws.ts` (WebSocket URL builder)
+  - `hooks/` — `useSnapshotWs.ts` (atomic snapshot replacement + reconnect), `useAuth.ts` (me/login/logout/register), TanStack query hooks for portals/log/stats
+  - `components/` — `AppLayout.tsx` (sidebar + header + userbox + topline), `StatCards.tsx`, `PortalTable.tsx`, `PortalModal.tsx`, shared bits
+  - `pages/` — `LoginPage.tsx`, `PortalListPage.tsx`, `LogPage.tsx`, `StatsPage.tsx`, `AdminPage.tsx`
+- Dev server runs Vite on port 80 inside the container (host `FRONTEND_PORT`, default 3000) so the prod/dev host port never differs; `VITE_BACKEND_URL` is baked at build (prod) or injected at runtime (dev override).
+- Frontend tests: Vitest + React Testing Library + MSW for API mocking (added at test milestone).

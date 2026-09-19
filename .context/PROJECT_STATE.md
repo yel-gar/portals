@@ -1,7 +1,17 @@
 # Project state
 
 ## Current status
-Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: initial superuser bootstrap via env vars; `STABILIZE` reworked to a random 10-30 bump capped at 100. Frontend development is on branch `frontend/react-vite`: stack and design choices confirmed and documented (React + Vite, Ant Design, TanStack Query + WS hook, React Router, npm, Russian UI / English code, `BACKEND_URL` from compose); scaffolding is the next step.
+Backend is complete (M1-M7: foundation, schemas/deps, auth, portal routes + two snapshot WebSockets + commit-safe actions, admin, entrypoint/env, tests at 99% coverage) and running in docker with seeded dev data. Frontend development is on branch `frontend/react-vite`: six AntD design mockups were built, the user chose **«Угли» (embers)** — dark sidebar theme with fiery orange accent. The mockups had `file://` loading fixed (renderer precompiled to plain JS), stat icons colored, portal detail as centered **Modal**, and a sidebar-layout flex bug fixed. Now the real React frontend is being implemented on this theme.
+
+## Current plan (frontend implementation, branch `frontend/react-vite`)
+1. **Prepare** — shut down the mockup HTTP server; trim `frontend/mockups/` to the embers theme only (keep its sources; delete other 5 variants).
+2. **Dockerfile** — multi-stage `frontend/Dockerfile`: `build` (node:24-alpine, `npm ci`, `npm run build`, `BACKEND_URL` baked via `VITE_BACKEND_URL` build arg) → `serve` (nginx:alpine, static + SPA fallback, minimal RAM); plus a `dev` target for the Vite dev server.
+3. **Compose** — add `frontend` service to `docker-compose.yml` (build args + `${FRONTEND_PORT:-3000}:80`); pass `BACKEND_URL`/`FRONTEND_URL`/`DEBUG` into the `backend` service env (CORS + dev cookies were not forwarded before).
+4. **Dev overrides** — extend `docker-compose.override.yml.dev` with a `frontend` dev service (build target `dev`, bind-mount `./frontend`, named `node_modules` volume, runtime `VITE_BACKEND_URL`, Vite on port 80 inside container → printed host port unchanged).
+5. **Copy template** — `docker-compose.override.yml.dev` → `docker-compose.override.yml` (gitignored).
+6. **Backend up + OpenAPI** — `docker compose up -d`, export `/openapi.json` to `/tmp/opencode/openapi.json` (done), smoke-test auth + portals live, seed the dev DB with realistic portals (done).
+7. **Frontend implementation** — React + Vite + TS strict, AntD (dark embers tokens), TanStack Query, snapshot WebSocket hook, React Router v7, Russian UI / English code; pages: login/register, portals table + detail modal with actions, action log, stats, admin users (superuser); live WS snapshots replace state atomically.
+8. **Tests + docs** — Vitest + Testing Library component/unit tests for hooks and key components; frontend README; envvars table refresh; final commit per milestone.
 
 ## Review fixes (post M6)
 - `nullable` now set explicitly on every model column.
