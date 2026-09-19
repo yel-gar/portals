@@ -92,7 +92,12 @@ export function useSnapshotWs<T>(
       };
     };
 
-    connect();
+    // Schedule the first connect on a macrotask: React's StrictMode dev remount
+    // runs the effect cleanup synchronously right after the effect, so a socket
+    // created here would be closed mid-handshake and the browser logs a spurious
+    // «connection interrupted» error. The cleanup clears this timer, so only the
+    // second (real) mount ever creates a socket.
+    retryTimer = window.setTimeout(connect, 0);
 
     return () => {
       disposed = true;

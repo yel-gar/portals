@@ -44,6 +44,17 @@ function fakeSocket(index: number): FakeWebSocket {
   return socket;
 }
 
+/**
+ * Mount the probe and let the deferred initial connect (a `setTimeout(0)`,
+ * scheduled so StrictMode's dev remount cannot abort a handshake) create the
+ * socket before the test asserts on `FakeWebSocket.instances`.
+ */
+function mountProbe(onUnauthorized?: () => void) {
+  const probe = renderProbe(onUnauthorized);
+  act(() => vi.advanceTimersByTime(0));
+  return probe;
+}
+
 describe("useSnapshotWs", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -56,7 +67,7 @@ describe("useSnapshotWs", () => {
   });
 
   it("connects, reports «open» and applies snapshot frames", () => {
-    const probe = renderProbe();
+    const probe = mountProbe();
     expect(FakeWebSocket.instances).toHaveLength(1);
 
     act(() => fakeSocket(0).open());
@@ -69,13 +80,13 @@ describe("useSnapshotWs", () => {
   });
 
   it("ignores malformed frames", () => {
-    renderProbe();
+    mountProbe();
     act(() => fakeSocket(0).open());
     expect(() => act(() => fakeSocket(0).message("not-json"))).not.toThrow();
   });
 
   it("schedules a reconnect with backoff after an unexpected close", () => {
-    renderProbe();
+    mountProbe();
     act(() => fakeSocket(0).open());
     act(() => fakeSocket(0).serverClose(1006));
 
@@ -86,7 +97,7 @@ describe("useSnapshotWs", () => {
 
   it("stops and reports a 4401 close as unauthorized", () => {
     const onUnauthorized = vi.fn();
-    renderProbe(onUnauthorized);
+    mountProbe(onUnauthorized);
     act(() => fakeSocket(0).serverClose(4401));
 
     expect(screen.getByTestId("status")).toHaveTextContent("unauthorized");
@@ -99,7 +110,7 @@ describe("useSnapshotWs", () => {
     // The backend rejects an expired-session handshake with HTTP 403, which
     // browsers surface as close 1006 while the socket never opened.
     const onUnauthorized = vi.fn();
-    const probe = renderProbe(onUnauthorized);
+    const probe = mountProbe(onUnauthorized);
 
     act(() => fakeSocket(0).serverClose(1006));
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
@@ -113,7 +124,7 @@ describe("useSnapshotWs", () => {
 
   it("does not treat a close after a successful open as an auth failure", () => {
     const onUnauthorized = vi.fn();
-    renderProbe(onUnauthorized);
+    mountProbe(onUnauthorized);
     act(() => fakeSocket(0).open());
     act(() => fakeSocket(0).serverClose(1006));
 
@@ -121,7 +132,7 @@ describe("useSnapshotWs", () => {
   });
 
   it("closes the socket and clears the retry timer on unmount", () => {
-    const { unmount } = renderProbe();
+    const { unmount } = mountProbe();
     act(() => fakeSocket(0).open());
     act(() => fakeSocket(0).serverClose(1006));
 
