@@ -76,10 +76,10 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 
 ### Initial superuser bootstrap + STABILIZE rework (latest batch)
 - `INITIAL_SUPERUSER_USERNAME` / `INITIAL_SUPERUSER_PASSWORD` env pair (both or none, lengths validated via shared constants): `app/config.py` `_read_initial_superuser` → `Settings.initial_superuser: tuple[str, str] | None`.
-- New `app/bootstrap.py::ensure_initial_superuser` — runs in the lifespan right after `create_all()`; deletes superusers with a different name (sessions CASCADE, log rows SET NULL), keeps a same-name superuser without resetting its password, fails fast if a regular user holds the configured name.
+- New `app/bootstrap.py::ensure_initial_superuser` — runs in the lifespan right after `create_all()`; deletes superusers with a different name (sessions CASCADE, log rows SET NULL), keeps a same-name superuser and updates its password hash when it no longer matches the configured password, fails fast if a regular user holds the configured name.
 - `docker-compose.yml` passes both vars to the backend service; `.env.example` + README envvars table updated.
 - `Portal.stabilize` now adds a random 10-30 to stability (`STABILITY_INCREASE_RAND_RANGE`, new constant) capped at 100, instead of jumping straight to 100; model test updated.
-- Tests: `tests/test_bootstrap.py` (create, delete-different-name incl. cascade/FK-NULL checks, keep-same-name+password, fail-fast), `tests/test_config.py` (+5 env parsing cases), `tests/test_main.py` (lifespan creates superuser).
+- Tests: `tests/test_bootstrap.py` (create, delete-different-name incl. cascade/FK-NULL checks, keep-same-name with unchanged hash, update hash on password change, fail-fast), `tests/test_config.py` (+5 env parsing cases), `tests/test_main.py` (lifespan creates superuser).
 
 ### Action log WebSocket + commit safety (latest batch)
 - `Portal.warn_creatures` now sets `creatures_count` to `0` after validating the warning can be issued.
