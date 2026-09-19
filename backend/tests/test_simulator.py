@@ -17,6 +17,7 @@ from app.constants import (
     SIMULATOR_PORTAL_TTL_MAX_SECONDS,
     SIMULATOR_PORTAL_TTL_MIN_SECONDS,
     SIMULATOR_STABILITY_DELTA,
+    STABILITY_INCREASE_RAND_RANGE,
 )
 from app.db import get_session_factory
 from app.models import Portal, utc_now
@@ -171,6 +172,51 @@ async def test_simulate_once_ignores_closed_portals(
         portals = (await session.scalars(select(Portal).order_by(Portal.id))).all()
     assert portals[0].stability == 50 + SIMULATOR_STABILITY_DELTA
     assert portals[1].stability == 50
+
+
+@pytest.mark.asyncio
+async def test_simulate_once_does_not_lose_concurrent_stabilize(
+    create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A STABILIZE committed while a tick is running must not be overwritten.
+
+    The simulator reads open portals with SELECT ... FOR UPDATE, so if the action
+    commits first the tick's blocked read re-fetches the action's stability and
+    applies its own delta on top. Without the row lock the tick would flush its
+    stale snapshot and the action's effect would be lost.
+    """
+    portal = await create_portal(stability=30, creatures_count=0)
+    # Deterministic deltas: the simulator adds +SIMULATOR_STABILITY_DELTA on top
+    # of whatever it reads, STABILIZE adds +STABILITY_INCREASE_RAND_RANGE[1].
+    monkeypatch.setattr(simulator, "random", _FakeRandom())
+    monkeypatch.setattr("app.models.random.randint", lambda _a, b: b)
+
+    async def run_sim() -> list[int]:
+        async with get_session_factory()() as sim_session:
+            return await simulator.simulate_once(sim_session, open_chance=0.0)
+
+    async with get_session_factory()() as action_session:
+        locked = await action_session.get(Portal, portal.id, with_for_update=True)
+        assert locked is not None
+        # The action now holds the row lock. Start the tick: its FOR UPDATE read
+        # blocks until the action commits, so any ordering keeps the action's
+        # result and the tick applies its delta to the fresh value.
+        sim_task = asyncio.create_task(run_sim())
+        await asyncio.sleep(0.05)
+        locked.stabilize()
+        action_result = locked.stability
+        await action_session.commit()
+
+    changed = await sim_task
+    assert changed == [portal.id]
+
+    async with get_session_factory()() as session:
+        fresh = await session.get(Portal, portal.id)
+    assert fresh is not None
+    # 30 (initial) + 30 (stabilize) + 15 (simulator delta) = 75; a fixed version
+    # flushes 75, the broken non-locking version flushes its stale 30 + 15 = 45.
+    assert fresh.stability == action_result + SIMULATOR_STABILITY_DELTA
+    assert action_result == 30 + STABILITY_INCREASE_RAND_RANGE[1]
 
 
 @pytest.mark.asyncio

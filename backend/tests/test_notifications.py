@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 import asyncpg
 import pytest
@@ -94,3 +95,40 @@ async def test_hub_broadcast_wakes_all_subscribers() -> None:
         portal_update_hub.unsubscribe(queue_a)
         portal_update_hub.unsubscribe(queue_b)
     assert portal_update_hub.subscriber_count == 0
+
+
+@pytest.mark.asyncio
+async def test_hub_broadcast_coalesces_pending_refresh() -> None:
+    """While a refresh is pending, extra broadcasts are skipped, not queued."""
+    queue = await portal_update_hub.subscribe()
+    try:
+        for _ in range(5):
+            await portal_update_hub.broadcast()
+        assert queue.qsize() == 1
+        await asyncio.wait_for(queue.get(), timeout=1.0)
+        assert queue.qsize() == 0
+        # once the pending refresh is consumed, the next broadcast enqueues again
+        await portal_update_hub.broadcast()
+        assert queue.qsize() == 1
+    finally:
+        portal_update_hub.unsubscribe(queue)
+
+
+@pytest.mark.asyncio
+async def test_hub_stop_interrupts_reconnect_backoff(postgres_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """stop() must not wait out a pending reconnect backoff sleep."""
+    url = postgres_url.replace("postgresql+asyncpg", "postgresql")
+    # Long base delay: without prompt cancellation, stop() would wait up to
+    # _RECONNECT_MAX_DELAY_SECONDS and stall application shutdown.
+    monkeypatch.setattr("app.notifications._RECONNECT_BASE_DELAY_SECONDS", 60.0)
+    await portal_update_hub.start(url)
+    try:
+        connection = portal_update_hub._connection
+        assert connection is not None
+        connection.terminate()
+        await asyncio.sleep(0.1)  # the supervisor notices the loss and starts backing off
+        started = time.monotonic()
+        await portal_update_hub.stop()
+        assert time.monotonic() - started < 5.0
+    finally:
+        await portal_update_hub.stop()

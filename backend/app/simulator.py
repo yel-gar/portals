@@ -146,9 +146,12 @@ async def simulate_once(session: AsyncSession, *, open_chance: float | None = No
     changed_ids: set[int] = set()
     now = utc_now()
 
-    open_portals = (
-        await session.scalars(select(Portal).where(Portal.is_closed.is_(False), Portal.expires_at > now))
-    ).all()
+    # Lock the rows with SELECT ... FOR UPDATE so a concurrent portal action
+    # (which also locks its row) can never be overwritten by this stale snapshot:
+    # if the action commits first, the blocked select re-reads the fresh values
+    # and the random deltas are applied on top of the action's result.
+    stmt = select(Portal).where(Portal.is_closed.is_(False), Portal.expires_at > now).with_for_update()
+    open_portals = (await session.scalars(stmt)).all()
     for portal in open_portals:
         if random.random() < SIMULATOR_UPDATE_CHANCE:
             randomize_stability(portal)

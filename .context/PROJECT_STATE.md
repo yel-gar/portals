@@ -1,7 +1,13 @@
 # Project state
 
 ## Current status
-Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: interactive docs (`/docs`, `/redoc`) and the OpenAPI schema (`/openapi.json`) are closed when `DEBUG` is off, via the FastAPI constructor params; app construction refactored into `create_app()` so both modes are testable. 108 tests, coverage 99%, mypy/ruff/black clean.
+Backend is scaffolded and fully configured for tooling, CI and docker deployment. Application code is being implemented: magic portals laboratory overseer dashboard API. Latest batch: simulator/action concurrency guard (FOR UPDATE), DISABLE_REGISTRATION compose passthrough, prompt hub shutdown and bounded subscriber queues. 111 tests, coverage 99%, mypy/ruff/black clean.
+
+## Concurrency & ops review fixes (latest batch)
+- **Simulator ↔ action race (P1)**: `simulate_once()` locks its open-portal snapshot with `SELECT ... FOR UPDATE`, so a committing STABILIZE/CLOSE/etc. can never be overwritten by the tick's stale flush — if the action commits first, the blocked read re-fetches fresh values and the deltas apply on top. Proved by a deterministic two-session test (`test_simulate_once_does_not_lose_concurrent_stabilize`): action holds the row lock, the tick blocks inside its read, action commits, tick finishes on fresh data (75 = 30 + 30 + 15; the non-locking version would flush a stale 45).
+- **DISABLE_REGISTRATION not deployed (P1)**: `docker-compose.yml` now passes `DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-0}` to the backend service (verified via `docker compose config`); previously the setting only worked outside docker.
+- **Hub shutdown can stall 30 s (P2)**: `UpdateHub.stop()` now cancels the supervisor task, so a pending reconnect backoff sleep never delays app shutdown; `test_hub_stop_interrupts_reconnect_backoff` stops the hub mid-backoff (base delay patched to 60 s) and asserts stop returns in < 5 s.
+- **Unbounded subscriber queues (P2)**: subscriber queues are `asyncio.Queue(maxsize=1)`; `broadcast()` skips enqueueing when a refresh is already pending — a slow client or slow snapshot query can no longer accumulate arbitrarily many refresh events. `test_hub_broadcast_coalesces_pending_refresh` covers the coalesce-then-refill cycle.
 
 ## Code review fixes (2026-09)
 Full review is persisted in `.context/REVIEW.md` (CRITICAL/MAJOR/MINOR/NIT findings, commits `c2197eb..6ed37f0`). All CRITICAL + MAJOR findings fixed:

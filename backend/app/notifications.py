@@ -95,6 +95,9 @@ class UpdateHub:
                 await connection.remove_listener(self._channel, self._on_notify)
             with suppress(Exception):
                 await connection.close()
+        # Cancel the supervisor so a pending reconnect backoff sleep (up to
+        # _RECONNECT_MAX_DELAY_SECONDS) does not stall application shutdown.
+        self._supervisor.cancel()
         with suppress(asyncio.CancelledError, Exception):
             await self._supervisor
         self._supervisor = None
@@ -105,7 +108,10 @@ class UpdateHub:
         await self.broadcast()
 
     async def subscribe(self) -> asyncio.Queue[None]:
-        queue: asyncio.Queue[None] = asyncio.Queue()
+        # A single pending refresh is enough: while it is unconsumed, extra
+        # broadcasts are coalesced away, so a slow subscriber or slow snapshot
+        # query cannot grow an unbounded queue of refresh events.
+        queue: asyncio.Queue[None] = asyncio.Queue(maxsize=1)
         self._subscribers.add(queue)
         return queue
 
@@ -114,7 +120,8 @@ class UpdateHub:
 
     async def broadcast(self) -> None:
         for queue in tuple(self._subscribers):
-            queue.put_nowait(None)
+            if not queue.full():
+                queue.put_nowait(None)
 
 
 async def notify_portal_changed(session: AsyncSession, portal_id: int) -> None:
