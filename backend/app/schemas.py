@@ -28,6 +28,7 @@ class PortalSchema(BaseModel):
     has_observer: bool
     last_update: datetime
     expires_at: datetime
+    dismissed_until: datetime | None
     risk_factor: float
     danger_level: DangerLevel
 

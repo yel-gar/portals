@@ -1,11 +1,12 @@
 import asyncio
 from collections.abc import Awaitable, Callable
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
 
+import app.simulator as simulator
 from app.db import get_session_factory
 from app.models import Action, ActionLogEntry, Portal, utc_now
 from app.notifications import action_log_hub, portal_update_hub
@@ -67,6 +68,7 @@ async def test_portal_payload_matches_schema(
         "has_observer",
         "last_update",
         "expires_at",
+        "dismissed_until",
         "risk_factor",
         "danger_level",
     }
@@ -356,6 +358,101 @@ async def test_execute_action_rejected(client: AsyncClient, create_portal: Calla
 
     response = await client.post(f"/portals/{portal.id}", params={"action": Action.RECALL_OBSERVER.value})
     assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_close_recalls_observer(client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]) -> None:
+    await _login(client)
+    portal = await create_portal(has_observer=True)
+
+    response = await client.post(f"/portals/{portal.id}", params={"action": Action.CLOSE.value})
+    assert response.status_code == 200, response.text
+    assert response.json()["closed"] is True
+    assert response.json()["has_observer"] is False
+
+
+@pytest.mark.asyncio
+async def test_dismiss_parks_portal(client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]) -> None:
+    await _login(client)
+    portal = await create_portal(expires_at=utc_now() + timedelta(hours=1))
+
+    response = await client.post(f"/portals/{portal.id}", params={"action": Action.DISMISS.value})
+    assert response.status_code == 200, response.text
+    dismissed_until = response.json()["dismissed_until"]
+    assert dismissed_until is not None
+    assert utc_now() + timedelta(minutes=4) < datetime.fromisoformat(dismissed_until.replace("Z", "+00:00"))
+
+
+@pytest.mark.asyncio
+async def test_dismiss_urgent_portal_rejected(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    await _login(client)
+    portal = await create_portal(expires_at=utc_now() + timedelta(minutes=1))
+
+    response = await client.post(f"/portals/{portal.id}", params={"action": Action.DISMISS.value})
+    assert response.status_code == 409
+    assert "5 минут" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_dismissed_portals_sink_in_every_order(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    await _login(client)
+    # B is far more dangerous by raw risk, but its parking window is active, so
+    # it must still sink below the calm, non-dismissed portal A.
+    await create_portal(
+        name="B_Dismissed", energy_level=100, stability=0, creatures_count=50, expires_at=utc_now() + timedelta(hours=1)
+    )
+    await create_portal(
+        name="A_Calm", energy_level=0, stability=100, creatures_count=0, expires_at=utc_now() + timedelta(hours=5)
+    )
+    async with get_session_factory()() as session:
+        portal_b = await session.scalar(select(Portal).where(Portal.name == "B_Dismissed"))
+        assert portal_b is not None
+        portal_b.dismiss()
+        await session.commit()
+
+    for order_by in ("risk", "expires_at", "name", "creatures"):
+        response = await client.get("/portals", params={"order_by": order_by})
+        assert response.status_code == 200, response.text
+        names = [item["name"] for item in response.json()["items"]]
+        assert names == ["A_Calm", "B_Dismissed"], order_by
+
+    # Once the parking window passes the portal returns to its natural position
+    # (high danger puts it first in the default risk order).
+    async with get_session_factory()() as session:
+        portal_b = await session.scalar(select(Portal).where(Portal.name == "B_Dismissed"))
+        assert portal_b is not None
+        portal_b.dismissed_until = utc_now() - timedelta(seconds=1)
+        await session.commit()
+
+    response = await client.get("/portals", params={"order_by": "risk"})
+    names = [item["name"] for item in response.json()["items"]]
+    assert names == ["B_Dismissed", "A_Calm"]
+
+
+@pytest.mark.asyncio
+async def test_action_bumps_last_update_but_simulation_does_not(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    await _login(client)
+    portal = await create_portal(stability=30)
+
+    response = await client.post(f"/portals/{portal.id}", params={"action": Action.STABILIZE.value})
+    assert response.status_code == 200, response.text
+    updated = datetime.fromisoformat(response.json()["last_update"].replace("Z", "+00:00"))
+    assert updated > portal.last_update.astimezone(UTC)
+
+    async with get_session_factory()() as session:
+        fresh = await session.get(Portal, portal.id)
+        assert fresh is not None
+        before = fresh.last_update
+        await simulator.simulate_once(session)
+        await session.commit()
+        await session.refresh(fresh)
+        assert fresh.last_update == before
 
 
 @pytest.mark.asyncio

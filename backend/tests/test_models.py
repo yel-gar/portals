@@ -69,6 +69,28 @@ async def test_closed_flag_makes_portal_unactionable() -> None:
 
 
 @pytest.mark.asyncio
+async def test_dismiss_parks_portal_and_rejects_urgent() -> None:
+    calm = _portal(expires_at=utc_now() + timedelta(hours=1))
+    calm.dismiss()
+    assert calm.dismissed_until is not None
+    assert calm.dismissed_until > utc_now() + timedelta(minutes=4)
+
+    urgent = _portal(expires_at=utc_now() + timedelta(minutes=1))
+    with pytest.raises(BadAction):
+        urgent.dismiss()
+    assert urgent.dismissed_until is None
+
+    # Re-dismissing simply extends the parking window.
+    again = _portal(expires_at=utc_now() + timedelta(hours=2))
+    again.dismiss()
+    first = again.dismissed_until
+    assert first is not None
+    again.dismiss()
+    assert again.dismissed_until is not None
+    assert again.dismissed_until >= first
+
+
+@pytest.mark.asyncio
 async def test_mark_unmark_allowed_on_closed_portal() -> None:
     closed = _portal(is_closed=True)
     closed.mark()
@@ -87,11 +109,10 @@ async def test_action_rules() -> None:
     with pytest.raises(BadAction):
         portal.close()
     portal.creatures_count = 0
-    with pytest.raises(BadAction):
-        portal.close()
-    portal.has_observer = False
+    # Closing a portal with an observer inside auto-recalls the observer.
     portal.close()
     assert portal.is_closed is True
+    assert portal.has_observer is False
 
     stable = _portal(stability=80)
     with pytest.raises(BadAction):

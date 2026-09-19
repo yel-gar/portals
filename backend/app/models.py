@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import random
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import (
     Boolean,
@@ -23,6 +23,8 @@ from .constants import (
     DANGER_LOW_THRESHOLD,
     DANGER_MEDIUM_THRESHOLD,
     DESTINATION_WORLD_MAX_LENGTH,
+    DISMISS_DURATION_SECONDS,
+    DISMISS_MIN_TTL_SECONDS,
     LOGIN_TOKEN_LENGTH,
     PASSWORD_HASH_MAX_LENGTH,
     PORTAL_NAME_MAX_LENGTH,
@@ -104,9 +106,12 @@ class Portal(Base):
     stability: Mapped[int] = mapped_column(Integer, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     creatures_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    last_update: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
-    )
+    # Touched only by explicit actions (routes/portals.py sets it on commit), so
+    # «обновлено» reflects operator activity — simulator noise never bumps it.
+    last_update: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Set by DISMISS («оставить открытым»): while in the future, the portal is
+    # parked below non-dismissed open portals in every ordering.
+    dismissed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_marked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     has_observer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_closed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -143,8 +148,9 @@ class Portal(Base):
         self._deny_if_closed()
         if self.creatures_count > 0:
             raise BadAction("Нельзя закрыть портал: внутри есть существа")
-        if self.has_observer:
-            raise BadAction("Нельзя закрыть портал: внутри находится наблюдатель")
+        # An operator closing a portal pulls the observer out with it — a closed
+        # portal can never keep an observer inside.
+        self.has_observer = False
         self.is_closed = True
 
     def stabilize(self) -> None:
@@ -156,7 +162,10 @@ class Portal(Base):
 
     def dismiss(self) -> None:
         self._deny_if_closed()
-        self.last_update = utc_now()
+        ttl_seconds = (self.expires_at - utc_now()).total_seconds()
+        if ttl_seconds <= DISMISS_MIN_TTL_SECONDS:
+            raise BadAction("Нельзя отложить портал: до истечения менее 5 минут")
+        self.dismissed_until = utc_now() + timedelta(seconds=DISMISS_DURATION_SECONDS)
 
     def send_observer(self) -> None:
         self._deny_if_closed()

@@ -77,6 +77,18 @@ def create_app() -> FastAPI:
     _app.include_router(auth.router)
     _app.include_router(portals.router)
     _app.include_router(admin.router)
+
+    @_app.get(
+        "/health",
+        summary="Проверка работоспособности",
+        description=(
+            "Простой liveness-эндпоинт для внешних проб (мониторинг, health-checks). "
+            "Не требует авторизации и не обращается к базе данных."
+        ),
+    )
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
+
     return _app
 
 

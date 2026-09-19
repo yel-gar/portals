@@ -132,9 +132,14 @@ def _portal_order_clauses(order_by: PortalOrder, now: datetime) -> list[Any]:
     # portals (an expired TTL clamps to zero, inflating the risk term), so they
     # sink below open ones while keeping their own relative order.
     open_first = case((and_(Portal.is_closed.is_(False), Portal.expires_at > now), 0), else_=1).asc()
+    # DISMISS («оставить открытым») parks the portal below open non-dismissed
+    # ones while the dismissal window (dismissed_until) is active. A NULL
+    # dismissed_until simply falls into the else branch (0).
+    dismissed_sinks = case((Portal.dismissed_until > now, 1), else_=0).asc()
     if order_by is PortalOrder.RISK:
         return [
             open_first,
+            dismissed_sinks,
             # Order by the discrete danger level (CRITICAL first), not the raw
             # risk value; within a level the earlier expiry wins.
             _danger_rank_expression(now).desc(),
@@ -144,10 +149,10 @@ def _portal_order_clauses(order_by: PortalOrder, now: datetime) -> list[Any]:
             Portal.id.asc(),
         ]
     if order_by is PortalOrder.EXPIRES_AT:
-        return [open_first, Portal.expires_at.asc(), Portal.id.asc()]
+        return [open_first, dismissed_sinks, Portal.expires_at.asc(), Portal.id.asc()]
     if order_by is PortalOrder.CREATURES:
-        return [open_first, Portal.creatures_count.desc(), Portal.id.asc()]
-    return [open_first, func.lower(Portal.name).asc(), Portal.id.asc()]
+        return [open_first, dismissed_sinks, Portal.creatures_count.desc(), Portal.id.asc()]
+    return [open_first, dismissed_sinks, func.lower(Portal.name).asc(), Portal.id.asc()]
 
 
 def _action_log_filter_clauses(
@@ -554,6 +559,8 @@ async def execute_action(portal_id: int, action: Action, session: DbSession, use
         getattr(portal, action.value.lower())()
     except BadAction as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    # «Обновлено» reflects operator actions only — the simulator never touches it.
+    portal.last_update = utc_now()
     session.add(ActionLogEntry(user_id=user.id, portal_id=portal.id, action=action))
     await session.flush()
     await _notify_action_committed(session, portal.id)

@@ -58,6 +58,23 @@ async def test_docs_closed_outside_debug(monkeypatch: pytest.MonkeyPatch) -> Non
 
 @pytest.mark.parametrize("debug", [True, False])
 @pytest.mark.asyncio
+async def test_health_endpoint(monkeypatch: pytest.MonkeyPatch, debug: bool) -> None:
+    monkeypatch.setattr(
+        "app.main.settings",
+        Settings(
+            database_url="postgresql+asyncpg://placeholder/placeholder", backend_url="", frontend_url="", debug=debug
+        ),
+    )
+    transport = ASGITransport(app=create_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # No auth required: the endpoint exists for external probes/health checks.
+        response = await client.get("/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+
+
+@pytest.mark.parametrize("debug", [True, False])
+@pytest.mark.asyncio
 async def test_lifespan_starts_and_stops_simulator(
     postgres_url: str, monkeypatch: pytest.MonkeyPatch, debug: bool
 ) -> None:

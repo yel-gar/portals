@@ -37,3 +37,9 @@ RISK_TTL_SCALE = 0.04
 DANGER_LOW_THRESHOLD = 0.3
 DANGER_MEDIUM_THRESHOLD = 0.6
 DANGER_HIGH_THRESHOLD = 0.9
+
+# DISMISS («оставить открытым») parks the portal at the bottom of every ordering
+# for a short window; a portal expiring sooner than the threshold cannot be
+# dismissed — there is no room to defer the inevitable.
+DISMISS_DURATION_SECONDS = 5 * 60
+DISMISS_MIN_TTL_SECONDS = 5 * 60
