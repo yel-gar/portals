@@ -48,15 +48,29 @@ async def test_deletes_superuser_with_different_name(
 
 
 @pytest.mark.asyncio
-async def test_keeps_same_name_superuser_and_password(create_user: Callable[..., Awaitable[User]]) -> None:
-    await create_user("admin", "old-password-1", is_superuser=True)
+async def test_keeps_same_name_superuser_when_password_unchanged(create_user: Callable[..., Awaitable[User]]) -> None:
+    user = await create_user("admin", "password-123", is_superuser=True)
+    original_hash = user.password_hash
+    await ensure_initial_superuser(get_session_factory(), "admin", "password-123")
+    async with get_session_factory()() as session:
+        admin = await session.scalar(select(User).where(User.username == "admin"))
+    assert admin is not None
+    assert admin.id == user.id
+    assert admin.is_superuser
+    assert admin.password_hash == original_hash
+
+
+@pytest.mark.asyncio
+async def test_updates_same_name_superuser_password_when_changed(create_user: Callable[..., Awaitable[User]]) -> None:
+    user = await create_user("admin", "old-password-1", is_superuser=True)
     await ensure_initial_superuser(get_session_factory(), "admin", "new-password-2")
     async with get_session_factory()() as session:
-        user = await session.scalar(select(User).where(User.username == "admin"))
-    assert user is not None
-    assert user.is_superuser
-    assert verify_password("old-password-1", user.password_hash)
-    assert not verify_password("new-password-2", user.password_hash)
+        admin = await session.scalar(select(User).where(User.username == "admin"))
+    assert admin is not None
+    assert admin.id == user.id
+    assert admin.is_superuser
+    assert verify_password("new-password-2", admin.password_hash)
+    assert not verify_password("old-password-1", admin.password_hash)
 
 
 @pytest.mark.asyncio
