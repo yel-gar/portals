@@ -35,6 +35,25 @@ class _FakeRandom:
         return seq[0]
 
 
+class _SequencedRandom:
+    """Yields the given ``random()`` values in order (cycling); other calls are deterministic."""
+
+    def __init__(self, values: list[float]) -> None:
+        self._values = values
+        self._index = 0
+
+    def random(self) -> float:
+        value = self._values[self._index % len(self._values)]
+        self._index += 1
+        return value
+
+    def randint(self, _a: int, b: int) -> int:
+        return b
+
+    def choice(self, seq: Sequence[str]) -> str:
+        return seq[0]
+
+
 def _portal(**overrides: Any) -> Portal:
     defaults: dict[str, Any] = {
         "name": "Test portal",
@@ -207,6 +226,63 @@ async def test_simulate_once_skips_action_locked_portal(
     assert fresh is not None
     assert fresh.stability == 50
     assert fresh.creatures_count == 0
+
+
+@pytest.mark.asyncio
+async def test_simulate_once_locks_only_candidate_portals(
+    create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An action on a non-candidate portal completes while the tick holds locks.
+
+    The tick picks its mutation candidates with a plain read and locks only their
+    ids (FOR UPDATE SKIP LOCKED), so a portal the tick decided not to update is
+    never locked: an action on it cannot be blocked behind the tick's transaction,
+    even while the tick holds locks on its selected candidates pre-commit.
+    """
+    portal_a = await create_portal(name="A", stability=50, creatures_count=0)
+    portal_b = await create_portal(name="B", stability=50, creatures_count=0)
+    # A is drawn as non-candidate (0.9 >= SIMULATOR_UPDATE_CHANCE), B as candidate (0.0).
+    monkeypatch.setattr(simulator, "random", _SequencedRandom([0.9, 0.0]))
+
+    locked_event = asyncio.Event()
+    release_event = asyncio.Event()
+
+    async def blocking_notify(_session: AsyncSession, _portal_id: int) -> None:
+        # The tick has already locked its candidate (B) and is pre-commit here.
+        locked_event.set()
+        await release_event.wait()
+
+    monkeypatch.setattr(simulator, "notify_portal_changed", blocking_notify)
+
+    async def run_sim() -> list[int]:
+        async with get_session_factory()() as sim_session:
+            return await simulator.simulate_once(sim_session, open_chance=0.0)
+
+    sim_task = asyncio.create_task(run_sim())
+    await asyncio.wait_for(locked_event.wait(), timeout=2.0)
+
+    # The tick now holds B's row lock and is waiting before commit. A concurrent
+    # action on A — which the tick decided not to update — must not wait on it.
+    async def run_action() -> None:
+        async with get_session_factory()() as action_session:
+            action_portal = await action_session.get(Portal, portal_a.id, with_for_update=True)
+            assert action_portal is not None
+            action_portal.mark()
+            await action_session.commit()
+
+    await asyncio.wait_for(run_action(), timeout=2.0)
+    release_event.set()
+    changed = await sim_task
+    assert changed == [portal_b.id]
+
+    async with get_session_factory()() as session:
+        portal_a_fresh = await session.get(Portal, portal_a.id)
+        portal_b_fresh = await session.get(Portal, portal_b.id)
+    assert portal_a_fresh is not None and portal_b_fresh is not None
+    assert portal_a_fresh.is_marked is True
+    assert portal_a_fresh.stability == 50 and portal_a_fresh.creatures_count == 0
+    assert portal_b_fresh.stability == 50 + SIMULATOR_STABILITY_DELTA
+    assert portal_b_fresh.creatures_count == SIMULATOR_CREATURES_DELTA
 
 
 @pytest.mark.asyncio

@@ -5,7 +5,7 @@ import logging
 import random
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import settings
@@ -145,16 +145,28 @@ async def simulate_once(session: AsyncSession, *, open_chance: float | None = No
     chance = settings.portal_open_chance if open_chance is None else open_chance
     changed_ids: set[int] = set()
     now = utc_now()
+    is_open = and_(Portal.is_closed.is_(False), Portal.expires_at > now)
 
-    # Lock the rows with SELECT ... FOR UPDATE SKIP LOCKED. The lock prevents a
-    # concurrent portal action from being overwritten by this snapshot (the tick
-    # only modifies rows it locked itself), while SKIP LOCKED means a portal that
-    # is being acted on right now is simply skipped — the tick returns promptly
-    # instead of blocking the action, and can update that portal on a later tick.
-    stmt = select(Portal).where(Portal.is_closed.is_(False), Portal.expires_at > now).with_for_update(skip_locked=True)
-    open_portals = (await session.scalars(stmt)).all()
-    for portal in open_portals:
-        if random.random() < SIMULATOR_UPDATE_CHANCE:
+    # Phase 1 — pick the portals this tick may update with a plain read (no locks,
+    # so no contention is created yet): each open portal becomes a candidate with
+    # SIMULATOR_UPDATE_CHANCE probability.
+    open_portals = (await session.scalars(select(Portal).where(is_open).order_by(Portal.id))).all()
+    candidate_ids = [portal.id for portal in open_portals if random.random() < SIMULATOR_UPDATE_CHANCE]
+
+    # Phase 2 — lock only the candidates (FOR UPDATE SKIP LOCKED), so an action on
+    # a non-candidate portal never waits behind this tick. The open predicates are
+    # reapplied so a portal closed/expired in between is excluded, and a candidate
+    # already being acted on is skipped (it can be updated on a later tick). The
+    # lock still prevents a concurrent action from being overwritten: the tick only
+    # ever modifies rows it locked itself.
+    if candidate_ids:
+        stmt = (
+            select(Portal)
+            .where(and_(is_open, Portal.id.in_(candidate_ids)))
+            .order_by(Portal.id)
+            .with_for_update(skip_locked=True)
+        )
+        for portal in (await session.scalars(stmt)).all():
             randomize_stability(portal)
             randomize_creatures(portal)
             changed_ids.add(portal.id)
