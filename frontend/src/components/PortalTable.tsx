@@ -5,6 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import type { Portal } from "../api/types";
 import { formatDateTime, formatRelative, formatTimeLeft } from "../format";
 import { DangerTag, RiskValue } from "./DangerTag";
+import { MarkedTag } from "./MarkedTag";
 
 /** Client-side presentation bands for the stability bar (not backend rules). */
 function stabilityColor(value: number): string {
@@ -45,11 +46,7 @@ export function PortalTable({
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               #{portal.id}
             </Typography.Text>
-            {portal.is_marked && (
-              <Tag color="orange" style={{ marginInlineStart: 6, fontSize: 11 }}>
-                отмечен
-              </Tag>
-            )}
+            {portal.is_marked && <MarkedTag />}
           </div>
         </div>
       ),

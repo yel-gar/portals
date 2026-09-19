@@ -10,7 +10,7 @@ Frontend on branch `frontend/react-vite` (merged with master): real React SPA im
 2. **Linter/formatter/coverage/pre-commit** — done: oxlint (react plugin, correctness/suspicious error + perf warn, 0 warnings 0 errors) + Prettier (printWidth 100), `--deny-warnings` strictness, coverage v8 (text + lcov, 76.7 % lines, no hard gate — mirrors backend), pre-commit hooks (format + lint:fix, `^frontend/`), CI workflows `frontend-ci.yml` + `frontend-coverage.yml` (Node 24 parity). ✅ (see DECISIONS.md)
 3. **Filters/ordering UI** — done: server-driven controls on both pages (portals: search/closed/danger-level/observer/mark + sort; log: action + sort). REST and snapshot-WS share one query builder so both fetch the identical filtered page; query keys carry the full params (distinct filter states never share a cache entry); filter changes reset to page 1; search applies on submit. ✅ (see DECISIONS.md)
 4. **`DISABLE_REGISTRATION` frontend part** — done: `VITE_DISABLE_REGISTRATION` wired like `BACKEND_URL` (Dockerfile build/dev stages, compose build args, dev override runtime env both template and local copy); the Register page shows the backend's «Регистрация отключена» instead of the form and never attempts the API call. ✅ (see DECISIONS.md)
-5. **Marked-portal behavior** — decided with user: **badge only** («Отмечено» tag in the table, no ordering/hide changes client-side; see DECISIONS.md). Still to be implemented.
+5. **Marked-portal behavior** — done: **badge only** (prominent «Отмечено» tag with flag icon in the portal table, shown for `is_marked` portals; no client-side hiding/reordering). ✅ (see DECISIONS.md)
 
 ## Current plan (frontend implementation, branch `frontend/react-vite`)
 1. **Prepare** — mockup server shut down; `frontend/mockups/` trimmed to embers theme only. ✅
@@ -87,6 +87,10 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 - Coverage: v8 provider, `text` + `lcov` reporters, `src/test/**`/`main.tsx`/`vite-env.d.ts` excluded; baseline 76.55 % statements / 76.71 % lines, 52 tests; no hard gate (mirrors backend coverage workflow).
 - Pre-commit: `prettier (frontend)` (`npm --prefix frontend run format`) + `oxlint (frontend)` (`lint:fix`), `files: ^frontend/`, `pass_filenames: false` — identical pattern to the backend hooks.
 - CI: `frontend-ci.yml` (matrix format/lint/typecheck/build + tests job) and `frontend-coverage.yml` (lcov artifact upload), Node 24 via `setup-node@v4` with npm cache (Dockerfile parity), both gated on `frontend/**`.
+
+### Frontend: marked-portal badge (branch `frontend/react-vite`)
+- Per the "badge only" decision: new `components/MarkedTag.tsx` — orange antd Tag with the MARK action's `FlagFilled` icon, «Отмечено» capitalized, tooltip. Replaced the old tiny lowercase «отмечен» tag (v5-era, fontSize 11) in the portal table name cell; no client-side hiding/reordering (backend stays single source of truth).
+- Test: `PortalsPage` — the badge renders inside the marked portal's row («Портал Бета», `is_marked: true`) and is absent from an unmarked row («Портал Альфа»). 53/53 tests, lint/typecheck/prettier green.
 
 ### Frontend kickoff (branch `frontend/react-vite`)
 - Stack confirmed with user: React + Vite + TypeScript (strict), SPA without SSR. Recorded in `DECISIONS.md` and a new "Frontend info" section in `AGENTS.md`.

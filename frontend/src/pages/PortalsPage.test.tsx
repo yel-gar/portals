@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import userEvent from "@testing-library/user-event";
@@ -43,6 +43,19 @@ describe("PortalsPage", () => {
     expect(await screen.findByText("Портал Гамма")).toBeInTheDocument();
     expect(screen.queryByText("Портал Альфа")).not.toBeInTheDocument();
     expect(screen.queryByText("Портал Бета")).not.toBeInTheDocument();
+  });
+
+  it("shows the marked badge only on marked portals", async () => {
+    renderWithProviders(<PortalsPage />);
+    expect(await screen.findByText("Портал Альфа")).toBeInTheDocument();
+
+    // CLOSED_PORTAL (is_marked: true) carries the badge; OPEN_PORTAL does not.
+    const alphaRow = screen.getByText("Портал Альфа").closest("tr");
+    const betaRow = screen.getByText("Портал Бета").closest("tr");
+    expect(betaRow).not.toBeNull();
+    expect(alphaRow).not.toBeNull();
+    expect(within(betaRow!).getByText("Отмечено")).toBeInTheDocument();
+    expect(within(alphaRow!).queryByText("Отмечено")).not.toBeInTheDocument();
   });
 
   it("shows an error banner when the portals request fails", async () => {

@@ -100,7 +100,7 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 
 ## Frontend: marked portals — badge only (2026-09)
 - Decided with the user: marked portals get **no ordering change** from the frontend. Neither a client-side "hide" nor "sink to end" (both would require presentation logic that must not exist client-side); the backend's `is_marked` filter/ordering params are already surfaceable if the user wants them later.
-- The frontend shows a prominent «Отмечено» tag on marked portals in the table so they stay visually distinguishable.
+- The frontend shows a prominent «Отмечено» badge on marked portal rows (`components/MarkedTag.tsx`, orange Tag with the MARK action's `FlagFilled` icon + tooltip, «Отмечено» capitalized). Replaced the previous tiny lowercase "отмечен" tag; it remains the only client-side treatment of marked portals.
 
 ## Frontend stack
 - The frontend is a **React SPA scaffolded with Vite**, TypeScript in strict mode, with **no SSR/SSG** (no Next.js). Rationale: the app is an authenticated dashboard where everything interesting arrives live in the browser via WebSockets, so server-side rendering buys nothing and would only add machinery (RSC, cookie forwarding, "use client" everywhere) without payoff.
