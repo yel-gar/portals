@@ -7,7 +7,7 @@ import { DANGER_META } from "../constants";
 export function DangerTag({ level }: { level: DangerLevel }) {
   const meta = DANGER_META[level];
   return (
-    <Tag color={meta.color} style={{ marginInlineEnd: 0 }}>
+    <Tag color={meta.color}>
       {meta.label}
     </Tag>
   );

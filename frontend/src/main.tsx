@@ -10,9 +10,6 @@ import { LiveStatusProvider } from "./live";
 import { embersTheme } from "./theme";
 
 import "antd/dist/reset.css";
-// Ant Design v5 targets React 16–18; this official patch adapts its static
-// APIs (message/Modal waves) to React 19. Must load before any antd component.
-import "@ant-design/v5-patch-for-react-19";
 import "./app.css";
 
 const queryClient = new QueryClient({

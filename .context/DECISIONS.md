@@ -87,7 +87,6 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 
 ## Future ideas (not yet implemented)
 - Background tasks that update portal data should also produce `portal_changes` notifications (the trigger-based producer is a later alternative to in-route `pg_notify`).
-- **Frontend: Ant Design must be migrated v5 → v6 before any new frontend work.** v6 is the current major (6.6.4, released Nov 2025); the project is on v5 (`^5.29.3`) only because the approved mockups/design were built on v5. Migration also removes the need for `@ant-design/v5-patch-for-react-19`. Touch points: theme tokens (embers palette survives), Table/Modal/Form API changes, icons v6.
 - **Frontend: linter, formatter, coverage checker and pre-commit hooks must be configured.** Prettier 3.9.8 + `@vitest/coverage-v8` 5.0.1 are installed (`c284243`). ESLint is blocked by TypeScript 7: typescript-eslint@8.70 requires TS <6.1.0 and the Go-native TS 7 ships no JS compiler API, so no ESLint-compatible parser can lint TS 7 yet. Pending user choice: oxlint + Prettier, TS downgrade to ^6, or Prettier-only. Coverage threshold = measured minus buffer. Hooks gated on changed `frontend/**` files (same pattern as backend hooks); CI workflows `.github/workflows/frontend-*.yml`.
 - **Frontend: action-log and dashboard filters + ordering.** The upcoming backend PR introduces filters and ordering for the action log and the dashboard; the frontend must surface them. Pagination/ordering stay server-driven — only the query params and UI controls are added client-side.
 - **Frontend: marked ("dismissed") portals temporarily disappear from the table or sink to the end.** Presentation details TBD: "move to end" may map onto the new backend ordering parameter; "hide" is client-side presentation and must not conflict with the backend-as-source-of-truth rule. Duration/semantics of "temporarily" to be specced.
@@ -128,3 +127,9 @@ All architecture decisions are recorded here. Chronological, newest at the botto
   - `pages/` — `LoginPage.tsx`, `PortalListPage.tsx`, `LogPage.tsx`, `StatsPage.tsx`, `AdminPage.tsx`
 - Dev server runs Vite on port 80 inside the container (host `FRONTEND_PORT`, default 3000) so the prod/dev host port never differs; `VITE_BACKEND_URL` is baked at build (prod) or injected at runtime (dev override).
 - Frontend tests: Vitest + React Testing Library + MSW for API mocking (added at test milestone).
+
+## Frontend: Ant Design v5 → v6 (migrated 2026-09)
+- `antd ^6.6.4` + `@ant-design/icons ^6.3.4` installed; `@ant-design/v5-patch-for-react-19` removed — v6 supports React 19 natively (React >= 18 required; we are on React 19.3).
+- Deprecated APIs migrated: `Alert.message` → `title` (4 call sites), `Table size="middle"` → `"medium"` (portal table, log, admin users), `Divider` title alignment `orientation="left"` → `titlePlacement="left"` (v6 `orientation` now means the divider's horizontal/vertical direction), and the no-longer-needed `marginInlineEnd: 0` override dropped from `DangerTag` (v6 removed the default trailing Tag margin).
+- Embers theme tokens in `theme.ts` compile unchanged; `app.css` contains no internal `.ant-*` DOM selectors, so the v6 DOM reshuffle needed no style adjustments.
+- Post-migration gates green: `npm run typecheck`, 43/43 Vitest tests, `npm run build` (antd bundle ~36 kB smaller).

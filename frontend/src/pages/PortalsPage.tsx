@@ -27,7 +27,7 @@ export function PortalsPage() {
       {stats.data ? (
         <StatCards stats={stats.data} />
       ) : stats.isError ? (
-        <Alert type="warning" showIcon message="Статистика недоступна" />
+        <Alert type="warning" showIcon title="Статистика недоступна" />
       ) : (
         <Skeleton active paragraph={{ rows: 2 }} />
       )}
@@ -45,7 +45,7 @@ export function PortalsPage() {
           <Alert
             type="error"
             showIcon
-            message="Не удалось загрузить порталы"
+            title="Не удалось загрузить порталы"
             description={query.error instanceof ApiError ? query.error.message : undefined}
             action={<Button onClick={() => void query.refetch()}>Повторить</Button>}
           />

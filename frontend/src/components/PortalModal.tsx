@@ -133,7 +133,7 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
         ]}
       />
 
-      <Divider orientation="left" plain style={{ margin: "20px 0 12px" }}>
+      <Divider titlePlacement="left" plain style={{ margin: "20px 0 12px" }}>
         Действия
       </Divider>
       <Row gutter={[12, 12]}>

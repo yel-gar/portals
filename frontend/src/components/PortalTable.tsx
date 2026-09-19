@@ -167,7 +167,7 @@ export function PortalTable({
       columns={columns}
       dataSource={portals}
       loading={loading}
-      size="middle"
+      size="medium"
       scroll={{ x: 1450 }}
       onRow={(portal) => ({
         style: { cursor: "pointer" },

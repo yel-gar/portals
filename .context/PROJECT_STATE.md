@@ -6,7 +6,7 @@ Backend is complete (M1–M7 + follow-ups): magic portals laboratory overseer da
 Frontend on branch `frontend/react-vite` (merged with master): real React SPA implemented — auth (cookie only), live portal table + 720px action modal, action log, stats, admin users — embers theme, 43 Vitest tests, `frontend/README.md`. Live-WS verification against the real backend is now possible (the dependency fix landed); dev containers need a rebuild to pick up the new backend image.
 
 ## Roadmap (frontend, branch `frontend/react-vite`)
-1. **AntD v5 → v6** — first priority; must land before new frontend work. Re-verify embers tokens, drop `@ant-design/v5-patch-for-react-19`.
+1. **AntD v5 → v6** — done: `antd ^6.6.4` + icons `^6.3.4`, React-19 patch dropped, deprecated APIs migrated (Alert `title`, Table `medium`, Divider `titlePlacement`), embers tokens intact. ✅ (see DECISIONS.md)
 2. **Linter/formatter/coverage/pre-commit** — prettier + coverage provider installed (`c284243`); ESLint blocked by TypeScript 7 → linter choice pending (see DECISIONS.md).
 3. **Filters/ordering UI** — backend landed (`e9cf180`, mirrored on the WS endpoints); frontend must surface filter + ordering controls for the portal table and the action log (server-driven params only, no client-side filtering).
 4. **`DISABLE_REGISTRATION` frontend part** — backend landed (403 + compose passthrough); frontend must gate the Register page (error message instead of the form) when the envvar reaches the frontend via compose.

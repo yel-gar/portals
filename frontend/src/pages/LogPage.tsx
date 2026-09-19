@@ -76,7 +76,7 @@ export function LogPage() {
         <Alert
           type="error"
           showIcon
-          message="Не удалось загрузить журнал действий"
+          title="Не удалось загрузить журнал действий"
           description={query.error instanceof ApiError ? query.error.message : undefined}
           action={<Button onClick={() => void query.refetch()}>Повторить</Button>}
         />
@@ -86,7 +86,7 @@ export function LogPage() {
           columns={columns}
           dataSource={entries}
           loading={query.isPending}
-          size="middle"
+          size="medium"
           onChange={(pagination) => {
             const nextPage = pagination.current ?? 1;
             const nextSize = pagination.pageSize ?? itemsPerPage;

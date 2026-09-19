@@ -109,7 +109,7 @@ export function AdminUsersPage() {
             columns={columns}
             dataSource={users.data ?? []}
             loading={users.isPending}
-            size="middle"
+            size="medium"
             pagination={false}
           />
         )}

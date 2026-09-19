@@ -2,7 +2,7 @@
 
 React SPA панели управления лабораторией порталов. Работает в связке с FastAPI-бэкендом
 (`backend/`) по JSON HTTP и двум snapshot WebSocket-каналам. UI на русском, код и
-идентификаторы на английском. Стек: **React 19 + Vite 8 + TypeScript (strict) + Ant Design v5 +
+идентификаторы на английском. Стек: **React 19 + Vite 8 + TypeScript (strict) + Ant Design v6 +
 TanStack Query + React Router v7**; тесты — **Vitest + Testing Library + MSW**.
 
 ## Структура

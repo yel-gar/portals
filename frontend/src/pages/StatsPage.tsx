@@ -10,7 +10,7 @@ export function StatsPage() {
   const stats = useStats();
 
   if (stats.isError) {
-    return <Alert type="error" showIcon message="Не удалось загрузить статистику" />;
+    return <Alert type="error" showIcon title="Не удалось загрузить статистику" />;
   }
   if (!stats.data) {
     return <Skeleton active paragraph={{ rows: 6 }} />;
