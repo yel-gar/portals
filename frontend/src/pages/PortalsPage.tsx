@@ -3,7 +3,7 @@ import { TableOutlined } from "@ant-design/icons";
 import { Alert, Button, Card, Skeleton, Space, Typography } from "antd";
 
 import { ApiError } from "../api/client";
-import type { PortalListParams } from "../api/types";
+import type { Portal, PortalListParams } from "../api/types";
 import {
   DEFAULT_PORTAL_FILTERS,
   PortalFiltersBar,
@@ -19,7 +19,9 @@ export function PortalsPage() {
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [filters, setFilters] = useState<PortalFiltersState>(DEFAULT_PORTAL_FILTERS);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // The open modal must survive reordering: keep the portal the user clicked,
+  // not a lookup against the current page snapshot.
+  const [selectedPortal, setSelectedPortal] = useState<Portal | null>(null);
 
   const params: PortalListParams = { page, itemsPerPage, ...filters };
   const applyFilters = (patch: Partial<PortalFiltersState>) => {
@@ -33,7 +35,14 @@ export function PortalsPage() {
 
   const portals = query.data?.items ?? [];
   const total = query.data?.total ?? 0;
-  const selected = portals.find((portal) => portal.id === selectedId) ?? null;
+  const selectedId = selectedPortal?.id ?? null;
+  // While open, prefer the freshest row from the current snapshot; if the portal
+  // has dropped off the visible page (risk-DESC reordering, a CLOSE sinking it
+  // to the end), fall back to the last known object so the modal stays usable.
+  const selected =
+    selectedId !== null
+      ? (portals.find((portal) => portal.id === selectedId) ?? selectedPortal)
+      : null;
 
   return (
     <>
@@ -80,7 +89,7 @@ export function PortalsPage() {
                   setPage(nextPage);
                   setItemsPerPage(nextSize);
                 }}
-                onOpen={(portal) => setSelectedId(portal.id)}
+                onOpen={(portal) => setSelectedPortal(portal)}
               />
             </div>
           </>
@@ -92,7 +101,7 @@ export function PortalsPage() {
         по WebSocket и целиком заменяют снапшот страницы.
       </Typography.Text>
 
-      <PortalModal portal={selected} onClose={() => setSelectedId(null)} />
+      <PortalModal portal={selected} onClose={() => setSelectedPortal(null)} />
     </>
   );
 }

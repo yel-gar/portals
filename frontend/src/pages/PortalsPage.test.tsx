@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 
 import { PortalsPage } from "./PortalsPage";
 import type { Portal } from "../api/types";
-import { API_URL, OPEN_PORTAL, portalPage, server } from "../test/mocks";
+import { API_URL, CLOSED_PORTAL, OPEN_PORTAL, portalPage, server } from "../test/mocks";
 import { FakeWebSocket } from "../test/fakeWs";
 import { renderWithProviders } from "../test/render";
 
@@ -118,6 +118,49 @@ describe("PortalsPage", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Портал Альфа")).toBeInTheDocument();
+  });
+
+  it("keeps the modal open when the portal drops off the visible page", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(<PortalsPage />);
+    await user.click(await screen.findByText("Портал Альфа"));
+    expect(within(await screen.findByRole("dialog")).getByText("Портал Альфа")).toBeInTheDocument();
+
+    // The next WS frame reorders the page (risk-DESC) and the opened portal is
+    // no longer among the visible items — the modal must survive, not unmount.
+    const socket = FakeWebSocket.instances[0];
+    expect(socket).toBeDefined();
+    act(() => socket.open());
+    act(() => socket.message(JSON.stringify(portalPage([CLOSED_PORTAL], 1, 20))));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Портал Альфа")).toBeInTheDocument();
+    expect(within(dialog).getByText("Отправить наблюдателя")).toBeInTheDocument();
+  });
+
+  it("keeps the modal open when a filter change empties the page", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(API_URL("/portals"), ({ request }) => {
+        const hasSearch = new URL(request.url).searchParams.has("search");
+        return HttpResponse.json(
+          hasSearch ? { items: [], page: 1, items_per_page: 20, total: 0 } : portalPage(),
+        );
+      }),
+    );
+
+    renderWithProviders(<PortalsPage />);
+    await user.click(await screen.findByText("Портал Альфа"));
+    expect(within(await screen.findByRole("dialog")).getByText("Портал Альфа")).toBeInTheDocument();
+
+    // A search that matches nothing empties the whole page snapshot — the open
+    // modal must stay on screen, not unmount.
+    await user.type(screen.getByPlaceholderText("Поиск: название или мир"), "nope{Enter}");
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Портал Альфа")).toBeInTheDocument();
+    expect(screen.queryByText("Портал Бета")).not.toBeInTheDocument();
   });
 
   it("applies pagination changes to the backend query", async () => {
