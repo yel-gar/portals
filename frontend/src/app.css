@@ -7,12 +7,12 @@
   --page-fg: #f6e7d3;
   --accent-1: #ff6a00;
   --accent-2: #ffb347;
-  --nav-bg: linear-gradient(180deg, rgba(21, 13, 5, 0.86) 0%, rgba(10, 6, 3, 0.86) 100%);
+  --nav-bg: linear-gradient(180deg, rgba(21, 13, 5, 0.42) 0%, rgba(10, 6, 3, 0.42) 100%);
   --nav-fg: #e9d3b8;
   --nav-fg-muted: #a07f5c;
   --nav-border: rgba(255, 138, 51, 0.14);
   --logo-fg: #fff3e6;
-  --header-bg: rgba(18, 11, 7, 0.84);
+  --header-bg: rgba(18, 11, 7, 0.4);
   --header-fg: #f2dfc9;
   --header-fg-muted: #a38662;
   --header-border: rgba(255, 138, 51, 0.12);
