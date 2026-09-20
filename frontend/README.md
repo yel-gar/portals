@@ -16,7 +16,7 @@ frontend/
                     usePortalData (страницы + stats), usePortalAction, useAuth
     components/     AppLayout, PortalTable, PortalModal, StatCards, DangerTag, LiveBadge,
                     PortalFiltersBar, LogFiltersBar, AuthShell, RequireAuth/RequireSuperuser
-                    fire/ (декоративные «огненные» панели по бокам), см. ниже
+                    fire/ (фоновая подложка-искры на весь экран), см. ниже
     pages/          Login, Register, Portals, Log, Stats, AdminUsers, Worklog, NotFound
     test/           mocks.ts (MSW handlers), fakeWs.ts (FakeWebSocket), render.tsx
     constants.tsx   только презентационные данные (лейблы, цвета, иконки) — без бизнес-логики
@@ -145,12 +145,14 @@ npm run test:e2e:ui       # Playwright UI-режим для отладки
   retryable-`Alert`.
 - `danger_levels`/`avg_risk` в статистике считаются сервером по **открытым** порталам;
   распределение на странице Stats — доля от `open`, не от `total`.
-- Декоративные огненные панели (`src/components/fire/`): WebGPU-шейдер пламени через
-  TypeGPU (`typegpu`, TS-first WGSL, код-сплит chunk — тянется только когда
-  `navigator.gpu` доступен), 2D-canvas-эмбер-фолбэк, а при `prefers-reduced-motion` —
-  статичный градиент без анимационного цикла. Панели абсолютные с `z-index: -1`,
-  `pointer-events: none`, `aria-hidden`; фолбэк выбирается по результату init и сохраняется
+- Декоративная фоновая подложка (`src/components/fire/`): WebGPU-шейдер искрящихся
+  частиц с завихрениями (TypeGPU, TS-first WGSL, код-сплит chunk — тянется только когда
+  `navigator.gpu` доступен), покрывает весь фон страницы; 2D-canvas-эмбер-фолбэк с
+  восходящими искрами, а при `prefers-reduced-motion` — статичный градиент без
+  анимационного цикла. Слой абсолютный с `z-index: -1`, `pointer-events: none`,
+  `aria-hidden`; фолбэк выбирается по результату init и сохраняется
   в `data-fire-backend` (static/webgpu/ember).
 - Перестановка строк таблицы порталов анимируется FLIP-переходом (`src/hooks/useFlip.ts`,
   только `PortalTable`, ключ `portal.id` → `data-flip-key`): замер позиций в layout-effect
-  после коммита, WAAPI `translateY`; пропускается на первом рендере и под reduced motion.
+  после коммита, WAAPI `translateY` (400 мс); пропускается на первом рендере и под reduced
+  motion.
