@@ -228,8 +228,8 @@ export function PortalTable({
       align: "center",
       // Pinned action column: always visible, never scrolls. `scroll.x` covers
       // the summed column widths, so the pin cannot overlap data. The cells
-      // stay opaque (the surface token is translucent and would show scrolled
-      // columns underneath) with an explicit hover tint approximating antd's.
+      // stay translucent (a backdrop blur smears the scrolled columns
+      // underneath), so the row hover highlight applies naturally.
       onCell: () => ({
         className: "portal-table-actions-sep portal-table-fixed-right",
       }),

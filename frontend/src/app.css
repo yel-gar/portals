@@ -368,17 +368,12 @@ body {
   border-inline-start: 1px solid rgba(255, 138, 51, 0.28);
 }
 
-/* The pinned «Детали» column must stay opaque: the surface token is
-   translucent, so without an explicit background the columns scrolling
-   underneath would show through the sticky cells. `!important` wins over
-   AntD's later-injected CSS-in-JS (its hover rule is not `!important`). The
-   hover tint approximates AntD's dark row-hover white overlay. */
+/* The pinned «Детали» column stays translucent like every other column, so
+   the row hover highlight applies to it naturally. A backdrop blur melts the
+   columns scrolling underneath into an unreadable smear instead of showing
+   them sharply through the sticky cells. */
 .portal-table-fixed-right.portal-table-actions-sep {
-  background: #171008 !important;
-}
-
-.ant-table-tbody > tr:hover > .portal-table-fixed-right.portal-table-actions-sep {
-  background: #2a231c !important;
+  backdrop-filter: blur(10px);
 }
 
 /* Numeric table cells: the progress bar / tag plus a delta badge side by side. */
