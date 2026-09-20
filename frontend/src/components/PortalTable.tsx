@@ -68,10 +68,12 @@ export function PortalTable({
       key: "name",
       width: 220,
       fixed: "left",
-      // Opaque background so the columns scrolling underneath stay hidden
-      // (surface token is translucent; see app.css `.portal-table-fixed-bg`).
+      // Sticky cells share the table's translucent surface so the pinned column
+      // does not look painted over (see app.css `.portal-table-fixed-bg`). The
+      // header gets no override class: it must keep the same background as the
+      // other headers.
       onCell: () => ({ className: "portal-table-fixed-bg portal-table-fixed-left" }),
-      onHeaderCell: () => ({ className: "portal-table-fixed-bg portal-table-fixed-left" }),
+      onHeaderCell: () => ({ className: "portal-table-fixed-left" }),
       render: (_, portal) => (
         <div>
           <Typography.Text strong>{portal.name}</Typography.Text>
@@ -220,13 +222,14 @@ export function PortalTable({
       fixed: "right",
       align: "center",
       // A 1px divider between the scrollable data columns and the fixed action
-      // column (the cell gets a start border via CSS) plus an opaque background
-      // so columns scrolling underneath stay hidden.
+      // column, plus the same translucent surface as the rest of the table.
       onCell: () => ({
         className: "portal-table-actions-sep portal-table-fixed-bg portal-table-fixed-right",
       }),
+      // The header keeps the divider but no background override: it must match
+      // the other headers.
       onHeaderCell: () => ({
-        className: "portal-table-actions-sep portal-table-fixed-bg portal-table-fixed-right",
+        className: "portal-table-actions-sep portal-table-fixed-right",
       }),
       render: (_, portal) => (
         <Button
