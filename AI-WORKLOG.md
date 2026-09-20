@@ -229,6 +229,15 @@ Your next task: add a portal populator/simulator. It is a background task that r
 # Этап 4. Интеграция
 Интеграция состояла из завершения написания фронтенда, добавления фильтров (которые писались параллельно), тестов для фронтенда и интеграционных тестов. Также был проведен код-ревью бэкенда с помощью gpt-5.6-terra.
 
+## Ошибки агента
+- Для работы скриптов популяции БД добавил poetry в deploy stage докерфайла, хотя нужно было просто использовать созданный venv
+- Реализуя индикатор изменений, получился небольшой баг: если изменение фактора риска было меньше 0.01, оно все равно отображалось, но как +0.00 или -0.00
+- Зачем-то помимо запроса к /health на бэке делал запрос на /v1/models (галлюцинация)
+- Агент надолго застрял в попытке написать тесты для индивидуальных обновлений портала, т.к. форматтер менял код и вызывал путаницу с инструментами чтения агента. Цикл прервался одним простым промтом, и выяснилось, что все уже работает
+```
+Stop thinking. Re-run black + ruff fully, run backend tests fully then call read tools and then proceed on fixing.
+```
+
 ## Ключевые промпты
 **доработка фронтенда**
 ```
@@ -288,6 +297,93 @@ Add new tasks:
 6) Merge "Recall observer" and "Send observer" buttons into one. Make sure it refreshes when portal closes
 7) The earlier stated task of moving the "dismissed" tasks to the end of the list on frontend side is not implemented.
 ```
+
+```
+I found following issues
+1. Websockets throw errors but seem to work (I do see updates every 10 seconds without polling over http):
+Firefox can't establish a connection to the server at ws://localhost:8000/portals/ws?page=1&items_per_page=20&order_by=risk. useSnapshotWs.ts:48:16
+The connection to ws://localhost:8000/portals/ws?page=1&items_per_page=20&order_by=risk was interrupted while the page was loading.
+2. There's an issue with the table: headers don't fully extend to the end of outer background. Horizontal scroll works
+3. Closed portal is displayed on top. It should not be that way, check with backend.
+4. Modify backend sorting so that instead of ordering by value of risk factor, it's ordered by danger level.
+5. Backend: observer must be automatically recalled on portal closure, i.e. closed portals must not have any observers in
+6. Frontend: reset filters button does not work neither in dashboard nor in logs
+7. Frontend: I see some requests to \/health being made, however there's no such endpoint
+8. Frontend: add "deltas" between last recorded stats in table items, top stats and separate stats
+9. Add a line separating scrollable table columns and button column. Also rename "Открыть" to "Детали", "Подробности", "Действия" or similar
+10. Merge "Recall observer" and "Send observer" buttons into one. Make sure it refreshes when portal closes
+11. The earlier stated task of moving the "dismissed" tasks to the end of the list on frontend side is not implemented.
+12. There should be another tab that should display AI-WORKLOG.md rendered as proper html.
+13. "Updated" field should not update on portal simulation update, only on actions
+14. Add code highlight for the markdown page
+15. Preferrably add the markdown via some link/volume instead of creating a copy needing maintenance. If going with link route, make sure it won't break on other platforms.
+16. Add python script to automatically populate db with some portals, add bash and ps1 scripts to repo root, they will automatically run docker compose exec backend ... python populate.py
+17. Add deploy instructions to README.md before the envvar table.
+18. After done, collect previous set of 9 tasks, merge it with this one and simply present the list to me
+19. The deltas for risk show +0.00 and -0.00, possibly when the risk factor value is too small. If the delta is below 0.01 in absolute value, don't show it
+20. After closing the portal, modal should grey out all buttons except mark. The buttons must be greyed out on closed portals by default (except mark/unmark)
+21. Harden both dockerfiles so that it's other user at runtime instead of root. Verify functionality.
+```
+
+```
+Implement e2e testing using playwright. Deploy special test stack using separate docker compose file, make sure there are no volume and override conflicts.
+```
+
+```
+List the scenarios you tested and make sure the following are handled:
+1. Login with bad username or password
+2. Login with extremely long username or password
+3. Register with extremely long username or password
+4. Register with empty username or password
+5. No portals on dashboard
+6. 10000 portals on dashboard
+7. No action logs
+8. 100000 action log entries
+9. All actions check in different states
+10. All pages accessible
+11. Filters set and reset on button click in dashboard and logs
+12. Non-superuser can't access admin
+13. Can't act with closed portal besides marking
+14. Empty stats page
+```
+
+```
+Next idea: add move animations when portals change positions + some cool fiery shader effects on the sides using wgpu. Make sure to commit before attempting to do that as it might be complicated and might break things.
+```
+
+```
+Issues:
+1) I want a shader effect to cover entire background. And not like fire, but instead spark particles with turbulence and stuff. Current shader is like two columns on each sides of table with rotating ovals, I don't think that's intended.
+2) Movement animation works, but it would be better if it was just a bit slower
+3) When opening modal, there's an animation, but when closing there's no
+4) When closing portal, buttons don't grey out immediately. They're greyed out only when re-opening modal for that portal.
+```
+
+```
+1) Bug: if the width is too low, "Details" button col overlaps with table columns
+2) Stats page should refresh in real time as well. You can just poll every ten seconds if user is on the page, it's fine
+
+Task: add transition animations between pages. Each element popping up with slight jitter offset with bouncy animation would be the best.
+
+Bug: when the portal expires while the modal is open, it does not update automatically and buttons don't grey out
+
+1) For modal expiry bug, implement a websocket endpoint on backend side for individual portal. It will listen to postgres notifies as well, but send updates only if the state of selected portal changed. Make sure to add jitter so we don't get mass update issue where every websocket produces load burst on notify.
+2) The dashboard currently has an issue: first the "Portal" column is not transparent. Next: "Portal" column header is of different color than the rest.
+```
+
+```
+Current bugs
+1) The old issue with "Details" button overlaying on narrow screens is back
+2) Energy bar is always orange, it should get greener as it approaches zero
+
+Ideas for future (don't start executing yet)
+1) Risk should be displayed as integer percentage on frontend
+2) Individual portal card should additionally poll to automatically grey out buttons in case portal closes in background
+3) If observer is inside, no new creatures should appear during simulation (they can only leave)
+```
+
+## Осознанно допущенные ситуации
+Есть ситуация, что портал критического риска нельзя закрыть, поскольку чтобы предупредить существ, нужно сперва отправить наблюдателя, а наблюдателя в портал с критическим риском отправлять нельзя. Также наблюдатель автоматически возвращается при закрытии портала.
 
 # Обработанные и покрытые тестами граничные случаи: Auth и Portals
 
