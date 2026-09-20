@@ -224,15 +224,17 @@ export function PortalTable({
       title: "",
       key: "actions",
       width: 100,
+      fixed: "right",
       align: "center",
-      // A 1px divider after the scrollable data columns (the cell gets a start
-      // border via CSS). No sticky positioning: every column shares the same
-      // translucent surface and hover highlight.
+      // Pinned action column: always visible, never scrolls. `scroll.x` covers
+      // the summed column widths, so the pin cannot overlap data. The cells
+      // stay opaque (the surface token is translucent and would show scrolled
+      // columns underneath) with an explicit hover tint approximating antd's.
       onCell: () => ({
-        className: "portal-table-actions-sep",
+        className: "portal-table-actions-sep portal-table-fixed-right",
       }),
       onHeaderCell: () => ({
-        className: "portal-table-actions-sep",
+        className: "portal-table-actions-sep portal-table-fixed-right",
       }),
       render: (_, portal) => (
         <Button
