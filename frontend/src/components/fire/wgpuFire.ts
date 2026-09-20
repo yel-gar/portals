@@ -93,10 +93,11 @@ const sparkLayer = (
   const dy = std.sub(local.y, cy);
   // Reversed smoothstep edges are undefined behavior in WGSL (garbage on some
   // drivers, e.g. DirectX — the black squares), so spell the falloff out
-  // explicitly instead of `smoothstep(0.32, 0, d)`.
+  // explicitly instead of `smoothstep(0.32, 0, d)`. The core radius stays well
+  // below half a cell so each spark fits inside its own grid box.
   const core = std.sub(
     1,
-    std.smoothstep(0, 0.32, std.sqrt(std.add(std.mul(dx, dx), std.mul(dy, dy)))),
+    std.smoothstep(0, 0.2, std.sqrt(std.add(std.mul(dx, dx), std.mul(dy, dy)))),
   );
   const twinkle = std.add(
     0.4,
