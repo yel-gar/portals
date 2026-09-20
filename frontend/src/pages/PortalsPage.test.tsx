@@ -247,6 +247,7 @@ describe("PortalsPage", () => {
     const user = userEvent.setup();
     const closed: Portal = { ...OPEN_PORTAL, closed: true, has_observer: false };
     let listCalls = 0;
+    let closedByAction = false;
     server.use(
       // The initial page load sees the open portal; any refetch after the
       // action reflects the server truth (closed).
@@ -256,7 +257,15 @@ describe("PortalsPage", () => {
           listCalls === 1 ? portalPage() : portalPage([closed, CLOSED_PORTAL], 1, 20),
         );
       }),
-      http.post(API_URL("/portals/:id"), () => HttpResponse.json(closed)),
+      http.post(API_URL("/portals/:id"), () => {
+        closedByAction = true;
+        return HttpResponse.json(closed);
+      }),
+      // The open modal also polls the detail endpoint: open until the action
+      // commits, closed from the server truth afterwards.
+      http.get(API_URL("/portals/1"), () =>
+        HttpResponse.json(closedByAction ? closed : OPEN_PORTAL),
+      ),
     );
 
     renderWithProviders(<PortalsPage />);
@@ -274,6 +283,24 @@ describe("PortalsPage", () => {
 
     // No snapshot needed: the action response updates the modal's portal copy
     // instantly, so every action except (un)mark greys out right away.
+    await waitFor(() => {
+      expect(within(dialog).getByRole("button", { name: /Стабилизировать/ })).toBeDisabled();
+    });
+    expect(within(dialog).getByRole("button", { name: /Отметить/ })).toBeEnabled();
+  });
+
+  it("greys out actions when the portal closes in the background", async () => {
+    const user = userEvent.setup();
+    const closed: Portal = { ...OPEN_PORTAL, closed: true, has_observer: false };
+    // The page snapshot still shows the portal open, but the polled detail
+    // endpoint already reports it closed (e.g. it expired in the background).
+    // Exact path: a `:id` pattern would also match `/portals/stats`.
+    server.use(http.get(API_URL("/portals/1"), () => HttpResponse.json(closed)));
+
+    renderWithProviders(<PortalsPage />);
+    await user.click(await screen.findByText("Портал Альфа"));
+    const dialog = await screen.findByRole("dialog");
+
     await waitFor(() => {
       expect(within(dialog).getByRole("button", { name: /Стабилизировать/ })).toBeDisabled();
     });
