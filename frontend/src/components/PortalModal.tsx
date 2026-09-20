@@ -39,6 +39,9 @@ interface PortalModalProps {
  *
  * The Modal stays mounted with `open` controlled so antd plays the closing
  * motion too — unmounting the whole component on close would cut it short.
+ *
+ * The dialog is translucent glass over the live background (blurred content,
+ * transparent header) instead of the opaque elevated token.
  */
 export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalProps) {
   const { message } = AntApp.useApp();
@@ -46,6 +49,10 @@ export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalPro
   // Keeps the «истекает» countdown and «назад» strings fresh while the modal is open.
   const now = useNow();
   const [pending, setPending] = useState<Action | null>(null);
+  // The glass background crossfades in only after the enter animation: blur
+  // is always on (it would otherwise pop in when the zoom settles), while the
+  // solid elevated token covers the animation itself.
+  const [entered, setEntered] = useState(false);
   // The id of the portal currently shown — `null` once closed. The action
   // response may land after the user already closed or switched the modal; the
   // success callback must not resurrect it, so the fresh portal is only fed
@@ -90,6 +97,15 @@ export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalPro
       centered
       footer={null}
       onCancel={onClose}
+      afterOpenChange={(open) => setEntered(open)}
+      styles={{
+        container: {
+          background: entered ? "rgba(23, 16, 8, 0.6)" : "#1e1409",
+          backdropFilter: "blur(12px)",
+          transition: "background-color 0.25s ease",
+        },
+        header: { background: "transparent" },
+      }}
       title={
         portal !== null ? (
           <span>
@@ -143,7 +159,7 @@ export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalPro
               },
               {
                 key: "danger",
-                label: "Уровень опасности",
+                label: "Уровень угрозы",
                 children: <DangerTag level={portal.danger_level} />,
               },
               {

@@ -13,7 +13,7 @@ describe("StatsPage", () => {
     expect(await screen.findByText("Всего порталов")).toBeInTheDocument();
     expect(screen.getByText("Открыто")).toBeInTheDocument();
     expect(screen.getByText("Средний риск")).toBeInTheDocument();
-    expect(screen.getByText("Распределение по уровню опасности")).toBeInTheDocument();
+    expect(screen.getByText("Распределение по уровню угрозы")).toBeInTheDocument();
     expect(screen.getByText("Средний риск по лаборатории")).toBeInTheDocument();
     // MOCK_STATS: one open portal, one MEDIUM level → 1 шт · 100%.
     expect(screen.getByText("1 шт · 100%")).toBeInTheDocument();

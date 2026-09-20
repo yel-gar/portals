@@ -39,7 +39,7 @@ export function StatsPage() {
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={14}>
           <Card
-            title="Распределение по уровню опасности"
+            title="Распределение по уровню угрозы"
             extra={<Typography.Text type="secondary">открытые порталы</Typography.Text>}
           >
             {DANGER_ORDER.map((level) => {
@@ -75,7 +75,7 @@ export function StatsPage() {
             })}
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Общее число порталов — {data.total}, из них открыто {data.open}, закрыто {data.closed}
-              . Уровни опасности и средний риск рассчитываются сервером по открытым порталам.
+              . Уровни угрозы и средний риск рассчитываются сервером по открытым порталам.
             </Typography.Text>
           </Card>
         </Col>

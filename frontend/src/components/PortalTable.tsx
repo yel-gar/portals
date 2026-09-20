@@ -176,7 +176,7 @@ export function PortalTable({
       },
     },
     {
-      title: "Опасность",
+      title: "Уровень угрозы",
       key: "danger",
       width: 130,
       render: (_, portal) => <DangerTag level={portal.danger_level} />,

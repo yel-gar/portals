@@ -19,7 +19,7 @@ interface RiskValueProps {
 export function RiskValue({ value, level, strong = false }: RiskValueProps) {
   const meta = DANGER_META[level];
   return (
-    <Tooltip title={`Уровень опасности: ${meta.label.toLowerCase()}`}>
+    <Tooltip title={`Уровень угрозы: ${meta.label.toLowerCase()}`}>
       <span style={{ color: meta.hex, fontWeight: strong ? 600 : 400 }}>
         {toRiskPercent(value)}
       </span>

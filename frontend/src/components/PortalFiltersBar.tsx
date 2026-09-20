@@ -98,8 +98,8 @@ export function PortalFiltersBar({ filters, onChange, onReset }: PortalFiltersBa
       />
       <Select
         allowClear
-        aria-label="Уровень опасности"
-        placeholder="Уровень опасности"
+        aria-label="Уровень угрозы"
+        placeholder="Уровень угрозы"
         style={{ width: 190 }}
         value={filters.dangerLevel}
         options={DANGER_ORDER.map((level) => ({ value: level, label: DANGER_META[level].label }))}

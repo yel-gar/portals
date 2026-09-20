@@ -42,9 +42,9 @@ test("фильтр «Закрытые» показывает только зак
   await expect(tableRows(page).getByText("Портал Эпсилон")).toBeVisible();
 });
 
-test("фильтр по уровню опасности «Средний»", async ({ page }) => {
+test("фильтр по уровню угрозы «Средний»", async ({ page }) => {
   await registerUser(page, "e2e_mid", "mid-pass-1");
-  await selectOption(page, "Уровень опасности", "Средний");
+  await selectOption(page, "Уровень угрозы", "Средний");
   await expect(page.getByText("Всего: 3")).toBeVisible();
 });
 
