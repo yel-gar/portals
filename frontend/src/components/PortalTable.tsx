@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useMemo, useRef } from "react";
 
 import type { Portal } from "../api/types";
-import { formatDateTime, formatRelative, formatTimeLeft } from "../format";
+import { formatDateTime, formatRelative, formatRiskDelta, formatTimeLeft } from "../format";
 import { useFlip } from "../hooks/useFlip";
 import { useNow } from "../hooks/useNow";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
@@ -168,7 +168,7 @@ export function PortalTable({
                 value={value}
                 polarity="good-when-down"
                 minMagnitude={0.01}
-                format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`}
+                format={(v) => formatRiskDelta(v)}
               />
             )}
           </div>

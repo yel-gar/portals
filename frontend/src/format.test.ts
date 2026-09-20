@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateTime, formatRelative, formatTimeLeft, toPercent } from "./format";
+import {
+  formatDateTime,
+  formatRelative,
+  formatRiskDelta,
+  formatTimeLeft,
+  toPercent,
+  toRiskPercent,
+} from "./format";
 
 const NOW = Date.parse("2026-09-19T12:00:00Z");
 
@@ -62,5 +69,21 @@ describe("toPercent", () => {
 
   it("returns 0 for an empty total", () => {
     expect(toPercent(4, 0)).toBe(0);
+  });
+});
+
+describe("toRiskPercent", () => {
+  it("renders the risk factor as a whole percent", () => {
+    expect(toRiskPercent(0.41)).toBe("41%");
+    expect(toRiskPercent(0)).toBe("0%");
+    expect(toRiskPercent(1)).toBe("100%");
+  });
+});
+
+describe("formatRiskDelta", () => {
+  it("renders signed deltas in percentage points", () => {
+    expect(formatRiskDelta(0.04)).toBe("+4");
+    expect(formatRiskDelta(-0.2)).toBe("-20");
+    expect(formatRiskDelta(0)).toBe("+0");
   });
 });

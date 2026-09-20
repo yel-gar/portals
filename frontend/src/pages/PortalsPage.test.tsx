@@ -151,7 +151,7 @@ describe("PortalsPage", () => {
     act(() => socket.open());
 
     // The second frame of the same snapshot scope: energy +3, stability −20,
-    // creatures +1, risk +0.04 → four delta badges appear.
+    // creatures +1, risk +4 points → four delta badges appear.
     const changed: Portal = {
       ...OPEN_PORTAL,
       energy_level: 85,
@@ -164,7 +164,7 @@ describe("PortalsPage", () => {
     expect(await screen.findByText("+3")).toBeInTheDocument();
     expect(screen.getByText("-20")).toBeInTheDocument();
     expect(screen.getByText("+1")).toBeInTheDocument();
-    expect(screen.getByText("+0.04")).toBeInTheDocument();
+    expect(screen.getByText("+4")).toBeInTheDocument();
   });
 
   it("hides risk deltas below the 0.01 magnitude threshold", async () => {
@@ -177,16 +177,16 @@ describe("PortalsPage", () => {
 
     // Frame 1: energy +2 (the visible «+2» proves the frame was applied) while
     // the risk moved by only +0.004 — below the 0.01 threshold, so no risk
-    // badge renders («+0.00» would appear if the too-small delta were shown).
+    // badge renders («+0» would appear if the too-small delta were shown).
     const tiny: Portal = { ...OPEN_PORTAL, energy_level: 84, risk_factor: 0.414 };
     act(() => socket.message(JSON.stringify(portalPage([tiny, CLOSED_PORTAL], 1, 20))));
     expect(await screen.findByText("+2")).toBeInTheDocument();
-    expect(screen.queryByText("+0.00")).not.toBeInTheDocument();
+    expect(screen.queryByText("+0")).not.toBeInTheDocument();
 
-    // Frame 2: risk moves by +0.011 — the badge appears with two decimals.
+    // Frame 2: risk moves by +0.011 — the badge appears in percentage points.
     const notable: Portal = { ...OPEN_PORTAL, energy_level: 84, risk_factor: 0.425 };
     act(() => socket.message(JSON.stringify(portalPage([notable, CLOSED_PORTAL], 1, 20))));
-    expect(await screen.findByText("+0.01")).toBeInTheDocument();
+    expect(await screen.findByText("+1")).toBeInTheDocument();
   });
 
   it("opens the portal modal when a row is clicked", async () => {

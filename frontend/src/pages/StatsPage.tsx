@@ -2,7 +2,7 @@ import { Alert, Card, Col, Progress, Row, Skeleton, Typography, theme } from "an
 
 import type { DangerLevel } from "../api/types";
 import { DANGER_META, DANGER_ORDER } from "../constants";
-import { toPercent } from "../format";
+import { formatRiskDelta, toPercent, toRiskPercent } from "../format";
 import { statsKey, useStats } from "../hooks/usePortalData";
 import { useSnapshotBaseline } from "../hooks/useSnapshotBaseline";
 import { DeltaIndicator, type DeltaPolarity } from "../components/DeltaIndicator";
@@ -88,7 +88,9 @@ export function StatsPage() {
                 percent={avgPercent}
                 strokeColor={token.colorPrimary}
                 format={() => (
-                  <span style={{ fontSize: 22, fontWeight: 700 }}>{data.avg_risk.toFixed(2)}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700 }}>
+                    {toRiskPercent(data.avg_risk)}
+                  </span>
                 )}
               />
             </div>
@@ -98,7 +100,7 @@ export function StatsPage() {
                   value={avgRiskDelta}
                   polarity="good-when-down"
                   minMagnitude={0.01}
-                  format={(value) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}`}
+                  format={(value) => formatRiskDelta(value)}
                 />
               </div>
             )}

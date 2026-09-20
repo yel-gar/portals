@@ -31,8 +31,8 @@ test("пустая статистика рендерит нули без оши�
   await expect(
     page.getByText("Общее число порталов — 0, из них открыто 0, закрыто 0"),
   ).toBeVisible();
-  // Average risk for zero open portals is 0.00, not NaN.
-  await expect(page.getByText("0.00").first()).toBeVisible();
+  // Average risk for zero open portals is 0%, not NaN.
+  await expect(page.getByText("0%").first()).toBeVisible();
 });
 
 test("десять тысяч порталов на доске рендерятся постранично", async ({ page }) => {
