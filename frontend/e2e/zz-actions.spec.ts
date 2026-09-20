@@ -88,3 +88,72 @@ test("действия фиксируются в журнале", async ({ page 
   await expect(tableRows(page).first().getByText("Снять отметку")).toBeVisible();
   await expect(tableRows(page).first().getByText(user)).toBeVisible();
 });
+
+test("предупреждение существ проходит, пока есть наблюдатель", async ({ page }) => {
+  await registerUser(page, "e2e_warn", "warn-pass-1");
+  const row = page.locator(".ant-table-row", { hasText: "Портал Альфа" });
+  await row.click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .locator(".ant-modal-body")
+    .getByRole("button", { name: "Предупредить существ" })
+    .click();
+  await expect(page.getByText("Действие «Предупредить существ» выполнено")).toBeVisible();
+});
+
+test("предупреждение без наблюдателя отклоняется сервером", async ({ page }) => {
+  await registerUser(page, "e2e_nosight", "nosight-pass-1");
+  // Бета has 9 creatures but no observer — warn must be rejected by the backend.
+  const row = page.locator(".ant-table-row", { hasText: "Портал Бета" });
+  await row.click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .locator(".ant-modal-body")
+    .getByRole("button", { name: "Предупредить существ" })
+    .click();
+  await expect(
+    page.getByText("Нет наблюдателя, через которого можно предупредить существ"),
+  ).toBeVisible();
+});
+
+test("«оставить открытым» продлевает срок жизни", async ({ page }) => {
+  await registerUser(page, "e2e_dismiss", "dismiss-pass-1");
+  const row = page.locator(".ant-table-row", { hasText: "Портал Зета" });
+  await row.click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .locator(".ant-modal-body")
+    .getByRole("button", { name: "Оставить открытым" })
+    .click();
+  await expect(page.getByText("Действие «Оставить открытым» выполнено")).toBeVisible();
+});
+
+test("стабилизация повышает стабильность портала", async ({ page }) => {
+  await registerUser(page, "e2e_stab", "stab-pass-1");
+  const row = page.locator(".ant-table-row", { hasText: "Портал Бета" });
+  await row.click();
+  const dialog = page.getByRole("dialog");
+  // Бета seeds at 12% stability; the boost is +15..30 %, so 12% must vanish.
+  await expect(dialog.getByText("12%")).toBeVisible();
+  await dialog.locator(".ant-modal-body").getByRole("button", { name: "Стабилизировать" }).click();
+  await expect(page.getByText("Действие «Стабилизировать» выполнено")).toBeVisible();
+  await expect(dialog.getByText("12%")).toHaveCount(0);
+});
+
+test("закрытие портала с существами отклоняется сервером", async ({ page }) => {
+  await registerUser(page, "e2e_noclose", "noclose-pass-1");
+  const row = page.locator(".ant-table-row", { hasText: "Портал Гамма" });
+  await row.click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator(".ant-modal-body").getByRole("button", { name: "Закрыть" }).click();
+  await expect(page.getByText("Нельзя закрыть портал: внутри есть существа")).toBeVisible();
+});
+
+test("стабилизация устойчивого портала отклоняется сервером", async ({ page }) => {
+  await registerUser(page, "e2e_nostab", "nostab-pass-1");
+  const row = page.locator(".ant-table-row", { hasText: "Портал Альфа" });
+  await row.click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator(".ant-modal-body").getByRole("button", { name: "Стабилизировать" }).click();
+  await expect(page.getByText("Стабильность портала уже не ниже 50%")).toBeVisible();
+});

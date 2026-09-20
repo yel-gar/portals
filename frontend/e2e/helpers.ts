@@ -49,18 +49,7 @@ export async function waitHttp(url: string, timeoutMs: number, what: string): Pr
  * the suite is still running); the seeded closed portal stays closed.
  */
 export function resetPortals(): void {
-  dockerCompose([
-    "exec",
-    "-T",
-    "postgres",
-    "psql",
-    "-U",
-    "postgres",
-    "-d",
-    "portals",
-    "-c",
-    "TRUNCATE portals, action_log CASCADE;",
-  ]);
+  wipePortals();
   dockerCompose(["exec", "-T", "backend", "/app/.venv/bin/python", "populate.py"]);
   dockerCompose([
     "exec",
@@ -73,6 +62,68 @@ export function resetPortals(): void {
     "portals",
     "-c",
     "UPDATE portals SET expires_at = now() + interval '2 hours' WHERE is_closed = false;",
+  ]);
+}
+
+/** Delete every portal and action-log row (cascades; users are untouched). */
+export function wipePortals(): void {
+  dockerCompose([
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "postgres",
+    "-d",
+    "portals",
+    "-c",
+    "TRUNCATE portals, action_log CASCADE;",
+  ]);
+}
+
+/**
+ * Bulk-insert `count` open demo portals («Портал N», world «Мир N») with TTL
+ * frozen at +2 h — volume/shape tests must not depend on a slow seed loop.
+ */
+export function seedBulkPortals(count: number): void {
+  dockerCompose([
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "postgres",
+    "-d",
+    "portals",
+    "-c",
+    `INSERT INTO portals (name, destination_world, energy_level, stability, creatures_count, ` +
+      `expires_at, is_marked, has_observer, is_closed) ` +
+      `SELECT 'Портал ' || i, 'Мир ' || i, (i * 7) % 101, (i * 13) % 101, i % 12, ` +
+      `now() + interval '2 hours', false, false, false FROM generate_series(1, ${count}) AS i;`,
+  ]);
+}
+
+/**
+ * Bulk-insert `count` action-log rows cycling through every action (so each
+ * action appears exactly `count / 8` times), newest timestamp last, against the
+ * first portal (NULL user — a deleted account is a legitimate log row).
+ */
+export function seedBulkLogs(count: number): void {
+  dockerCompose([
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "postgres",
+    "-d",
+    "portals",
+    "-c",
+    `INSERT INTO action_log (user_id, portal_id, action, timestamp) ` +
+      `SELECT NULL, (SELECT id FROM portals ORDER BY id LIMIT 1), ` +
+      `(ARRAY['DISMISS','STABILIZE','SEND_OBSERVER','RECALL_OBSERVER','CLOSE','MARK',` +
+      `'UNMARK','WARN_CREATURES']::action[])[i % 8 + 1], ` +
+      `now() - ((${count} - i) * interval '1 second') FROM generate_series(1, ${count}) AS i;`,
   ]);
 }
 
