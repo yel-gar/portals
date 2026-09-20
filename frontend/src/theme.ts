@@ -13,10 +13,10 @@ export const embersTheme: ThemeConfig = {
     colorLink: "#ff8c1a",
     colorBgLayout: "#0e0905",
     // Slightly translucent surface so the full-background spark layer glows
-    // through the cards, table and inputs. Dialogs keep a mostly opaque
-    // elevated background via colorBgElevated for readability.
+    // through the cards, table and inputs. Dialogs keep an opaque elevated
+    // background via colorBgElevated for readability.
     colorBgContainer: "rgba(23, 16, 8, 0.45)",
-    colorBgElevated: "rgba(30, 20, 9, 0.75)",
+    colorBgElevated: "#1e1409",
     borderRadius: 10,
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif',

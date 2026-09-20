@@ -68,6 +68,10 @@ export function PortalTable({
       key: "name",
       width: 220,
       fixed: "left",
+      // Opaque background so the columns scrolling underneath stay hidden
+      // (surface token is translucent; see app.css `.portal-table-fixed-bg`).
+      onCell: () => ({ className: "portal-table-fixed-bg portal-table-fixed-left" }),
+      onHeaderCell: () => ({ className: "portal-table-fixed-bg portal-table-fixed-left" }),
       render: (_, portal) => (
         <div>
           <Typography.Text strong>{portal.name}</Typography.Text>
@@ -216,9 +220,14 @@ export function PortalTable({
       fixed: "right",
       align: "center",
       // A 1px divider between the scrollable data columns and the fixed action
-      // column: the cell (header and body) gets a start border via CSS.
-      onCell: () => ({ className: "portal-table-actions-sep" }),
-      onHeaderCell: () => ({ className: "portal-table-actions-sep" }),
+      // column (the cell gets a start border via CSS) plus an opaque background
+      // so columns scrolling underneath stay hidden.
+      onCell: () => ({
+        className: "portal-table-actions-sep portal-table-fixed-bg portal-table-fixed-right",
+      }),
+      onHeaderCell: () => ({
+        className: "portal-table-actions-sep portal-table-fixed-bg portal-table-fixed-right",
+      }),
       render: (_, portal) => (
         <Button
           type="link"

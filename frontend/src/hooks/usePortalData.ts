@@ -18,7 +18,9 @@ import { useLiveSnapshot } from "./useLiveSnapshot";
  * complete page snapshots, so whichever arrives last simply replaces the cache.
  */
 const REFRESH_INTERVAL_MS = 30_000;
-const STATS_REFRESH_INTERVAL_MS = 20_000;
+// Stats have no live channel: 10 s polling keeps the cards on the stats page
+// (and the stat strip on the portals page) fresh while the page is mounted.
+const STATS_REFRESH_INTERVAL_MS = 10_000;
 
 /**
  * Query keys carry the full params object: two different filter/order states
