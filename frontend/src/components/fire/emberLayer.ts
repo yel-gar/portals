@@ -95,6 +95,8 @@ export class EmberLayer {
   private raf = 0;
   private running = false;
   private observer: ResizeObserver | null = null;
+  /** Live counters for the console debug probe (see `FirePanels.getFireDebug`). */
+  readonly debug = { frames: 0 };
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -139,6 +141,7 @@ export class EmberLayer {
       return;
     }
     drawFrame(this.ctx, this.canvas.width, this.canvas.height, now);
+    this.debug.frames += 1;
     this.raf = requestAnimationFrame((then) => this.frame(then));
   }
 }

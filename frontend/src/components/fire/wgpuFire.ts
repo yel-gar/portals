@@ -15,11 +15,21 @@ import { fitCanvasSize } from "./canvasSize";
 
 export interface WgpuFireHandle {
   stop(): void;
+  /** Live counters for the console debug probe (see `FirePanels.getFireDebug`). */
+  debug: {
+    frames: number;
+    adapter: string;
+  };
 }
 
 // One device per page — the background layer draws through it.
 let rootPromise: Promise<TgpuRoot | null> | null = null;
 let rootUsers = 0;
+let adapterDescription: string | null = null;
+
+function describeAdapter(info: GPUAdapterInfo): string {
+  return info.description || info.device || info.vendor || "unknown adapter";
+}
 
 function getRoot(): Promise<TgpuRoot | null> {
   if (rootPromise === null) {
@@ -32,6 +42,7 @@ function getRoot(): Promise<TgpuRoot | null> {
         if (adapter === null) {
           return null;
         }
+        adapterDescription = describeAdapter(await adapter.info);
         const device = await adapter.requestDevice();
         return tgpu.initFromDevice({ device });
       } catch {
@@ -87,7 +98,9 @@ const sparkLayer = (
   const jitter = std.mul(std.sub(std.mul(warp, 2), 1), 0.5);
   const warped = std.add(grid, d.vec2f(jitter, std.mul(jitter, 0.5)));
   const base = std.floor(warped);
-  let best = 0;
+  // f32 zero on purpose: a bare `0` literal infers i32 here, and every stored
+  // brightness would truncate to an integer (no dots at all).
+  let best = std.sub(t, t);
   for (let i = -1; i <= 1; i += 1) {
     for (let j = -1; j <= 1; j += 1) {
       const cell = std.add(base, d.vec2f(i, j));
@@ -138,6 +151,11 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
     context = root.configureContext({ canvas, alphaMode: "premultiplied" });
     const time = root.createUniform(d.f32, 0);
     const resolution = root.createUniform(d.vec2f, d.vec2f(1, 1));
+    const adapterInfo = adapterDescription ?? "unknown adapter";
+    const debug = {
+      frames: 0,
+      adapter: adapterInfo,
+    };
 
     const resize = (): void => {
       const rect = canvas.getBoundingClientRect();
@@ -206,6 +224,7 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
       if (context !== null) {
         pipeline.withColorAttachment({ view: context }).draw(3);
       }
+      debug.frames += 1;
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -219,8 +238,10 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
         if (rootUsers <= 0) {
           void rootPromise?.then((resolved) => resolved?.destroy());
           rootPromise = null;
+          adapterDescription = null;
         }
       },
+      debug,
     };
   } catch {
     observer?.disconnect();

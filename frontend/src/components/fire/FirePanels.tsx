@@ -8,6 +8,25 @@ interface FirePanelProps {
   backend: FireBackend;
 }
 
+/** Live decorative-layer state for console diagnosis — call `fireDebug()` in devtools. */
+export interface FireDebugSnapshot {
+  requested: FireBackend;
+  active: FireBackend;
+  frames: number;
+  cssWidth: number;
+  cssHeight: number;
+  canvasWidth: number;
+  canvasHeight: number;
+  dpr: number;
+  adapter: string | null;
+}
+
+let debugReader: (() => FireDebugSnapshot | null) | null = null;
+
+export function getFireDebug(): FireDebugSnapshot | null {
+  return debugReader?.() ?? null;
+}
+
 function FirePanel({ backend }: FirePanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Which backend actually paints the background — WebGPU may fail at init and
@@ -20,14 +39,37 @@ function FirePanel({ backend }: FirePanelProps) {
       return;
     }
     let disposed = false;
-    let effect: { stop(): void } | null = null;
+    let effect: { stop(): void; debug: { frames: number } } | null = null;
+    let resolved: FireBackend = backend === "webgpu" ? "ember" : backend;
+    let adapter: string | null = null;
+
+    debugReader = () => {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        requested: backend,
+        active: resolved,
+        frames: effect?.debug.frames ?? 0,
+        cssWidth: Math.round(rect.width),
+        cssHeight: Math.round(rect.height),
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height,
+        dpr: globalThis.devicePixelRatio ?? 1,
+        adapter,
+      };
+    };
+
+    const report = (): void => {
+      console.info("[fire]", JSON.stringify(debugReader?.() ?? null));
+    };
 
     const startEmber = (): void => {
       if (!disposed) {
         const layer = new EmberLayer(canvas);
         layer.start();
         effect = layer;
+        resolved = "ember";
         setActive("ember");
+        report();
       }
     };
 
@@ -41,7 +83,10 @@ function FirePanel({ backend }: FirePanelProps) {
           }
           if (handle !== null) {
             effect = handle;
+            adapter = handle.debug.adapter;
+            resolved = "webgpu";
             setActive("webgpu");
+            report();
           } else {
             startEmber();
           }
@@ -79,6 +124,16 @@ export function FirePanels() {
     reduced,
     typeof navigator !== "undefined" && navigator.gpu !== undefined,
   );
+
+  useEffect(() => {
+    const scope = window as unknown as { fireDebug?: typeof getFireDebug };
+    scope.fireDebug = getFireDebug;
+    return () => {
+      if (scope.fireDebug === getFireDebug) {
+        delete scope.fireDebug;
+      }
+    };
+  }, []);
 
   return (
     <div className="fire-panels" aria-hidden="true">
