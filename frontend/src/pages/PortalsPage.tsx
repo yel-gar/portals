@@ -55,19 +55,30 @@ export function PortalsPage() {
     enabled: selectedId !== null,
     refetchInterval: 10_000,
   });
-  // While open, the polled detail copy and the page snapshot race: the portal
-  // may close in the background (expiry) or over the socket, and whichever
-  // source refreshed last wins. Ties fall back to the snapshot row, then to
-  // the last known object so the modal stays usable when the portal drops off
-  // the visible page (risk-DESC reordering, a CLOSE sinking it to the end).
+  // `closed` is terminal (expiry and CLOSE never revert), so latch it: once
+  // either source reports the portal closed, keep showing a closed copy. The
+  // page snapshot must never flip the open card back to open — only the
+  // detail endpoint (the correct per-portal data) moves it forward.
   const snapshotRow =
     selectedId !== null ? portals.find((portal) => portal.id === selectedId) : undefined;
+  const closedCopy =
+    snapshotRow?.closed === true
+      ? snapshotRow
+      : detail.data?.closed === true
+        ? detail.data
+        : undefined;
+  // Otherwise the freshest source wins: background expiry reaches the card
+  // through the detail poll, socket closes through the page snapshot. Ties
+  // fall back to the snapshot row, then to the last known object so the modal
+  // stays usable when the portal drops off the visible page (risk-DESC
+  // reordering, a CLOSE sinking it to the end).
   const selected =
     selectedId === null
       ? null
-      : detail.data !== undefined && detail.dataUpdatedAt > query.dataUpdatedAt
-        ? detail.data
-        : (snapshotRow ?? selectedPortal);
+      : (closedCopy ??
+        (detail.data !== undefined && detail.dataUpdatedAt > query.dataUpdatedAt
+          ? detail.data
+          : (snapshotRow ?? selectedPortal)));
 
   return (
     <>

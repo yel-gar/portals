@@ -307,6 +307,32 @@ describe("PortalsPage", () => {
     expect(within(dialog).getByRole("button", { name: /Отметить/ })).toBeEnabled();
   });
 
+  it("never flips a closed card back to open on a stale page snapshot", async () => {
+    const user = userEvent.setup();
+    const closed: Portal = { ...OPEN_PORTAL, closed: true, has_observer: false };
+    // Detail already reports the portal closed; the page snapshot below is
+    // stale (still open) and must not revive the card.
+    server.use(http.get(API_URL("/portals/1"), () => HttpResponse.json(closed)));
+
+    renderWithProviders(<PortalsPage />);
+    await user.click(await screen.findByText("Портал Альфа"));
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => {
+      expect(within(dialog).getByRole("button", { name: /Стабилизировать/ })).toBeDisabled();
+    });
+
+    const socket = FakeWebSocket.instances[0];
+    expect(socket).toBeDefined();
+    act(() => socket.open());
+    act(() => socket.message(JSON.stringify(portalPage([OPEN_PORTAL, CLOSED_PORTAL], 1, 20))));
+
+    await waitFor(() => {
+      expect(within(dialog).getByRole("button", { name: /Стабилизировать/ })).toBeDisabled();
+    });
+    // The latched closed copy (no observer inside) stays on screen.
+    expect(within(dialog).getByText("Отправить наблюдателя")).toBeInTheDocument();
+  });
+
   it("keeps the modal open when a filter change empties the page", async () => {
     const user = userEvent.setup();
     server.use(
