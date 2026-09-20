@@ -4,3 +4,6 @@ coverage
 mockups
 package-lock.json
 *.tsbuildinfo
+test-results
+playwright-report
+blob-report

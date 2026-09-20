@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
@@ -38,6 +38,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts", "./src/test/server.ts"],
     css: false,
+    // Playwright specs live in e2e/ and must never run under vitest.
+    exclude: [...configDefaults.exclude, "e2e/**"],
     env: {
       // Deterministic backend origin: tests talk to MSW handlers by path,
       // while this keeps `websocketUrl`/`BACKEND_URL` stable across machines.

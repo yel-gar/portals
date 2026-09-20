@@ -1,0 +1,14 @@
+# Layered on top of docker-compose.e2e.yml by the Playwright "live" project:
+#
+#   docker compose -f docker-compose.e2e.yml -f docker-compose.e2e.live.yml \
+#     up -d --no-build --force-recreate backend
+#
+# re-creates ONLY the backend container with the portal simulator enabled.
+# Compose merges `environment` maps, so this single key overrides the base
+# value; postgres and the frontend container keep running untouched, and a
+# logged-in browser keeps its DB-backed session across the restart.
+
+services:
+  backend:
+    environment:
+      DISABLE_SIMULATOR: "0"

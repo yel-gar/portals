@@ -1,0 +1,76 @@
+# Isolated docker compose stack for the Playwright E2E suite (frontend/e2e).
+#
+# Deliberately NOT layered on docker-compose.yml:
+#   - its own project name (`portals-e2e`) → isolated networks and the
+#     `e2e_postgres_data` volume never collide with the dev/prod `portals` stack;
+#   - an explicit `-f` file means the dev `docker-compose.override.yml` is never
+#     auto-merged (verified empirically with `docker compose config`);
+#   - every value is hardcoded — no `${...}` interpolation, so the repo-root
+#     `.env` cannot leak POSTGRES_*/BACKEND_URL/... into the test stack.
+#
+# Determinism: DISABLE_SIMULATOR=1 (the `live` Playwright project re-creates
+# only the backend with it enabled — see docker-compose.e2e.live.yml) and the
+# demo portals are re-seeded per spec file via populate.py.
+
+name: portals-e2e
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: e2e-postgres-pass
+      POSTGRES_DB: portals
+    volumes:
+      - e2e_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: e2e-postgres-pass
+      POSTGRES_DB: portals
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      # DEBUG=1: plain-HTTP stack needs non-Secure session cookies, and it
+      # disables the login rate limiter (flakiness-free rapid logins in specs).
+      DEBUG: "1"
+      DISABLE_REGISTRATION: "0"
+      # Deterministic suite — the portal simulator stays off; the "live"
+      # Playwright project flips it for one smoke test only.
+      DISABLE_SIMULATOR: "1"
+      # Superuser for the admin specs; bootstrapped by the app on startup.
+      INITIAL_SUPERUSER_USERNAME: admin
+      INITIAL_SUPERUSER_PASSWORD: e2e-admin-pw-1
+      BACKEND_URL: http://localhost:8010
+      FRONTEND_URL: http://localhost:3010
+    ports:
+      - "8010:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: http://localhost:8010
+        DISABLE_REGISTRATION: "0"
+    ports:
+      - "3010:80"
+    depends_on:
+      - backend
+    volumes:
+      # Same canonical-worklog mount as docker-compose.yml: the /worklog spec
+      # asserts the REAL repo-root AI-WORKLOG.md is served.
+      - ./AI-WORKLOG.md:/usr/share/nginx/html/AI-WORKLOG.md:ro
+
+volumes:
+  e2e_postgres_data:

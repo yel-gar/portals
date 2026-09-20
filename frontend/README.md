@@ -110,6 +110,24 @@ npm run build         # tsc -b && vite build
 - `test.env.VITE_BACKEND_URL` в `vite.config.ts` фиксирует origin для тестов; `BACKEND_ORIGIN`
   в `mocks.ts` должен совпадать.
 
+## E2E (Playwright, docker compose)
+
+Сквозной набор — `frontend/e2e/` + `playwright.config.ts` в корне фронтенда. Работает против
+**выделенного** стека `docker-compose.e2e.yml` (проект `portals-e2e`, порты 8010/3010,
+свои network/volume, без `.env` и без dev-override) — не трогает запущенный dev/prod стек:
+
+```bash
+npm run test:e2e          # оба проекта: детерминированный набор + live-смоук
+npm run test:e2e:chromium # только детерминированные спеки (DISABLE_SIMULATOR=1)
+npm run test:e2e:live     # live-смоук: симулятор включён, обновления по WebSocket
+npm run test:e2e:ui       # Playwright UI-режим для отладки
+```
+
+Подробности (подготовка стека, сидирование, порядок файлов, live-проект, teardown) — в
+корневом README, раздел «E2E tests (Playwright)». Настройки Playwright — в
+`tsconfig.e2e.json` (проект typecheck'ится вместе с приложением), спеки исключены из vitest
+(`vite.config.ts` → `test.exclude`).
+
 ## Ключевые решения
 
 - Тема «Угли», деталь портала — центрированный Modal 720px, действия по 3 в ряд (см.

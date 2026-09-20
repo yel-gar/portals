@@ -72,6 +72,13 @@ Milestones (a git commit happens after each milestone; pre-commit runs on each c
 
 ## Completed milestones
 
+### Playwright E2E suite (master, 2026-09)
+Full cross-stack test suite at `frontend/e2e/` (decision + full rationale in DECISIONS.md):
+- **Isolated stack** `docker-compose.e2e.yml` (project `portals-e2e`): own network/volume/ports (8010/3010), hardcoded env (no `.env` interpolation, no dev-override auto-merge), prod-like build (baked `http://localhost:8010`). `docker-compose.e2e.live.yml` flips only `DISABLE_SIMULATOR: "0"` for the backend via compose `environment`-merge.
+- **Infra**: `frontend/playwright.config.ts` (workers 1, `chromium` + trailing `live` projects), `tsconfig.e2e.json` referenced from the root tsconfig so e2e is typechecked by `tsc -b`; global-setup (up --build → health → seed) + global-teardown (`down -v`, `E2E_KEEP_STACK=1` opt-out); `resetPortals()` truncate + `populate.py` + 2 h freeze of open portals' `expires_at` (demo TTLs are 3 min — nothing expires mid-run).
+- **Specs** (7 deterministic + 1 live): auth (register auto-login, logout/relogin, wrong password, 403 admin, redirect), admin (superuser CRUD via INITIAL_SUPERUSER bootstrap), log (mark/unmark roundtrip → filter → reset), portals (7 rows + statuses, search, closed/danger/observer/marked filters, reset, name sort), stats (7/6/1 cards), worklog (AI-WORKLOG.md rendered with hljs), `zz-actions` (serial: mark/unmark, close + disabled actions, observer toggle, closed portal, log entry), `live` (sim on → WS delta badges appear; impossible with sim off).
+- vitest excludes `e2e/**`; `.gitignore`/`.prettierignore` cover playwright artifacts; new `E2E_KEEP_STACK` in `.env.example` + README envvars table; root + frontend README get an E2E section; CI workflow `.github/workflows/e2e-ci.yml` (npm ci → playwright install --with-deps chromium → full suite, report/test-results artifacts).
+
 ### Nine UX/data tasks (master, 2026-09)
 Backend (all gates green: black/ruff/mypy clean, 126 tests, coverage 99 %):
 - **CLOSE auto-recalls the observer**: `Portal.close()` sets `has_observer = False` before closing (a closed portal can never keep an observer inside); the log still records one `CLOSE` entry. New model test + `test_close_recalls_observer`.

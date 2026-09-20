@@ -12,3 +12,8 @@ node_modules
 # Docker materializes an empty root-owned stub here for the dev worklog bind
 # mount (./AI-WORKLOG.md:/app/public/AI-WORKLOG.md) — never track it.
 frontend/public/
+
+# Playwright E2E artifacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
