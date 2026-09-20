@@ -12,6 +12,7 @@ import type { TgpuRoot } from "typegpu";
 import type { v2f } from "typegpu/data";
 
 import { fitCanvasSize } from "./canvasSize";
+import { fireTuning } from "./fireTuning";
 
 export interface WgpuFireHandle {
   stop(): void;
@@ -93,6 +94,9 @@ const valueNoise = (p: v2f): number => {
  * Spark centers are constrained to [R, 1 - R] inside their cell, where R is
  * the falloff radius: no dot ever crosses a cell border, so a single tap per
  * pixel is exact (no neighbourhood search, no cut-off square edges).
+ * `warpScale` scales the turbulence nudge: 0 keeps dots perfectly round in
+ * rigid (rotated/scrolled) space, 1 lets the warp knead them. `cutoff` is the
+ * occupancy threshold: cells whose hash falls below it stay empty.
  */
 const sparkLayer = (
   st: v2f,
@@ -102,20 +106,22 @@ const sparkLayer = (
   gain: number,
   seed: number,
   warp: number,
+  warpScale: number,
+  cutoff: number,
 ): number => {
   "use gpu";
   // The field scrolls upward continuously: adding `t * speed` shifts the
   // sampled window downward in texture space, so on the y-down screen the
   // sparks drift up and never pop while crossing cell borders.
   const grid = std.mul(std.add(st, d.vec2f(0, std.mul(t, speed))), scale);
-  const jitter = std.mul(std.sub(std.mul(warp, 2), 1), 0.5);
+  const jitter = std.mul(std.mul(std.sub(std.mul(warp, 2), 1), 0.5), warpScale);
   const warped = std.add(grid, d.vec2f(jitter, std.mul(jitter, 0.5)));
   const cell = std.floor(warped);
   const local = std.fract(warped);
   // One hash feeds every per-cell value (density, center, phase).
   const rand = hash21(std.add(cell, d.vec2f(seed, 0)));
   // Only a fraction of the cells host a spark — keeps the field rarefied.
-  const density = std.step(0.62, std.fract(std.mul(rand, 9.17)));
+  const density = std.step(cutoff, std.fract(std.mul(rand, 9.17)));
   const R = 0.24;
   const span = std.sub(1, std.add(R, R));
   const cx = std.add(R, std.mul(span, std.fract(std.mul(rand, 7.17))));
@@ -166,6 +172,15 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
     context = root.configureContext({ canvas, alphaMode: "opaque" });
     const time = root.createUniform(d.f32, 0);
     const resolution = root.createUniform(d.vec2f, d.vec2f(1, 1));
+    // Live tuning knobs for the `?fire=` experiment panel (see fireTuning).
+    const tuneA = root.createUniform(
+      d.vec4f,
+      d.vec4f(fireTuning.flowA, fireTuning.flowB, fireTuning.swirl, fireTuning.warpFreq),
+    );
+    const tuneB = root.createUniform(
+      d.vec4f,
+      d.vec4f(fireTuning.cutA, fireTuning.cutB, fireTuning.bright, fireTuning.dotScale),
+    );
     const adapterInfo = adapterDescription ?? "unknown adapter";
     const debug = {
       frames: 0,
@@ -193,31 +208,79 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
         "use gpu";
         const t = time.$;
         const size = resolution.$;
+        // Live knobs from the experiment panel (rewritten every frame).
+        const ta = tuneA.$;
+        const tb = tuneB.$;
         // Visible uv is [0, 1] × [0, 1] (y down: uv.y = 1 at the NDC
         // bottom); remap to an aspect-corrected [0..aspect] × [0..1] so the
         // spark density is uniform across screens.
-        const st = d.vec2f(uv.x * (size.x / size.y), uv.y);
+        const base = d.vec2f(uv.x * (size.x / size.y), uv.y);
 
-        // Slow swirling turbulence — a single shared noise sample.
+        // Fast-evolving turbulence — a single shared noise sample.
         const warp = valueNoise(
           std.add(
-            std.mul(st, d.vec2f(1.35, 1.35)),
-            d.vec2f(std.sin(t * 0.21) * 0.35, std.sin(t * 0.17) * 0.3),
+            std.mul(base, d.vec2f(ta.w, ta.w)),
+            d.vec2f(std.sin(t * 0.22) * 0.5, std.sin(t * 0.18) * 0.45),
           ),
+        );
+
+        // Large-scale slow swirl: rotate the sampling domain around the
+        // screen center so currents curl into each other (cos via a sin
+        // shift). The edge falloff below shares the center, so it is
+        // unaffected by the rotation.
+        const swirlA = std.add(std.mul(t, ta.z), std.mul(warp, 2.5));
+        const swirlC = std.sin(std.add(swirlA, 1.5708));
+        const swirlS = std.sin(swirlA);
+        const swirlX = std.sub(base.x, std.mul(size.x / size.y, 0.5));
+        const swirlY = std.sub(base.y, 0.5);
+        const st = d.vec2f(
+          std.add(
+            std.sub(std.mul(swirlC, swirlX), std.mul(swirlS, swirlY)),
+            std.mul(size.x / size.y, 0.5),
+          ),
+          std.add(std.add(std.mul(swirlS, swirlX), std.mul(swirlC, swirlY)), 0.5),
         );
 
         // Dark ember base, faintly breathing with the turbulence.
         let color = std.mul(d.vec3f(0.026, 0.01, 0.004), std.add(1, std.mul(warp, 1.5)));
 
-        // Three rarefied spark layers — sparse large, medium, dense tiny.
-        // Fractional seeds: integer literals infer i32 and raise conversion
-        // warnings at resolve time; the offsets only need distinctness.
-        const s1 = sparkLayer(st, t, 15, 0.05, 1, 0.5, warp);
-        color = std.add(color, std.mul(d.vec3f(1, 0.62, 0.16), s1));
-        const s2 = sparkLayer(st, t, 29, 0.085, 0.5, 3.5, warp);
-        color = std.add(color, std.mul(d.vec3f(0.8, 0.4, 0.1), s2));
-        const s3 = sparkLayer(st, t, 52, 0.12, 0.26, 6.5, warp);
-        color = std.add(color, std.mul(d.vec3f(0.5, 0.22, 0.05), s3));
+        // Long magic streams flowing across the screen: noise stretched along
+        // x, sharpened into thin currents, riding the shared turbulence.
+        const flowA = valueNoise(
+          std.add(
+            std.add(std.mul(st, d.vec2f(1.6, 7.0)), d.vec2f(std.mul(t, ta.x), std.mul(t, 0.02))),
+            d.vec2f(std.mul(warp, 1.6), std.mul(warp, 0.9)),
+          ),
+        );
+        const bandA = std.smoothstep(0.52, 0.92, flowA);
+        const streamA = std.mul(bandA, bandA);
+        color = std.add(
+          color,
+          std.mul(d.vec3f(0.95, 0.42, 0.08), std.mul(streamA, std.mul(0.55, tb.z))),
+        );
+
+        const flowB = valueNoise(
+          std.sub(
+            std.add(
+              std.mul(st, d.vec2f(2.3, 11.0)),
+              d.vec2f(std.mul(warp, 1.6), std.mul(warp, 0.9)),
+            ),
+            d.vec2f(std.mul(t, ta.y), std.mul(t, 0.03)),
+          ),
+        );
+        const bandB = std.smoothstep(0.58, 0.95, flowB);
+        const streamB = std.mul(bandB, bandB);
+        color = std.add(
+          color,
+          std.mul(d.vec3f(0.7, 0.25, 0.05), std.mul(streamB, std.mul(0.4, tb.z))),
+        );
+
+        // Dense fine glitter in two sizes drifting over the streams —
+        // undistorted by the turbulence so every dot stays round and crisp.
+        const glintA = sparkLayer(st, t, 260 * tb.w, 0.045, 0.75 * tb.z, 1.5, warp, 0, tb.x);
+        color = std.add(color, std.mul(d.vec3f(1.0, 0.8, 0.45), glintA));
+        const glintB = sparkLayer(st, t, 520 * tb.w, 0.06, 0.55 * tb.z, 4.5, warp, 0, tb.y);
+        color = std.add(color, std.mul(d.vec3f(1.0, 0.85, 0.55), glintB));
 
         // Soft elliptical falloff keeps the corners calm (spelled without
         // reversed smoothstep edges — those are WGSL undefined behavior).
@@ -249,6 +312,12 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
       // Wrapped to hours: unbounded f32 time loses fractional precision,
       // which shows up as flicker/jitter (the grid math needs the fraction).
       time.write((now / 1000) % 3600);
+      tuneA.write(
+        d.vec4f(fireTuning.flowA, fireTuning.flowB, fireTuning.swirl, fireTuning.warpFreq),
+      );
+      tuneB.write(
+        d.vec4f(fireTuning.cutA, fireTuning.cutB, fireTuning.bright, fireTuning.dotScale),
+      );
       if (context !== null) {
         pipeline.withColorAttachment({ view: context }).draw(3);
       }

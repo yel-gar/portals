@@ -16,17 +16,27 @@ describe("chooseFireBackend", () => {
     expect(chooseFireBackend(false, false)).toBe("ember");
   });
 
-  it("prefers the ember canvas on Windows even with WebGPU", () => {
+  it("uses WebGPU on Windows when the browser offers it", () => {
     const original = navigator.userAgent;
     Object.defineProperty(navigator, "userAgent", {
       value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
       configurable: true,
     });
     try {
-      expect(chooseFireBackend(false, true)).toBe("ember");
-      expect(chooseFireBackend(true, true)).toBe("static");
+      expect(chooseFireBackend(false, true)).toBe("webgpu");
+      expect(chooseFireBackend(false, false)).toBe("ember");
     } finally {
       Object.defineProperty(navigator, "userAgent", { value: original, configurable: true });
+    }
+  });
+
+  it("honours an explicit ?fire= override above every heuristic", () => {
+    window.history.replaceState({}, "", "/?fire=webgpu");
+    try {
+      expect(chooseFireBackend(false, false)).toBe("webgpu");
+      expect(chooseFireBackend(true, true)).toBe("webgpu");
+    } finally {
+      window.history.replaceState({}, "", "/");
     }
   });
 });
