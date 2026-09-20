@@ -44,6 +44,13 @@ function getRoot(): Promise<TgpuRoot | null> {
         }
         adapterDescription = describeAdapter(await adapter.info);
         const device = await adapter.requestDevice();
+        // A lost device (TDR/driver reset under load) must not freeze the
+        // background forever: drop the cached root so the next mount
+        // re-initializes (falling back to embers if that fails).
+        void device.lost.then(() => {
+          rootPromise = null;
+          adapterDescription = null;
+        });
         return tgpu.initFromDevice({ device });
       } catch {
         return null;
@@ -53,10 +60,16 @@ function getRoot(): Promise<TgpuRoot | null> {
   return rootPromise;
 }
 
-/** Hash of a 2D point → smooth pseudo-random value in [0, 1). */
+/**
+ * Cheap sin-free hash of a 2D point → value in [0, 1). A multiplicative
+ * cascade only (`fract`/`mul`/`add`): `sin` of large arguments needs range
+ * reduction that is slow on some drivers, and its precision varies per GPU
+ * (visible as extra flicker). Identical results everywhere.
+ */
 const hash21 = (p: v2f): number => {
   "use gpu";
-  return std.fract(std.sin(std.dot(p, d.vec2f(127.1, 311.7))) * 43758.5453);
+  const h = std.fract(std.add(std.mul(p.x, 0.1031), std.mul(p.y, 0.1097)));
+  return std.fract(std.mul(std.add(std.mul(h, h), 19.19), std.add(h, 7.13)));
 };
 
 /** Bilinear value noise in [0, 1). */
@@ -77,9 +90,9 @@ const valueNoise = (p: v2f): number => {
  * of a hash grid may host one soft particle; `warp` nudges the sampled
  * position so the whole field shimmers with the shared turbulence.
  *
- * Every pixel considers the 3×3 cells around it and keeps the brightest
- * spark: dots centered near a cell border render whole instead of being cut
- * at the grid line (the visible square edges).
+ * Spark centers are constrained to [R, 1 - R] inside their cell, where R is
+ * the falloff radius: no dot ever crosses a cell border, so a single tap per
+ * pixel is exact (no neighbourhood search, no cut-off square edges).
  */
 const sparkLayer = (
   st: v2f,
@@ -97,38 +110,38 @@ const sparkLayer = (
   const grid = std.mul(std.add(st, d.vec2f(0, std.mul(t, speed))), scale);
   const jitter = std.mul(std.sub(std.mul(warp, 2), 1), 0.5);
   const warped = std.add(grid, d.vec2f(jitter, std.mul(jitter, 0.5)));
-  const base = std.floor(warped);
-  // f32 zero on purpose: a bare `0` literal infers i32 here, and every stored
-  // brightness would truncate to an integer (no dots at all).
-  let best = std.sub(t, t);
-  for (let i = -1; i <= 1; i += 1) {
-    for (let j = -1; j <= 1; j += 1) {
-      const cell = std.add(base, d.vec2f(i, j));
-      const rand = hash21(std.add(cell, d.vec2f(seed, 0)));
-      // Only a fraction of the cells host a spark — keeps the field rarefied.
-      const density = std.step(0.62, hash21(std.add(cell, d.vec2f(std.add(seed, 7.3), 3.7))));
-      const cx = std.fract(std.mul(rand, 7.17));
-      const cy = std.fract(std.mul(rand, 3.61));
-      const shift = std.sub(std.sub(warped, cell), d.vec2f(cx, cy));
-      // Reversed smoothstep edges are undefined behavior in WGSL (garbage on
-      // some drivers, e.g. DirectX — the black squares), so spell the falloff
-      // out explicitly. The core radius stays well below half a cell.
-      const core = std.sub(
-        1,
-        std.smoothstep(
-          0,
-          0.2,
-          std.sqrt(std.add(std.mul(shift.x, shift.x), std.mul(shift.y, shift.y))),
-        ),
-      );
-      const twinkle = std.add(
-        0.4,
-        std.mul(0.6, std.sin(std.add(std.mul(t, std.add(4, std.mul(rand, 8))), std.mul(rand, 29)))),
-      );
-      best = std.max(best, std.mul(std.mul(std.mul(core, density), twinkle), gain));
-    }
-  }
-  return best;
+  const cell = std.floor(warped);
+  const local = std.fract(warped);
+  // One hash feeds every per-cell value (density, center, phase).
+  const rand = hash21(std.add(cell, d.vec2f(seed, 0)));
+  // Only a fraction of the cells host a spark — keeps the field rarefied.
+  const density = std.step(0.62, std.fract(std.mul(rand, 9.17)));
+  const R = 0.24;
+  const span = std.sub(1, std.add(R, R));
+  const cx = std.add(R, std.mul(span, std.fract(std.mul(rand, 7.17))));
+  const cy = std.add(R, std.mul(span, std.fract(std.mul(rand, 3.61))));
+  const dx = std.sub(local.x, cx);
+  const dy = std.sub(local.y, cy);
+  // Reversed smoothstep edges are undefined behavior in WGSL (garbage on some
+  // drivers, e.g. DirectX — the black squares), so spell the falloff out
+  // explicitly.
+  const core = std.sub(
+    1,
+    std.smoothstep(0, R, std.sqrt(std.add(std.mul(dx, dx), std.mul(dy, dy)))),
+  );
+  // Same gentle twinkle as the 2D fallback: slow, shallow, floored.
+  const phase = std.mul(rand, 6.2831);
+  const twinkle = std.max(
+    0.45,
+    std.add(
+      0.72,
+      std.add(
+        std.mul(0.18, std.sin(std.add(std.mul(t, 1.9), phase))),
+        std.mul(0.1, std.sin(std.add(std.mul(t, 3.4), std.mul(phase, 1.7)))),
+      ),
+    ),
+  );
+  return std.mul(std.mul(std.mul(core, density), twinkle), gain);
 };
 
 /**
@@ -148,7 +161,9 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
   let context: GPUCanvasContext | null = null;
 
   try {
-    context = root.configureContext({ canvas, alphaMode: "premultiplied" });
+    // Opaque surface: the shader never outputs partial alpha, so the browser
+    // can skip blend work when compositing under the DOM.
+    context = root.configureContext({ canvas, alphaMode: "opaque" });
     const time = root.createUniform(d.f32, 0);
     const resolution = root.createUniform(d.vec2f, d.vec2f(1, 1));
     const adapterInfo = adapterDescription ?? "unknown adapter";
@@ -159,12 +174,17 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
 
     const resize = (): void => {
       const rect = canvas.getBoundingClientRect();
-      // Soft embers need no retina density: CSS resolution quarters the fill
-      // cost, which matters every frame and on every recomposite.
-      const size = fitCanvasSize(rect.width, rect.height, 1);
-      canvas.width = size.width;
-      canvas.height = size.height;
-      resolution.write(d.vec2f(canvas.width, canvas.height));
+      // Half CSS resolution: soft dots upscale invisibly while the fill cost
+      // quarters every frame and on every recomposite.
+      const size = fitCanvasSize(rect.width, rect.height, 0.5);
+      // Assigning canvas.width resets the backing store (and the swapchain),
+      // so only assign on a real change — e.g. a scrollbar toggling during a
+      // data update must not reconfigure mid-frame.
+      if (canvas.width !== size.width || canvas.height !== size.height) {
+        canvas.width = size.width;
+        canvas.height = size.height;
+        resolution.write(d.vec2f(canvas.width, canvas.height));
+      }
     };
 
     const pipeline = root.createRenderPipeline({
@@ -190,11 +210,13 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
         let color = std.mul(d.vec3f(0.026, 0.01, 0.004), std.add(1, std.mul(warp, 1.5)));
 
         // Three rarefied spark layers — sparse large, medium, dense tiny.
-        const s1 = sparkLayer(st, t, 15, 0.05, 1, 0, warp);
+        // Fractional seeds: integer literals infer i32 and raise conversion
+        // warnings at resolve time; the offsets only need distinctness.
+        const s1 = sparkLayer(st, t, 15, 0.05, 1, 0.5, warp);
         color = std.add(color, std.mul(d.vec3f(1, 0.62, 0.16), s1));
-        const s2 = sparkLayer(st, t, 29, 0.085, 0.5, 3, warp);
+        const s2 = sparkLayer(st, t, 29, 0.085, 0.5, 3.5, warp);
         color = std.add(color, std.mul(d.vec3f(0.8, 0.4, 0.1), s2));
-        const s3 = sparkLayer(st, t, 52, 0.12, 0.26, 6, warp);
+        const s3 = sparkLayer(st, t, 52, 0.12, 0.26, 6.5, warp);
         color = std.add(color, std.mul(d.vec3f(0.5, 0.22, 0.05), s3));
 
         // Soft elliptical falloff keeps the corners calm (spelled without
@@ -220,7 +242,13 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
       if (stopped) {
         return;
       }
-      time.write(now / 1000);
+      if (document.hidden) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      // Wrapped to hours: unbounded f32 time loses fractional precision,
+      // which shows up as flicker/jitter (the grid math needs the fraction).
+      time.write((now / 1000) % 3600);
       if (context !== null) {
         pipeline.withColorAttachment({ view: context }).draw(3);
       }

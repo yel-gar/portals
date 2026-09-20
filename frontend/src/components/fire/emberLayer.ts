@@ -127,9 +127,8 @@ export class EmberLayer {
 
   private resize(): void {
     const rect = this.canvas.getBoundingClientRect();
-    // Soft embers need no retina density: CSS resolution quarters the fill
-    // cost, which matters every frame and on every recomposite.
-    const size = fitCanvasSize(rect.width, rect.height, 1);
+    // Half CSS resolution, like the WebGPU path: soft dots upscale invisibly.
+    const size = fitCanvasSize(rect.width, rect.height, 0.5);
     if (this.canvas.width !== size.width || this.canvas.height !== size.height) {
       this.canvas.width = size.width;
       this.canvas.height = size.height;

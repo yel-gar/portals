@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import { fitCanvasSize } from "./canvasSize";
 
 describe("fitCanvasSize", () => {
-  it("scales CSS pixels by the device pixel ratio", () => {
+  it("scales CSS pixels by the resolution scale", () => {
     expect(fitCanvasSize(800, 600, 2)).toEqual({ width: 1600, height: 1200 });
+    expect(fitCanvasSize(800, 600, 0.5)).toEqual({ width: 400, height: 300 });
   });
 
   it("never drops below one pixel", () => {
