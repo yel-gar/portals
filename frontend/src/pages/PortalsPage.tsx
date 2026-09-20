@@ -134,8 +134,8 @@ export function PortalsPage() {
       </Card>
 
       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        Кликните по строке, чтобы открыть карточку портала и выполнить действие. Обновления приходят
-        по WebSocket и целиком заменяют снапшот страницы.
+        Нажмите на портал, чтобы управлять им. Обновления приходят по WebSocket и целиком заменяют
+        снапшот страницы.
       </Typography.Text>
 
       <PortalModal

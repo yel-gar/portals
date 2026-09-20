@@ -363,11 +363,6 @@ body {
   margin-inline: -24px;
 }
 
-/* Divider after the scrollable data columns, before the action column. */
-.portal-table-actions-sep {
-  border-inline-start: 1px solid rgba(255, 138, 51, 0.28);
-}
-
 /* Numeric table cells: the progress bar / tag plus a delta badge side by side. */
 .portal-cell-numeric {
   display: flex;

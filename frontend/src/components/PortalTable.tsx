@@ -1,5 +1,5 @@
 import { EyeOutlined } from "@ant-design/icons";
-import { Button, Progress, Table, Tag, Tooltip, Typography } from "antd";
+import { Progress, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useMemo, useRef } from "react";
 
@@ -220,35 +220,6 @@ export function PortalTable({
         </Tooltip>
       ),
     },
-    {
-      title: "",
-      key: "actions",
-      width: 100,
-      fixed: "right",
-      align: "center",
-      // Pinned action column: always visible, never scrolls. `scroll.x` covers
-      // the summed column widths, so the pin cannot overlap data. The cells
-      // stay translucent (a backdrop blur smears the scrolled columns
-      // underneath), so the row hover highlight applies naturally.
-      onCell: () => ({
-        className: "portal-table-actions-sep portal-table-fixed-right",
-      }),
-      onHeaderCell: () => ({
-        className: "portal-table-actions-sep portal-table-fixed-right",
-      }),
-      render: (_, portal) => (
-        <Button
-          type="link"
-          size="small"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpen(portal);
-          }}
-        >
-          Детали
-        </Button>
-      ),
-    },
   ];
 
   return (
@@ -259,7 +230,7 @@ export function PortalTable({
         dataSource={portals}
         loading={loading}
         size="medium"
-        scroll={{ x: 1580 }}
+        scroll={{ x: 1480 }}
         onRow={(portal) => ({
           "data-flip-key": String(portal.id),
           style: { cursor: "pointer" },
