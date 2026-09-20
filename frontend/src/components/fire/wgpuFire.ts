@@ -1,9 +1,11 @@
 /**
- * WebGPU fire renderer built on TypeGPU (TS-first WGSL).
+ * WebGPU background renderer built on TypeGPU (TS-first WGSL).
  *
- * This module is only ever loaded via dynamic `import()` from `FirePanels`,
- * so browsers without WebGPU never download the TypeGPU chunk. Any failure
- * here degrades to `null` and the caller rolls back to the ember canvas.
+ * Paints the entire background as a rarefied field of ember spark particles
+ * drifting upward through slow swirling turbulence. This module is only ever
+ * loaded via dynamic `import()` from `FirePanels`, so browsers without WebGPU
+ * never download the TypeGPU chunk. Any failure here degrades to `null` and
+ * the caller rolls back to the ember canvas.
  */
 import { common, d, std, tgpu } from "typegpu";
 import type { TgpuRoot } from "typegpu";
@@ -13,7 +15,7 @@ export interface WgpuFireHandle {
   stop(): void;
 }
 
-// One device per page — both side panels draw through it.
+// One device per page — the background layer draws through it.
 let rootPromise: Promise<TgpuRoot | null> | null = null;
 let rootUsers = 0;
 
@@ -57,24 +59,47 @@ const valueNoise = (p: v2f): number => {
   return std.mix(std.mix(a, b, blend.x), std.mix(c, e, blend.x), blend.y);
 };
 
-/** Four-octave fractal Brownian motion in roughly [0, 1). */
-const fbm = (seed: v2f): number => {
+/**
+ * Brightness of one rarefied spark layer covering the whole canvas. Each cell
+ * of a hash grid may host one soft particle; `warp` nudges the sampled
+ * position so the whole field shimmers with the shared turbulence.
+ */
+const sparkLayer = (
+  st: v2f,
+  t: number,
+  scale: number,
+  speed: number,
+  gain: number,
+  seed: number,
+  warp: number,
+): number => {
   "use gpu";
-  let total = 0;
-  let amplitude = 0.5;
-  // A fresh vector copy — WGSL references cannot seed a `let` binding.
-  let pos = d.vec2f(seed.x, seed.y);
-  for (let octave = 0; octave < 4; octave += 1) {
-    total += amplitude * valueNoise(pos);
-    amplitude *= 0.5;
-    pos = std.mul(pos, 2);
-  }
-  return total;
+  // The field scrolls upward continuously: subtracting `t * speed` keeps the
+  // grid glued to the flow, so sparks never pop while crossing cell borders.
+  const grid = std.mul(std.sub(st, d.vec2f(0, std.mul(t, speed))), scale);
+  const jitter = std.mul(std.sub(std.mul(warp, 2), 1), 0.5);
+  const warped = std.add(grid, d.vec2f(jitter, std.mul(jitter, 0.5)));
+  const cell = std.floor(warped);
+  const local = std.fract(warped);
+  const rand = hash21(std.add(cell, d.vec2f(seed, 0)));
+  // Only a fraction of the cells host a spark — keeps the field rarefied.
+  const density = std.step(0.62, hash21(std.add(cell, d.vec2f(std.add(seed, 7.3), 3.7))));
+  const cx = std.fract(std.mul(rand, 7.17));
+  const cy = std.fract(std.mul(rand, 3.61));
+  const dx = std.sub(local.x, cx);
+  const dy = std.sub(local.y, cy);
+  const core = std.smoothstep(0.32, 0, std.sqrt(std.add(std.mul(dx, dx), std.mul(dy, dy))));
+  const twinkle = std.add(
+    0.4,
+    std.mul(0.6, std.sin(std.add(std.mul(t, std.add(4, std.mul(rand, 8))), std.mul(rand, 29)))),
+  );
+  return std.mul(std.mul(std.mul(core, density), twinkle), gain);
 };
 
 /**
- * Creates a fire pipeline on the given canvas and starts rendering frames.
- * Returns `null` (after cleanup) when WebGPU is unavailable or fails to init.
+ * Creates a background spark pipeline on the given canvas and starts rendering
+ * frames. Returns `null` (after cleanup) when WebGPU is unavailable or fails
+ * to init.
  */
 export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFireHandle | null> {
   const root = await getRoot();
@@ -87,39 +112,57 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
   let observer: ResizeObserver | null = null;
   let context: GPUCanvasContext | null = null;
 
-  const resize = (): void => {
-    const rect = canvas.getBoundingClientRect();
-    const dpr = Math.min(globalThis.devicePixelRatio ?? 1, 2);
-    canvas.width = Math.max(1, Math.round(rect.width * dpr));
-    canvas.height = Math.max(1, Math.round(rect.height * dpr));
-  };
-
   try {
-    // Premultiplied alpha so transparent flame tips composite over the page.
     context = root.configureContext({ canvas, alphaMode: "premultiplied" });
     const time = root.createUniform(d.f32, 0);
+    const resolution = root.createUniform(d.vec2f, d.vec2f(1, 1));
+
+    const resize = (): void => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(globalThis.devicePixelRatio ?? 1, 2);
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      resolution.write(d.vec2f(canvas.width, canvas.height));
+    };
+
     const pipeline = root.createRenderPipeline({
       vertex: common.fullScreenTriangle,
       fragment: ({ uv }) => {
         "use gpu";
-        // uv spans [0, 2] × [0, 1] (y down); remap to a centered bottom-up frame.
         const t = time.$;
-        const x = uv.x - 1;
-        const u = 1 - uv.y;
+        const size = resolution.$;
+        // uv spans [0, 2] × [0, 1] (y down); remap to an aspect-corrected
+        // [0..aspect] × [0..1] so the spark density is uniform across screens.
+        const st = d.vec2f(uv.x * 0.5 * (size.x / size.y), uv.y);
 
-        // Upward-scrolling value noise shaped into flame tongues.
-        const noise = fbm(d.vec2f(x * 2.4 + std.sin(t * 0.9) * 0.1, u * 6 - t * 1.35));
-        const flame = std.smoothstep(0.05, 0.3, noise - (1 - u));
-        const core = std.smoothstep(0.55, 0.95, flame) * (1 - std.abs(x) * 0.4);
+        // Slow swirling turbulence — a single shared noise sample.
+        const warp = valueNoise(
+          std.add(
+            std.mul(st, d.vec2f(1.35, 1.35)),
+            d.vec2f(std.sin(t * 0.21) * 0.35, std.sin(t * 0.17) * 0.3),
+          ),
+        );
 
-        const ember = d.vec3f(0.4, 0.05, 0);
-        const orange = d.vec3f(1, 0.47, 0.06);
-        const hot = d.vec3f(1, 0.94, 0.6);
-        const color = std.mix(std.mix(ember, orange, flame), hot, core);
+        // Dark ember base, faintly breathing with the turbulence.
+        let color = std.mul(d.vec3f(0.026, 0.01, 0.004), std.add(1, std.mul(warp, 1.5)));
 
-        // Fade toward the strip borders and the top edge.
-        const alpha = flame * std.smoothstep(1, 0.45, std.abs(x)) * std.smoothstep(0.92, 0.4, u);
-        return d.vec4f(color, alpha);
+        // Three rarefied spark layers — sparse large, medium, dense tiny.
+        const s1 = sparkLayer(st, t, 15, 0.05, 1, 0, warp);
+        color = std.add(color, std.mul(d.vec3f(1, 0.62, 0.16), s1));
+        const s2 = sparkLayer(st, t, 29, 0.085, 0.5, 3, warp);
+        color = std.add(color, std.mul(d.vec3f(0.8, 0.4, 0.1), s2));
+        const s3 = sparkLayer(st, t, 52, 0.12, 0.26, 6, warp);
+        color = std.add(color, std.mul(d.vec3f(0.5, 0.22, 0.05), s3));
+
+        // Soft elliptical falloff keeps the corners calm.
+        const edge = std.smoothstep(
+          1.6,
+          0.55,
+          std.length(std.sub(st, d.vec2f(size.x / (size.y * 2), 0.5))),
+        );
+        color = std.mul(color, std.add(0.3, std.mul(edge, 0.7)));
+
+        return d.vec4f(color, 1);
       },
     });
 

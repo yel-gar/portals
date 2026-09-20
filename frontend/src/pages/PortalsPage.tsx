@@ -110,7 +110,11 @@ export function PortalsPage() {
         по WebSocket и целиком заменяют снапшот страницы.
       </Typography.Text>
 
-      <PortalModal portal={selected} onClose={() => setSelectedPortal(null)} />
+      <PortalModal
+        portal={selected}
+        onClose={() => setSelectedPortal(null)}
+        onPortalUpdated={(fresh) => setSelectedPortal(fresh)}
+      />
     </>
   );
 }

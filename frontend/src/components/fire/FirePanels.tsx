@@ -6,12 +6,11 @@ import { chooseFireBackend, type FireBackend } from "./fireBackend";
 
 interface FirePanelProps {
   backend: FireBackend;
-  side: "left" | "right";
 }
 
-function FirePanel({ backend, side }: FirePanelProps) {
+function FirePanel({ backend }: FirePanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Which backend actually paints this panel — WebGPU may fail at init and
+  // Which backend actually paints the background — WebGPU may fail at init and
   // roll back to the ember canvas. Exposed as a data attribute for tests.
   const [active, setActive] = useState<FireBackend>(backend === "webgpu" ? "ember" : backend);
 
@@ -60,7 +59,7 @@ function FirePanel({ backend, side }: FirePanelProps) {
 
   return (
     <aside
-      className={`fire-panel fire-panel--${side}${backend === "static" ? " fire-panel--static" : ""}`}
+      className={`fire-panel${backend === "static" ? " fire-panel--static" : ""}`}
       data-fire-backend={active}
       aria-hidden="true"
     >
@@ -70,9 +69,9 @@ function FirePanel({ backend, side }: FirePanelProps) {
 }
 
 /**
- * Decorative fiery side panels mounted behind the signed-in layout: WebGPU
- * shader flames when the browser supports it, a 2D-canvas ember fallback
- * otherwise, and a static gradient under reduced motion.
+ * Decorative full-background layer mounted behind the signed-in layout: a
+ * WebGPU spark-particle shader when the browser supports it, a 2D-canvas ember
+ * fallback otherwise, and a static gradient under reduced motion.
  */
 export function FirePanels() {
   const reduced = usePrefersReducedMotion();
@@ -83,8 +82,7 @@ export function FirePanels() {
 
   return (
     <div className="fire-panels" aria-hidden="true">
-      <FirePanel backend={backend} side="left" />
-      <FirePanel backend={backend} side="right" />
+      <FirePanel backend={backend} />
     </div>
   );
 }

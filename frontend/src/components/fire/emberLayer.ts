@@ -1,71 +1,79 @@
 /**
- * 2D-canvas fallback for the fiery side panels: additive flame tongues with a
- * deterministic flicker. Used whenever WebGPU is unavailable or fails to init.
- * The class is inert where there is no canvas 2D context (e.g. jsdom in tests).
+ * 2D-canvas fallback for the background spark field: additive ember sparks
+ * drifting upward, deterministic per spark and per frame. Used whenever
+ * WebGPU is unavailable or fails to init. The class is inert where there is
+ * no canvas 2D context (e.g. jsdom in tests).
  */
 
-const TONGUES = 11;
-const FLICKER_MIN = 0.55;
+const SPARKS = 140;
+const FLICKER_MIN = 0.45;
 const FLICKER_MAX = 1;
 
 /** Layered-sine flicker factor; deterministic per (time, phase). */
 export function flicker(timeMs: number, phase: number): number {
   const t = timeMs / 1000;
-  const raw = 0.78 + 0.15 * Math.sin(t * 1.7 + phase) + 0.07 * Math.sin(t * 3.1 + phase * 1.7);
+  const raw = 0.72 + 0.18 * Math.sin(t * 1.9 + phase) + 0.1 * Math.sin(t * 3.4 + phase * 1.7);
   return Math.min(FLICKER_MAX, Math.max(FLICKER_MIN, raw));
 }
 
-/** How tall a flame tongue reaches, as a fraction of the canvas height. */
-export function tongueHeight(baseFraction: number, timeMs: number, phase: number): number {
-  return Math.min(1, baseFraction * flicker(timeMs, phase));
+/** Deterministic pseudo-random in [0, 1) — stable across frames and runs. */
+function hash(n: number): number {
+  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
 }
 
-/**
- * Draws one flame tongue as a teardrop with a vertical warm gradient,
- * additively blended over the previous frame.
- */
-function drawTongue(
+export interface SparkSpec {
+  /** Horizontal anchor as a fraction of the width. */
+  x: number;
+  /** Vertical phase as a fraction of the height; rises over time. */
+  y: number;
+  /** Max radius as a fraction of the smaller canvas dimension. */
+  size: number;
+  /** Upward velocity in screen-height fractions per second. */
+  speed: number;
+  /** Flicker phase, in radians. */
+  phase: number;
+}
+
+/** Static per-spark parameters, deterministic from the index alone. */
+export function sparkSpec(index: number): SparkSpec {
+  return {
+    x: hash(index * 7.31 + 1.7),
+    y: hash(index * 13.7 + 5.3),
+    size: 0.0025 + hash(index * 3.77 + 9.9) * 0.006,
+    speed: 0.025 + hash(index * 5.9 + 17.3) * 0.085,
+    phase: hash(index * 11.31 + 23.7) * Math.PI * 2,
+  };
+}
+
+/** Draws one soft rising spark, additively blended over the previous frame. */
+function drawSpark(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
   nowMs: number,
   index: number,
-  tongueCount: number,
 ): void {
-  const phase = index * 1.9;
-  const centerX = ((index + 0.65) / tongueCount) * width;
-  const tongueWidth = width * (0.16 + 0.05 * Math.sin(nowMs / 800 + phase));
-  const heightPx = height * tongueHeight(0.45 + 0.35 * Math.sin(phase), nowMs, phase);
+  const spec = sparkSpec(index);
+  const t = nowMs / 1000;
+  const progress = (spec.y + t * spec.speed) % 1;
+  const sx = spec.x * width + Math.sin(t * 1.3 + spec.phase * 2) * width * 0.004;
+  const sy = height * (1 - progress) + Math.sin(t * 1.9 + spec.phase) * height * 0.006;
+  // Sparks dim as they climb and grow back down near the hearth.
+  const intensity = flicker(nowMs, spec.phase) * (1 - progress * 0.75);
+  const radius = Math.max(1, spec.size * Math.min(width, height) * (1.4 - progress * 0.6));
 
-  const gradient = ctx.createLinearGradient(0, height, 0, height - heightPx);
-  gradient.addColorStop(0, "rgba(255, 106, 0, 0.5)");
-  gradient.addColorStop(0.4, "rgba(255, 70, 0, 0.28)");
+  const gradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, radius);
+  gradient.addColorStop(0, `rgba(255, 196, 118, ${(0.9 * intensity).toFixed(3)})`);
+  gradient.addColorStop(0.35, `rgba(255, 106, 0, ${(0.45 * intensity).toFixed(3)})`);
   gradient.addColorStop(1, "rgba(255, 61, 0, 0)");
-
   ctx.beginPath();
-  ctx.moveTo(centerX, height);
-  ctx.bezierCurveTo(
-    centerX - tongueWidth / 2,
-    height - heightPx * 0.35,
-    centerX - tongueWidth / 3,
-    height - heightPx * 0.85,
-    centerX,
-    height - heightPx,
-  );
-  ctx.bezierCurveTo(
-    centerX + tongueWidth / 3,
-    height - heightPx * 0.85,
-    centerX + tongueWidth / 2,
-    height - heightPx * 0.35,
-    centerX,
-    height,
-  );
-  ctx.closePath();
+  ctx.arc(sx, sy, radius, 0, Math.PI * 2);
   ctx.fillStyle = gradient;
   ctx.fill();
 }
 
-/** Draws the full flame column: tongues over a constant warm bottom band. */
+/** Draws the whole spark field over the canvas. */
 function drawFrame(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -74,17 +82,9 @@ function drawFrame(
 ): void {
   ctx.globalCompositeOperation = "lighter";
   ctx.clearRect(0, 0, width, height);
-
-  for (let i = 0; i < TONGUES; i += 1) {
-    drawTongue(ctx, width, height, nowMs, i, TONGUES);
+  for (let i = 0; i < SPARKS; i += 1) {
+    drawSpark(ctx, width, height, nowMs, i);
   }
-
-  const band = ctx.createLinearGradient(0, height, 0, height - height * 0.16);
-  band.addColorStop(0, "rgba(255, 94, 0, 0.25)");
-  band.addColorStop(1, "rgba(255, 94, 0, 0)");
-  ctx.fillStyle = band;
-  ctx.fillRect(0, height - height * 0.16, width, height * 0.16);
-
   ctx.globalCompositeOperation = "source-over";
 }
 

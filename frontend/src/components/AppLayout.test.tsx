@@ -33,12 +33,12 @@ describe("AppLayout", () => {
     expect(screen.getByText("Оператор")).toBeInTheDocument();
   });
 
-  it("renders the decorative fire panels behind the content", () => {
+  it("renders the decorative full-background spark layer behind the content", () => {
     const { container } = renderLayout();
 
     expect(container.querySelector(".fire-panels")).not.toBeNull();
     const panels = container.querySelectorAll(".fire-panel");
-    expect(panels).toHaveLength(2);
+    expect(panels).toHaveLength(1);
     for (const panel of panels) {
       expect(panel.getAttribute("aria-hidden")).toBe("true");
     }

@@ -8,8 +8,14 @@ import type { Portal } from "../api/types";
 import { API_URL, CLOSED_PORTAL, OPEN_PORTAL, server } from "../test/mocks";
 import { renderWithProviders } from "../test/render";
 
-const renderModal = (portal: Portal | null = OPEN_PORTAL, onClose = vi.fn()) =>
-  renderWithProviders(<PortalModal portal={portal} onClose={onClose} />);
+const renderModal = (
+  portal: Portal | null = OPEN_PORTAL,
+  onClose = vi.fn(),
+  onPortalUpdated = vi.fn(),
+) =>
+  renderWithProviders(
+    <PortalModal portal={portal} onClose={onClose} onPortalUpdated={onPortalUpdated} />,
+  );
 
 /**
  * antd Modal mounts its body through an appear animation, so everything inside
@@ -85,6 +91,21 @@ describe("PortalModal", () => {
     await user.click(closeAction!);
 
     expect(await screen.findByText("Портал уже закрыт")).toBeInTheDocument();
+  });
+
+  it("hands the fresh portal back after an action succeeds", async () => {
+    const user = userEvent.setup();
+    const onPortalUpdated = vi.fn();
+    const fresh = { ...OPEN_PORTAL, closed: true, has_observer: false };
+    server.use(http.post(API_URL("/portals/:id"), () => HttpResponse.json(fresh)));
+
+    renderModal(OPEN_PORTAL, vi.fn(), onPortalUpdated);
+    const closeAction = (await screen.findByText("Закрыть")).closest("button");
+    expect(closeAction).not.toBeNull();
+    await user.click(closeAction!);
+
+    expect(onPortalUpdated).toHaveBeenCalledTimes(1);
+    expect(onPortalUpdated).toHaveBeenCalledWith(fresh);
   });
 
   it("renders nothing when closed", () => {

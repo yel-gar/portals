@@ -118,14 +118,14 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  /* Containing block for the decorative fire side panels. */
+  /* Containing block for the decorative full-background spark layer. */
   position: relative;
 }
 
-/* Fiery side panels: decorative WebGPU/ember glow behind the page content.
-   z-index: -1 paints them below in-flow card backgrounds (but above the page
-   background), so they read as a soft glow in the side gutters and the
-   top/bottom bands around the cards. */
+/* Decorative full-background spark field: a WebGPU shader (or a 2D-canvas
+   ember fallback) painted behind the page content. z-index: -1 keeps it under
+   the cards' opaque backgrounds while it still covers every gap between them,
+   so the background is fully framed by the effect. */
 .fire-panels {
   position: absolute;
   inset: 0;
@@ -136,17 +136,7 @@ body {
 
 .fire-panel {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: clamp(96px, 11vw, 176px);
-}
-
-.fire-panel--left {
-  left: 0;
-}
-
-.fire-panel--right {
-  right: 0;
+  inset: 0;
 }
 
 .fire-panel-canvas {
@@ -158,8 +148,8 @@ body {
 /* Reduced motion: no animation loop at all, just a static ember gradient. */
 .fire-panel--static {
   background:
-    radial-gradient(130% 50% at 50% 100%, rgba(255, 106, 0, 0.28), transparent 70%),
-    linear-gradient(180deg, transparent 60%, rgba(255, 61, 0, 0.16));
+    radial-gradient(120% 90% at 50% 100%, rgba(255, 106, 0, 0.22), transparent 65%),
+    linear-gradient(180deg, transparent 55%, rgba(255, 61, 0, 0.09));
 }
 
 .app-topline {

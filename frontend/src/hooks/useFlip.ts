@@ -35,7 +35,7 @@ export function computeFlipSteps(
   return steps;
 }
 
-const FLIP_DURATION_MS = 240;
+const FLIP_DURATION_MS = 400;
 const FLIP_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 function animateStep(element: HTMLElement, delta: number): void {

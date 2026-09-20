@@ -243,6 +243,43 @@ describe("PortalsPage", () => {
     expect(within(dialog).queryByText("Отозвать наблюдателя")).not.toBeInTheDocument();
   });
 
+  it("greys out remaining actions immediately after a successful close", async () => {
+    const user = userEvent.setup();
+    const closed: Portal = { ...OPEN_PORTAL, closed: true, has_observer: false };
+    let listCalls = 0;
+    server.use(
+      // The initial page load sees the open portal; any refetch after the
+      // action reflects the server truth (closed).
+      http.get(API_URL("/portals"), () => {
+        listCalls += 1;
+        return HttpResponse.json(
+          listCalls === 1 ? portalPage() : portalPage([closed, CLOSED_PORTAL], 1, 20),
+        );
+      }),
+      http.post(API_URL("/portals/:id"), () => HttpResponse.json(closed)),
+    );
+
+    renderWithProviders(<PortalsPage />);
+    await user.click(await screen.findByText("Портал Альфа"));
+    const dialog = await screen.findByRole("dialog");
+
+    const stabilize = within(dialog).getByRole("button", { name: /Стабилизировать/ });
+    expect(stabilize).toBeEnabled();
+
+    // Query by visible text, not role — the modal close (X) button picks up
+    // the ru_RU aria-label «Закрыть» and would collide with the action button.
+    const closeButton = (await within(dialog).findByText("Закрыть")).closest("button");
+    expect(closeButton).not.toBeNull();
+    await user.click(closeButton!);
+
+    // No snapshot needed: the action response updates the modal's portal copy
+    // instantly, so every action except (un)mark greys out right away.
+    await waitFor(() => {
+      expect(within(dialog).getByRole("button", { name: /Стабилизировать/ })).toBeDisabled();
+    });
+    expect(within(dialog).getByRole("button", { name: /Отметить/ })).toBeEnabled();
+  });
+
   it("keeps the modal open when a filter change empties the page", async () => {
     const user = userEvent.setup();
     server.use(
