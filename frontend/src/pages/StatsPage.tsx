@@ -97,6 +97,7 @@ export function StatsPage() {
                 <DeltaIndicator
                   value={avgRiskDelta}
                   polarity="good-when-down"
+                  minMagnitude={0.01}
                   format={(value) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}`}
                 />
               </div>

@@ -177,3 +177,20 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 ## Frontend: AI-WORKLOG tab (2026-09)
 - New `/worklog` route + nav tab «Журнал разработки» (FileTextOutlined) rendering `AI-WORKLOG.md` with `react-markdown` (new dependency). The markdown is bundled via Vite's `?raw` import and styled for the dark embers theme (headings, code fences, blockquotes, tables).
 - The worklog is committed **twice**: repo-root `AI-WORKLOG.md` (canonical) and `frontend/src/worklog/AI-WORKLOG.md` (bundled copy). The Vite build context is `frontend/` only, so the root file cannot be COPYed into the image; the copy must be kept in sync when the root file changes.
+
+## Frontend: worklog served at runtime, not bundled (2026-09, supersedes the decision above)
+- The `?raw`-bundled copy and `frontend/src/worklog/` are gone. `WorklogPage` fetches `/AI-WORKLOG.md` from its own origin; prod nginx (`/usr/share/nginx/html`) and the dev Vite server (`public/`) both bind-mount the repo-root `AI-WORKLOG.md` — no symlinks, works on every platform. MSW test handler `*/AI-WORKLOG.md` serves a deterministic fixture.
+- Code fences render through `rehype-highlight` (`{ detect: true, ignoreMissing: true }`) + the `highlight.js` github-dark theme. Only labeled fences and auto-detectable snippets get token spans — short unlabeled fragments stay plain (highlight.js auto-detection is deliberately conservative; `dockerfile` is not in lowlight's common subset, a labeled ` ```Dockerfile ` fence is left as-is). The embers `pre` keeps its background/padding via a dedicated `.worklog-markdown pre code.hljs` rule.
+
+## Frontend: risk-delta magnitude threshold (2026-09)
+- `DeltaIndicator` gained a `minMagnitude` prop (default 0). The three `toFixed(2)`-formatted sites — portal-table risk, stat-card avg-risk, stats-page avg-risk — pass `minMagnitude={0.01}`, so float jitter below 1 % renders no badge. Pure presentation; the backend is untouched.
+
+## Frontend: modal disables actions on closed portals (2026-09)
+- All action buttons except MARK/UNMARK are disabled when `portal.closed` (a UX hint only: the backend remains the source of truth and would answer 409 anyway; its reason is still shown verbatim for other invalid actions). Modal caption and the "actions never disabled client-side" stance in the READMEs updated, with a closed-portal test.
+
+## Docker: unprivileged runtime users (2026-09)
+- Both Dockerfiles drop root at runtime: the backend runs uvicorn as the `app` user (alpine `addgroup -S app && adduser -S app -G app`); the frontend dev stage runs Vite as `node` (uid 1000 — matches the host user, so the bind-mounted `./frontend` stays fully owned, and `chown -R node:node /app` makes the `node_modules` named volume writable); the prod `serve` stage runs nginx as `nginx` (html chowned; pid + all temp paths moved from `/var` to `/tmp` so an unprivileged master can start).
+- The dev Vite container binds low port 80 via `cap_add: NET_BIND_SERVICE` instead of root. Verified on the running stack: containers run as `app`/`node`/`nginx`, `/health` 200, index and `/AI-WORKLOG.md` 200 (sha-identical to the repo-root file), `populate.sh` works as `app`, logs free of permission errors; the prod `serve` stage was additionally built and smoke-tested standalone.
+
+## Backend: demo-data seeding (2026-09)
+- New `backend/populate.py` (image path `/app/populate.py`) builds **fresh** `Portal` instances per call (`_build_demo_portals()`) and is idempotent — when portals already exist it prints a note and skips. `populate.sh` / `populate.ps1` run `docker compose exec backend /app/.venv/bin/python populate.py`; per the user's explicit decision no poetry is installed in the container — the deploy venv ships python only. Covered by `backend/tests/test_populate.py`.

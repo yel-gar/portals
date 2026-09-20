@@ -26,9 +26,10 @@ interface PortalModalProps {
 }
 
 /**
- * Portal detail modal with the full action set. Actions are never disabled
- * client-side: availability is business logic owned by the backend, and a
- * rejected action returns its reason (HTTP 409) which is shown verbatim.
+ * Portal detail modal with the full action set. On a closed portal only
+ * MARK/UNMARK stay available — every other action is disabled client-side
+ * because the backend rejects them with 409 for closed portals (that reason is
+ * shown verbatim). Availability beyond that remains backend-owned.
  */
 export function PortalModal({ portal, onClose }: PortalModalProps) {
   const { message } = AntApp.useApp();
@@ -176,6 +177,9 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
           const meta = ACTION_META[resolved];
           const { Icon } = meta;
           const danger = DANGER_ACTIONS.has(resolved);
+          // Actions other than (un)marking are meaningless on a closed portal;
+          // the backend would answer 409 anyway — disable them up front.
+          const closedUnavailable = portal.closed && resolved !== "MARK" && resolved !== "UNMARK";
           return (
             <Col span={8} key={entry}>
               <Button
@@ -184,7 +188,7 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
                 type={danger || PRIMARY_ACTIONS.has(resolved) ? "primary" : "default"}
                 icon={<Icon />}
                 loading={pending === resolved}
-                disabled={pending !== null && pending !== resolved}
+                disabled={closedUnavailable || (pending !== null && pending !== resolved)}
                 onClick={() => run(resolved)}
               >
                 {meta.label}
@@ -194,7 +198,8 @@ export function PortalModal({ portal, onClose }: PortalModalProps) {
         })}
       </Row>
       <Typography.Text type="secondary" style={{ display: "block", marginTop: 14, fontSize: 12 }}>
-        Допустимость действия проверяет сервер. Если оно недопустимо для текущего состояния портала,
+        На закрытом портале доступны только отметка и снятие отметки. Допустимость остальных
+        действий проверяет сервер — если действие недопустимо для текущего состояния портала,
         причина будет показана здесь же.
       </Typography.Text>
     </Modal>

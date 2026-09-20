@@ -18,5 +18,10 @@ WORKDIR /app
 COPY --from=build /app/.venv /app/.venv
 COPY . .
 
+# Runtime hardening: the API only reads code/config and talks to Postgres, so
+# root is not needed — the process runs as the unprivileged `app` user.
+RUN addgroup -S app && adduser -S app -G app
+USER app
+
 EXPOSE 8000
 CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

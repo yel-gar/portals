@@ -5,7 +5,7 @@ import { http, HttpResponse } from "msw";
 
 import { PortalModal } from "./PortalModal";
 import type { Portal } from "../api/types";
-import { API_URL, OPEN_PORTAL, server } from "../test/mocks";
+import { API_URL, CLOSED_PORTAL, OPEN_PORTAL, server } from "../test/mocks";
 import { renderWithProviders } from "../test/render";
 
 const renderModal = (portal: Portal | null = OPEN_PORTAL, onClose = vi.fn()) =>
@@ -90,5 +90,28 @@ describe("PortalModal", () => {
   it("renders nothing when closed", () => {
     renderModal(null);
     expect(document.body).not.toHaveTextContent("Портал Альфа");
+  });
+
+  it("disables every action on a closed portal except mark/unmark", async () => {
+    renderModal(CLOSED_PORTAL);
+
+    // CLOSED_PORTAL is marked, so the toggle reads «Снять отметку» and stays enabled.
+    expect(await screen.findByRole("button", { name: /Снять отметку/ })).toBeEnabled();
+    // The rest are unavailable client-side on a closed portal. Query by visible
+    // text, not role: the modal close (X) button picks up the ru_RU aria-label
+    // «Закрыть» and would collide with the action button.
+    const labels = [
+      "Оставить открытым",
+      "Стабилизировать",
+      "Отправить наблюдателя",
+      "Закрыть",
+      "Предупредить существ",
+    ];
+    const found = await Promise.all(labels.map((label) => screen.findByText(label)));
+    for (const el of found) {
+      const button = el.closest("button");
+      expect(button).not.toBeNull();
+      expect(button!).toBeDisabled();
+    }
   });
 });

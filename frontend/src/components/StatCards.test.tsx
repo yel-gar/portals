@@ -47,4 +47,27 @@ describe("StatCards", () => {
     expect(screen.queryByText("+1")).not.toBeInTheDocument();
     expect(screen.queryByText("+0.03")).not.toBeInTheDocument();
   });
+
+  it("hides the avg-risk delta when its magnitude is below 0.01", () => {
+    // avg risk 0.61 → 0.613 is a 0.003 change: below the 0.01 threshold, and
+    // the other metrics are unchanged, so no delta badge renders at all.
+    renderWithProviders(
+      <StatCards
+        stats={{ ...CURRENT, avg_risk: 0.613 }}
+        prevStats={{ ...CURRENT, avg_risk: 0.61 }}
+      />,
+    );
+    expect(screen.queryByLabelText("delta")).not.toBeInTheDocument();
+  });
+
+  it("shows the avg-risk delta at exactly 0.01", () => {
+    renderWithProviders(
+      <StatCards
+        stats={{ ...CURRENT, avg_risk: 0.62 }}
+        prevStats={{ ...CURRENT, avg_risk: 0.61 }}
+      />,
+    );
+    expect(screen.getByLabelText("delta")).toBeInTheDocument();
+    expect(screen.getByText("+0.01")).toBeInTheDocument();
+  });
 });

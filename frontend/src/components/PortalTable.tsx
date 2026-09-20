@@ -148,6 +148,7 @@ export function PortalTable({
               <DeltaIndicator
                 value={value}
                 polarity="good-when-down"
+                minMagnitude={0.01}
                 format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`}
               />
             )}

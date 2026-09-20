@@ -14,16 +14,18 @@ export interface DeltaIndicatorProps {
   polarity: DeltaPolarity;
   /** Optional formatting (e.g. risk `toFixed(2)`) — defaults to the plain signed number. */
   format?: (value: number) => string;
+  /** Deltas smaller than this magnitude (by absolute value) render nothing — kills risk jitter. */
+  minMagnitude?: number;
 }
 
 /**
  * «▲ +3» / «▼ −2» badge showing the change since the last recorded snapshot.
  * Colored by polarity so an operator can read at a glance whether the change
  * is good (green), bad (red) or neutral (embers amber). Renders nothing for a
- * zero delta.
+ * zero delta or one below `minMagnitude`.
  */
-export function DeltaIndicator({ value, polarity, format }: DeltaIndicatorProps) {
-  if (value === 0) {
+export function DeltaIndicator({ value, polarity, format, minMagnitude = 0 }: DeltaIndicatorProps) {
+  if (value === 0 || Math.abs(value) < minMagnitude) {
     return null;
   }
   const increase = value > 0;

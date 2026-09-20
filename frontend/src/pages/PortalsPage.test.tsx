@@ -167,6 +167,28 @@ describe("PortalsPage", () => {
     expect(screen.getByText("+0.04")).toBeInTheDocument();
   });
 
+  it("hides risk deltas below the 0.01 magnitude threshold", async () => {
+    renderWithProviders(<PortalsPage />);
+    expect(await screen.findByText("Портал Альфа")).toBeInTheDocument();
+
+    const socket = FakeWebSocket.instances[0];
+    expect(socket).toBeDefined();
+    act(() => socket.open());
+
+    // Frame 1: energy +2 (the visible «+2» proves the frame was applied) while
+    // the risk moved by only +0.004 — below the 0.01 threshold, so no risk
+    // badge renders («+0.00» would appear if the too-small delta were shown).
+    const tiny: Portal = { ...OPEN_PORTAL, energy_level: 84, risk_factor: 0.414 };
+    act(() => socket.message(JSON.stringify(portalPage([tiny, CLOSED_PORTAL], 1, 20))));
+    expect(await screen.findByText("+2")).toBeInTheDocument();
+    expect(screen.queryByText("+0.00")).not.toBeInTheDocument();
+
+    // Frame 2: risk moves by +0.011 — the badge appears with two decimals.
+    const notable: Portal = { ...OPEN_PORTAL, energy_level: 84, risk_factor: 0.425 };
+    act(() => socket.message(JSON.stringify(portalPage([notable, CLOSED_PORTAL], 1, 20))));
+    expect(await screen.findByText("+0.01")).toBeInTheDocument();
+  });
+
   it("opens the portal modal when a row is clicked", async () => {
     const user = userEvent.setup();
 

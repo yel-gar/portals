@@ -8,3 +8,7 @@ __pycache__
 docker-compose.override.yml
 .env
 node_modules
+
+# Docker materializes an empty root-owned stub here for the dev worklog bind
+# mount (./AI-WORKLOG.md:/app/public/AI-WORKLOG.md) — never track it.
+frontend/public/

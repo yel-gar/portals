@@ -361,7 +361,11 @@ body {
   margin: 10px 0;
 }
 
-.worklog-markdown pre code {
+/* Fenced code keeps the embers pre background even when rehype-highlight adds
+   the `.hljs` class (the github-dark theme would otherwise paint its own
+   background/padding over the block). */
+.worklog-markdown pre code,
+.worklog-markdown pre code.hljs {
   background: transparent;
   padding: 0;
   color: #f0dcc0;

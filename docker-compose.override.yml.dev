@@ -13,9 +13,16 @@ services:
       # names are baked into the client by Vite.
       VITE_BACKEND_URL: ${BACKEND_URL:-}
       VITE_DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-0}
+    cap_add:
+      # The dev server runs as the unprivileged `node` user; the capability
+      # lets it bind the low port 80 without granting root.
+      - NET_BIND_SERVICE
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
+      # Vite serves `public/` at the origin root: mount the canonical worklog so
+      # `/AI-WORKLOG.md` works in dev exactly like in the production image.
+      - ./AI-WORKLOG.md:/app/public/AI-WORKLOG.md:ro
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
 
 volumes:

@@ -16,7 +16,7 @@ frontend/
                     usePortalData (страницы + stats), usePortalAction, useAuth
     components/     AppLayout, PortalTable, PortalModal, StatCards, DangerTag, LiveBadge,
                     PortalFiltersBar, LogFiltersBar, AuthShell, RequireAuth/RequireSuperuser
-    pages/          Login, Register, Portals, Log, Stats, AdminUsers, NotFound
+    pages/          Login, Register, Portals, Log, Stats, AdminUsers, Worklog, NotFound
     test/           mocks.ts (MSW handlers), fakeWs.ts (FakeWebSocket), render.tsx
     constants.tsx   только презентационные данные (лейблы, цвета, иконки) — без бизнес-логики
     format.ts       относительное время, «осталось», ru-RU дата (с инъекцией `now` для тестов)
@@ -26,7 +26,9 @@ frontend/
 Бэкенд — единственный источник истины. Фронтенд:
 
 - не считает риск/уровень опасности и не проверяет допустимость действий — оценки и
-  ошибки 409/422 приходят от сервера и показываются как есть;
+  ошибки 409/422 приходят от сервера и показываются как есть. Единственное client-side
+  исключение: на закрытом портале кнопки всех действий, кроме MARK/UNMARK, отключены сразу
+  (сервер всё равно ответил бы 409) — это подсказка, а не проверка.
 - не хранит токены — аутентификация по httpOnly-куке `session_token` (`credentials: "include"`)
   во всех запросах;
 - не делает client-side сортировку/фильтрацию/поиск — пагинация и все фильтры
@@ -69,10 +71,16 @@ frontend/
 Всё запускается из корня репозитория через docker compose:
 
 - **Production**: `docker compose up --build -d` — build-стадия собирает бандл с
-  `BACKEND_URL`, serve-стадия отдаёт статику через nginx (SPA-fallback, gzip).
+  `BACKEND_URL`, serve-стадия отдаёт статику через nginx (SPA-fallback, gzip), nginx
+  работает под пользователем `nginx` (не root).
 - **Dev (HMR)**: `docker-compose.override.yml` (копия `.dev`-шаблона) — контейнер с Vite,
   bind-mount `./frontend`, named-volume `frontend_node_modules`, runtime `VITE_BACKEND_URL`;
-  порт 80 внутри, наружу `${FRONTEND_PORT:-3000}`.
+  порт 80 внутри, наружу `${FRONTEND_PORT:-3000}`. Vite работает под пользователем `node`
+  (uid 1000 — совпадает с хостовым, поэтому bind-mount полностью доступен) и слушает порт 80
+  через capability `NET_BIND_SERVICE`, а не root.
+- В обоих режимах корневой `AI-WORKLOG.md` монтируется так, что страница `/worklog` читает
+  его по `/AI-WORKLOG.md` (prod — в html-каталог nginx, dev — в `public/` Vite); вшитой копии
+  нет.
 
 Локально, без docker: `npm ci && npm run dev` (нужен `VITE_BACKEND_URL` в окружении).
 
@@ -106,8 +114,15 @@ npm run build         # tsc -b && vite build
 
 - Тема «Угли», деталь портала — центрированный Modal 720px, действия по 3 в ряд (см.
   `.context/DECISIONS.md`).
-- Кнопки действий всегда доступны (не блокируются на клиенте); сервер решает и отвечает
-  409/422 — сообщение показывается дословно.
+- Кнопки действий доступны всегда, кроме закрытых порталов: там остаются только
+  MARK/UNMARK, остальные отключены на клиенте как подсказка — сервер остаётся источником
+  истины и отвечает 409/422, сообщение показывается дословно.
 - MARK/UNMARK — одна кнопка-переключатель по `is_marked`.
+- Дельта-бейджи риска и среднего риска скрываются при |изменение| < 0.01 (дрожание
+  float-значений) — порог чисто презентационный.
+- Журнал разработки (`/worklog`): `AI-WORKLOG.md` отдаётся фронтендом с собственного origin
+  (bind-mount в compose), рендер `react-markdown`, подсветка кода `rehype-highlight`
+  (`detect + ignoreMissing`) + тема `highlight.js` github-dark; ошибка загрузки показывает
+  retryable-`Alert`.
 - `danger_levels`/`avg_risk` в статистике считаются сервером по **открытым** порталам;
   распределение на странице Stats — доля от `open`, не от `total`.

@@ -1,15 +1,28 @@
-import { FileTextOutlined } from "@ant-design/icons";
-import { Card, Space, Typography } from "antd";
+import { FileTextOutlined, ReloadOutlined } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
+import { Alert, Button, Card, Skeleton, Space, Typography } from "antd";
 import ReactMarkdown from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github-dark.min.css";
 
 /**
- * Root `AI-WORKLOG.md` is a repository document; the Vite build context is
- * `frontend/` only, so a copy lives under `src/worklog/` and is bundled by the
- * `?raw` import. Keep the copy in sync with the repo-root file.
+ * The worklog is read at runtime from the frontend origin (`/AI-WORKLOG.md`):
+ * production nginx and the dev Vite server both mount the repo-root
+ * `AI-WORKLOG.md` (see the docker-compose files), so the file displayed is
+ * always the canonical one — there is no bundled copy to keep in sync.
  */
-import worklogSource from "../worklog/AI-WORKLOG.md?raw";
-
 export function WorklogPage() {
+  const worklog = useQuery({
+    queryKey: ["worklog"],
+    queryFn: async () => {
+      const response = await fetch("/AI-WORKLOG.md");
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.text();
+    },
+  });
+
   return (
     <Card
       title={
@@ -22,9 +35,27 @@ export function WorklogPage() {
         </Space>
       }
     >
-      <div className="worklog-markdown">
-        <ReactMarkdown>{worklogSource}</ReactMarkdown>
-      </div>
+      {worklog.isPending ? (
+        <Skeleton active paragraph={{ rows: 12 }} />
+      ) : worklog.isError ? (
+        <Alert
+          type="error"
+          showIcon
+          title="Не удалось загрузить журнал"
+          description="Файл AI-WORKLOG.md недоступен на origin фронтенда. Проверьте монтирование тома в docker compose и повторите попытку."
+          action={
+            <Button size="small" icon={<ReloadOutlined />} onClick={() => worklog.refetch()}>
+              Повторить
+            </Button>
+          }
+        />
+      ) : (
+        <div className="worklog-markdown">
+          <ReactMarkdown rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}>
+            {worklog.data}
+          </ReactMarkdown>
+        </div>
+      )}
     </Card>
   );
 }

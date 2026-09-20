@@ -12,6 +12,8 @@ interface StatItem {
   /** Signed delta vs the previous stats snapshot (`null` = no baseline yet). */
   delta: number | null;
   polarity: DeltaPolarity;
+  /** Deltas below this magnitude (by absolute value) render nothing. */
+  minMagnitude?: number;
   format?: (value: number) => string;
 }
 
@@ -76,6 +78,7 @@ export function StatCards({ stats, prevStats }: { stats: Stats; prevStats?: Stat
       color: token.colorPrimary,
       delta: delta((prev, current) => current.avg_risk - prev.avg_risk),
       polarity: "good-when-down",
+      minMagnitude: 0.01,
       format: (value) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}`,
     },
   ];
@@ -96,6 +99,7 @@ export function StatCards({ stats, prevStats }: { stats: Stats; prevStats?: Stat
                     <DeltaIndicator
                       value={item.delta}
                       polarity={item.polarity}
+                      minMagnitude={item.minMagnitude}
                       format={item.format}
                     />
                   ) : undefined

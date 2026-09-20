@@ -52,6 +52,10 @@ services:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       - backend
+    volumes:
+      # The canonical worklog is served from the frontend origin at
+      # `/AI-WORKLOG.md` (the nginx html dir); no bundled copy to keep in sync.
+      - ./AI-WORKLOG.md:/usr/share/nginx/html/AI-WORKLOG.md:ro
 
 volumes:
   postgres_data:

@@ -67,6 +67,23 @@ export const MOCK_STATS: Stats = {
 };
 
 /**
+ * Default `/AI-WORKLOG.md` payload for tests. Production/dev deployments mount
+ * the repo-root `AI-WORKLOG.md` into the container (see the compose files);
+ * tests use this deterministic fixture instead.
+ */
+export const WORKLOG_MARKDOWN = `# Этап 1: конфигурация проекта и CI pipeline
+
+Абзац о настройке CI-пайплайна.
+
+\`\`\`python
+def hello():
+    return "world"
+\`\`\`
+
+## Этап 2: бэкенд и тесты
+`;
+
+/**
  * Default API surface for tests. Individual tests override handlers with
  * `server.use(...)` when they need a specific behaviour (see `server.ts`).
  * Handler URLs are absolute: path-only patterns do not resolve against the
@@ -85,6 +102,9 @@ export const handlers = [
   http.get(`${BACKEND_ORIGIN}/portals/log`, () =>
     HttpResponse.json({ items: [], page: 1, items_per_page: 20, total: 0 }),
   ),
+
+  // The worklog lives on the frontend origin: any host + path matches.
+  http.get("*/AI-WORKLOG.md", () => HttpResponse.text(WORKLOG_MARKDOWN)),
 ];
 
 export const server = setupServer(...handlers);

@@ -86,6 +86,16 @@ Frontend (gates green: 100 Vitest tests, tsc/oxlint/prettier/build):
 - **Merged observer toggle**: modal resolves SEND/RECALL from `portal.has_observer` (like MARK/UNMARK); `RECALL_OBSERVER` removed from `ACTION_ORDER` but kept in the log filter. Tests: label flip per state, live flip when the portal closes over the socket.
 - **AI-WORKLOG tab**: `react-markdown` dependency; worklog bundled copy at `frontend/src/worklog/AI-WORKLOG.md` (`?raw` import — Vite build context is `frontend/` only, keep in sync with the root file); new `/worklog` route, nav tab «Журнал разработки» (FileTextOutlined), PAGE_META entry, dark-theme markdown CSS. WorklogPage tests render real headings and code blocks. All decisions recorded in DECISIONS.md.
 
+### Seven dev-mode/UX tasks + Docker hardening (master, 2026-09)
+Backend (gates green; 128 tests, coverage 99 %):
+- **Demo-data seeding**: idempotent `backend/populate.py` (fresh instances per call, skips when portals exist) + `populate.sh`/`populate.ps1` wrappers running `/app/.venv/bin/python populate.py` in the container — no poetry installed (user decision) — with `backend/tests/test_populate.py` (idempotency proven on the live stack: 7 rows seeded, «пропущено» on rerun).
+- **Docker hardening**: backend image drops root — uvicorn runs as the `app` user; frontend dev runs Vite as `node` (uid 1000 == host uid, `chown -R node:node /app` + `cap_add: NET_BIND_SERVICE` for port 80), prod runs nginx as `nginx` (pid/temp paths → `/tmp`). Verified end-to-end on the dev stack (non-root `id`, `/health` 200, index + `/AI-WORKLOG.md` 200, `./populate.sh` OK, no permission errors in logs) and the prod `serve` stage built and smoke-tested standalone.
+
+Frontend (gates green: 105 Vitest tests, tsc/oxlint/prettier/build):
+- **Worklog at runtime, not bundled**: `WorklogPage` fetches `/AI-WORKLOG.md` (loading skeleton + retryable error Alert); prod nginx and dev Vite bind-mount the repo-root `AI-WORKLOG.md` (sha-identical in dev); the `?raw` copy and `frontend/src/worklog/` deleted. Fences render with `rehype-highlight` (`detect + ignoreMissing`) + github-dark; unit tests assert real `<h1>`s, `.hljs` token spans and the error state.
+- **Risk-delta threshold**: `DeltaIndicator.minMagnitude` (default 0) hides |delta| < 0.01 at the table-risk / stat-card-avg-risk / stats-page-avg-risk sites. Tests: +0.004 hidden, +0.01 shown (table + cards).
+- **Closed-portal modal**: every action except MARK/UNMARK is disabled on `portal.closed` (UX hint; backend 409s stay verbatim); caption + README stance updated, closed-portal test added.
+
 ### Frontend SPA implementation (branch `frontend/react-vite`)
 - Real React SPA committed (`aa6ae30`): React 19 + Vite 8 + TS strict, AntD v5 embers theme, TanStack Query, React Router v7; Russian UI / English code.
 - API layer: `types.ts` mirrors backend pydantic schemas; `client.ts` fetch wrapper (`credentials: "include"`, `ApiError` with FastAPI `detail` extraction incl. 422 arrays, `websocketUrl` helper); `endpoints.ts` typed auth/portals/admin calls.
