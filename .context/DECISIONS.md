@@ -10,7 +10,7 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 - Risk factor is calculated as
   `(energy/100)*0.2 + (1 - stability/100)*0.2 + (0.1*c/(0.1*c+1))*0.3 + (1 - 0.04*TTL/(0.04*TTL+1))*0.3`,
   where `TTL = max((expires_at - now).total_seconds(), 0.0)` — clamped, expired portals never produce negative TTL.
-- Danger levels: `<= 0.3` LOW, `<= 0.6` MEDIUM, `<= 0.9` HIGH, `> 0.9` CRITICAL.
+- Danger levels: `<= 0.3` LOW, `<= 0.6` MEDIUM, `<= 0.85` HIGH, `> 0.85` CRITICAL.
 - `STABILIZE` condition "stability below 0.5" is interpreted for the 0-100 int scale as `stability < 50`; stabilizing increases stability by a random value from `STABILITY_INCREASE_RAND_RANGE = (10, 30)`, capped at `100`.
 - `DISMISS` (the UI's "leave open") **parks the portal at the bottom of every ordering** while a `dismissed_until` window (5 min) is active; it is rejected while the portal is closed and when the remaining TTL is ≤ 5 min («Нельзя отложить портал: до истечения менее 5 минут» — constant `DISMISS_MIN_TTL_SECONDS`). Re-dismissing simply extends the window. The parking is a pure ordering sink clause (`dismissed_until > now`), applied after the open-first clause in every `order_by` mode; closing/expiry ends it with no extra cleanup.
 - MARK/UNMARK are the only actions allowed on a closed/expired portal, per requirements.
