@@ -19,6 +19,13 @@ function stabilityColor(value: number): string {
   return "#52c41a";
 }
 
+/** Energy bar mirrors stability: full energy burns bright orange, empty is calm green. */
+function energyColor(value: number): string {
+  if (value > 60) return "#fa541c";
+  if (value > 30) return "#faad14";
+  return "#52c41a";
+}
+
 interface PortalTableProps {
   portals: Portal[];
   /** The `items` of the previous page snapshot — per-row deltas live here. */
@@ -94,7 +101,12 @@ export function PortalTable({
         const value = delta(portal, (prev, current) => current.energy_level - prev.energy_level);
         return (
           <div className="portal-cell-numeric">
-            <Progress percent={portal.energy_level} size="small" format={(v) => v} />
+            <Progress
+              percent={portal.energy_level}
+              size="small"
+              strokeColor={energyColor(portal.energy_level)}
+              format={(v) => v}
+            />
             {value !== null && <DeltaIndicator value={value} polarity="good-when-down" />}
           </div>
         );
