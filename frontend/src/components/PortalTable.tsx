@@ -1,11 +1,13 @@
 import { EyeOutlined } from "@ant-design/icons";
 import { Button, Progress, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import type { Portal } from "../api/types";
 import { formatDateTime, formatRelative, formatTimeLeft } from "../format";
+import { useFlip } from "../hooks/useFlip";
 import { useNow } from "../hooks/useNow";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { DeltaIndicator } from "./DeltaIndicator";
 import { DangerTag, RiskValue } from "./DangerTag";
 import { MarkedTag } from "./MarkedTag";
@@ -41,6 +43,12 @@ export function PortalTable({
 }: PortalTableProps) {
   // Re-render on a clock so «истекает» countdowns and «назад» strings stay fresh.
   const now = useNow();
+  // FLIP move animation on row reorders: rows are keyed via `data-flip-key`,
+  // and the animation is skipped under reduced motion.
+  const flipRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = usePrefersReducedMotion();
+  const flipKeys = useMemo(() => portals.map((portal) => portal.id), [portals]);
+  useFlip(flipKeys, flipRef, !reducedMotion);
   // Snapshots may reorder or add rows; deltas are only meaningful per portal id.
   const prevById = useMemo(
     () => new Map(prevPortals?.map((portal) => [portal.id, portal]) ?? []),
@@ -227,32 +235,35 @@ export function PortalTable({
   ];
 
   return (
-    <Table<Portal>
-      rowKey="id"
-      columns={columns}
-      dataSource={portals}
-      loading={loading}
-      size="medium"
-      scroll={{ x: 1450 }}
-      onRow={(portal) => ({
-        style: { cursor: "pointer" },
-        onClick: () => onOpen(portal),
-      })}
-      pagination={{
-        current: page,
-        pageSize: itemsPerPage,
-        total,
-        showSizeChanger: true,
-        pageSizeOptions: ["10", "20", "50", "100"],
-        showTotal: (count, range) => `${range[0]}–${range[1]} из ${count}`,
-      }}
-      onChange={(pagination) => {
-        const nextPage = pagination.current ?? 1;
-        const nextSize = pagination.pageSize ?? itemsPerPage;
-        if (nextPage !== page || nextSize !== itemsPerPage) {
-          onPageChange(nextPage, nextSize);
-        }
-      }}
-    />
+    <div ref={flipRef}>
+      <Table<Portal>
+        rowKey="id"
+        columns={columns}
+        dataSource={portals}
+        loading={loading}
+        size="medium"
+        scroll={{ x: 1450 }}
+        onRow={(portal) => ({
+          "data-flip-key": String(portal.id),
+          style: { cursor: "pointer" },
+          onClick: () => onOpen(portal),
+        })}
+        pagination={{
+          current: page,
+          pageSize: itemsPerPage,
+          total,
+          showSizeChanger: true,
+          pageSizeOptions: ["10", "20", "50", "100"],
+          showTotal: (count, range) => `${range[0]}–${range[1]} из ${count}`,
+        }}
+        onChange={(pagination) => {
+          const nextPage = pagination.current ?? 1;
+          const nextSize = pagination.pageSize ?? itemsPerPage;
+          if (nextPage !== page || nextSize !== itemsPerPage) {
+            onPageChange(nextPage, nextSize);
+          }
+        }}
+      />
+    </div>
   );
 }

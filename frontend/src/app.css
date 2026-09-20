@@ -118,6 +118,48 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  /* Containing block for the decorative fire side panels. */
+  position: relative;
+}
+
+/* Fiery side panels: decorative WebGPU/ember glow behind the page content.
+   z-index: -1 paints them below in-flow card backgrounds (but above the page
+   background), so they read as a soft glow in the side gutters and the
+   top/bottom bands around the cards. */
+.fire-panels {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fire-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: clamp(96px, 11vw, 176px);
+}
+
+.fire-panel--left {
+  left: 0;
+}
+
+.fire-panel--right {
+  right: 0;
+}
+
+.fire-panel-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Reduced motion: no animation loop at all, just a static ember gradient. */
+.fire-panel--static {
+  background:
+    radial-gradient(130% 50% at 50% 100%, rgba(255, 106, 0, 0.28), transparent 70%),
+    linear-gradient(180deg, transparent 60%, rgba(255, 61, 0, 0.16));
 }
 
 .app-topline {

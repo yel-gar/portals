@@ -21,6 +21,10 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
+    // Headless chromium has no usable WebGPU adapter; emulating reduced motion
+    // pins the fire panels to the static-gradient path, keeping every run
+    // cheap and deterministic (the WebGPU path is smoke-tested manually).
+    reducedMotion: "reduce",
   },
   projects: [
     {

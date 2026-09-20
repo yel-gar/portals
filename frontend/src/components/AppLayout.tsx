@@ -5,6 +5,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useLogout, useMe } from "../hooks/useAuth";
 import { LOGO_ICON, NAV_ICONS } from "../constants";
+import { FirePanels } from "./fire/FirePanels";
 import { LiveBadge } from "./LiveBadge";
 
 interface PageMeta {
@@ -125,6 +126,7 @@ export function AppLayout() {
       </aside>
 
       <div className="app-main">
+        <FirePanels />
         <div className="app-topline" />
         <header className="app-header">
           <div>

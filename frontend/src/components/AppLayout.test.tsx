@@ -33,6 +33,17 @@ describe("AppLayout", () => {
     expect(screen.getByText("Оператор")).toBeInTheDocument();
   });
 
+  it("renders the decorative fire panels behind the content", () => {
+    const { container } = renderLayout();
+
+    expect(container.querySelector(".fire-panels")).not.toBeNull();
+    const panels = container.querySelectorAll(".fire-panel");
+    expect(panels).toHaveLength(2);
+    for (const panel of panels) {
+      expect(panel.getAttribute("aria-hidden")).toBe("true");
+    }
+  });
+
   it("shows the admin section and the superuser role for admins", async () => {
     server.use(http.get(API_URL("/auth/me"), () => HttpResponse.json(SUPER_USER)));
 

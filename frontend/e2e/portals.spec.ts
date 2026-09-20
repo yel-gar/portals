@@ -11,6 +11,9 @@ test.beforeAll(() => {
 test("таблица показывает посеянные порталы и статусы", async ({ page }) => {
   await registerUser(page, "e2e_table", "table-pass-1");
   await expect(page.getByText("Всего: 7")).toBeVisible();
+  // Decorative fire side panels render in every environment (here the static
+  // gradient — headless chromium has no WebGPU and reduced motion is emulated).
+  await expect(page.locator(".fire-panels")).toBeVisible();
   await expect(page.locator(".ant-table-row", { hasText: "Портал Гамма" })).toBeVisible();
   await expect(
     page

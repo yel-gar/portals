@@ -1,9 +1,10 @@
 /// <reference types="vitest/config" />
 import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import typegpu from "unplugin-typegpu/vite";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), typegpu()],
   server: {
     host: true,
     port: Number(process.env.VITE_DEV_PORT ?? 5173),
@@ -17,6 +18,12 @@ export default defineConfig({
       output: {
         manualChunks(id: string) {
           if (!id.includes("node_modules")) {
+            return undefined;
+          }
+          // TypeGPU (and its runtime deps) are pulled in only by the dynamic
+          // import inside the fire panels — keep them out of the eagerly
+          // loaded vendor chunk so browsers without WebGPU never fetch them.
+          if (/(^|\/)node_modules\/(typegpu|tsover-runtime|typed-binary|tinyest)\//.test(id)) {
             return undefined;
           }
           if (id.includes("antd") || id.includes("@ant-design")) {
