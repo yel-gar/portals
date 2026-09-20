@@ -86,6 +86,7 @@ export function AppLayout() {
 
   return (
     <div className="app-shell">
+      <FirePanels />
       <aside className="app-sider">
         <div className="app-logo">
           <span className="app-logo-icon">
@@ -126,7 +127,6 @@ export function AppLayout() {
       </aside>
 
       <div className="app-main">
-        <FirePanels />
         <div className="app-topline" />
         <header className="app-header">
           <div>
