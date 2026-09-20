@@ -251,7 +251,7 @@ export function PortalTable({
         dataSource={portals}
         loading={loading}
         size="medium"
-        scroll={{ x: 1450 }}
+        scroll={{ x: 1580 }}
         onRow={(portal) => ({
           "data-flip-key": String(portal.id),
           style: { cursor: "pointer" },
