@@ -313,7 +313,10 @@ async def _hub_snapshot_loop(
                 break
     finally:
         hub.unsubscribe(queue)
-        with suppress(RuntimeError):
+        # If the client is already gone (abrupt tab close, code 1006) the farewell
+        # close itself raises WebSocketDisconnect — that is a normal teardown, not
+        # an error, so swallow it together with the usual RuntimeError.
+        with suppress(RuntimeError, WebSocketDisconnect):
             await websocket.close()
 
 

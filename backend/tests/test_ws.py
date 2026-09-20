@@ -146,6 +146,26 @@ async def test_hub_snapshot_loop_ignores_client_ping() -> None:
 
 
 @pytest.mark.asyncio
+async def test_hub_snapshot_loop_silent_when_client_gone_before_farewell_close() -> None:
+    """An abrupt disconnect (tab closed, code 1006) must not surface a traceback.
+
+    The client can vanish before the server's farewell ``close()`` runs; that
+    close then raises WebSocketDisconnect itself. The loop must swallow it so
+    uvicorn logs a clean disconnect instead of an ASGI exception.
+    """
+
+    class _AbruptWebSocket(_MockWebSocket):
+        async def close(self, code: int = 1000) -> None:
+            raise WebSocketDisconnect(code=code)
+
+    websocket = _AbruptWebSocket()
+    websocket.disconnect.set()
+    await _hub_snapshot_loop(websocket, action_log_hub, _noop_snapshot)  # type: ignore[arg-type]
+    assert websocket.sent == [{"snapshot": 0}]
+    assert action_log_hub.subscriber_count == 0
+
+
+@pytest.mark.asyncio
 async def test_portal_ws_rejects_anonymous() -> None:
     websocket = _MockWebSocket()
     await _portal_updates_call(websocket)
