@@ -403,4 +403,4 @@ async def test_simulator_loop_logs_changed_portals(
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-    assert "Симулятор: обновлено порталов: 1, 2" in caplog.text
+    assert "Симулятор: обновлены порталы: 1, 2" in caplog.text

@@ -196,7 +196,7 @@ async def simulator_loop() -> None:
             async with get_session_factory()() as session:
                 changed_ids = await simulate_once(session)
             if changed_ids:
-                logger.info("Симулятор: обновлено порталов: %s", ", ".join(map(str, changed_ids)))
+                logger.info("Симулятор: обновлены порталы: %s", ", ".join(map(str, changed_ids)))
         except Exception:
             logger.exception("Симулятор: ошибка тика")
         await asyncio.sleep(SIMULATOR_TICK_SECONDS)
