@@ -147,11 +147,14 @@ npm run test:e2e:ui       # Playwright UI-режим для отладки
   распределение на странице Stats — доля от `open`, не от `total`.
 - Декоративная фоновая подложка (`src/components/fire/`): WebGPU-шейдер искрящихся
   частиц с завихрениями (TypeGPU, TS-first WGSL, код-сплит chunk — тянется только когда
-  `navigator.gpu` доступен), покрывает весь фон страницы; 2D-canvas-эмбер-фолбэк с
+  `navigator.gpu` доступен), покрывает весь фон приложения, включая сайдбар; 2D-canvas-эмбер-фолбэк с
   восходящими искрами, а при `prefers-reduced-motion` — статичный градиент без
   анимационного цикла. Слой абсолютный с `z-index: -1`, `pointer-events: none`,
   `aria-hidden`; фолбэк выбирается по результату init и сохраняется
-  в `data-fire-backend` (static/webgpu/ember).
+  в `data-fire-backend` (static/webgpu/ember). Поверх подложки основные поверхности UI
+  полупрозрачны (обычный rgba, без blur — сайдбар/шапка в `app.css`, карточки/таблица/инпуты
+  через `colorBgContainer` в `theme.ts`), чтобы искры просвечивали сквозь весь интерфейс;
+  диалоги (модалка, дропдауны) остаются непрозрачными.
 - Перестановка строк таблицы порталов анимируется FLIP-переходом (`src/hooks/useFlip.ts`,
   только `PortalTable`, ключ `portal.id` → `data-flip-key`): замер позиций в layout-effect
   после коммита, WAAPI `translateY` (400 мс); пропускается на первом рендере и под reduced
