@@ -102,6 +102,14 @@ export const handlers = [
   http.get(`${BACKEND_ORIGIN}/portals/log`, () =>
     HttpResponse.json({ items: [], page: 1, items_per_page: 20, total: 0 }),
   ),
+  // Registered after the exact `/stats` and `/log` paths so `:id` never
+  // shadows them (`/portals/stats` would otherwise match with id="stats").
+  http.get(`${BACKEND_ORIGIN}/portals/:id`, ({ params }) => {
+    const portal = [OPEN_PORTAL, CLOSED_PORTAL].find((item) => item.id === Number(params.id));
+    return portal
+      ? HttpResponse.json(portal)
+      : HttpResponse.json({ detail: "Портал не найден" }, { status: 404 });
+  }),
 
   // The worklog lives on the frontend origin: any host + path matches.
   http.get("*/AI-WORKLOG.md", () => HttpResponse.text(WORKLOG_MARKDOWN)),

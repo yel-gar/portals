@@ -123,13 +123,15 @@ body {
   flex-direction: column;
 }
 
-/* Decorative full-background spark field: a WebGPU shader (or a 2D-canvas
+/* Decorative viewport-fixed spark field: a WebGPU shader (or a 2D-canvas
    ember fallback) painted behind every surface of the signed-in layout,
-   sidebar included. z-index: -1 keeps it under the translucent chrome and
-   cards while it still fills every gap between them, so the whole app is
-   framed by the effect. */
+   sidebar included. `fixed` (not `absolute`) keeps the canvas viewport-sized:
+   a document-tall canvas both distorts the spark field and can exceed the GPU
+   texture limit on long pages. z-index: -1 keeps it under the translucent
+   chrome and cards while it still fills every gap between them, so the whole
+   app is framed by the effect. */
 .fire-panels {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
@@ -361,19 +363,9 @@ body {
   margin-inline: -24px;
 }
 
-/* Divider between the scrollable data columns and the fixed action column. */
+/* Divider after the scrollable data columns, before the action column. */
 .portal-table-actions-sep {
   border-inline-start: 1px solid rgba(255, 138, 51, 0.28);
-}
-
-/* Sticky columns share the table's translucent surface (the value mirrors
-   `colorBgContainer` in theme.ts), so the pinned «Портал»/«Детали» columns look
-   native instead of solid painted-over bands. No `!important`: AntD's
-   CSS-in-JS is injected after this file and its row-hover rule tints the fixed
-   cells too, so they highlight on hover exactly like every other cell. */
-.portal-table-fixed-bg.portal-table-fixed-left,
-.portal-table-fixed-bg.portal-table-fixed-right {
-  background: rgba(23, 16, 8, 0.45);
 }
 
 /* Numeric table cells: the progress bar / tag plus a delta badge side by side. */

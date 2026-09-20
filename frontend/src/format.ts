@@ -83,3 +83,14 @@ export function toPercent(value: number, total: number): number {
   }
   return Math.round((value / total) * 100);
 }
+
+/** Risk factor 0..1 as a whole percent, e.g. 0.41 → «41%». Rendering only. */
+export function toRiskPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+/** Signed risk delta in percentage points, e.g. 0.04 → «+4». Rendering only. */
+export function formatRiskDelta(value: number): string {
+  const points = Math.round(value * 100);
+  return `${points >= 0 ? "+" : ""}${points}`;
+}

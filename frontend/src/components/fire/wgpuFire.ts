@@ -11,6 +11,8 @@ import { common, d, std, tgpu } from "typegpu";
 import type { TgpuRoot } from "typegpu";
 import type { v2f } from "typegpu/data";
 
+import { fitCanvasSize } from "./canvasSize";
+
 export interface WgpuFireHandle {
   stop(): void;
 }
@@ -74,9 +76,10 @@ const sparkLayer = (
   warp: number,
 ): number => {
   "use gpu";
-  // The field scrolls upward continuously: subtracting `t * speed` keeps the
-  // grid glued to the flow, so sparks never pop while crossing cell borders.
-  const grid = std.mul(std.sub(st, d.vec2f(0, std.mul(t, speed))), scale);
+  // The field scrolls upward continuously: adding `t * speed` shifts the
+  // sampled window downward in texture space, so on the y-down screen the
+  // sparks drift up and never pop while crossing cell borders.
+  const grid = std.mul(std.add(st, d.vec2f(0, std.mul(t, speed))), scale);
   const jitter = std.mul(std.sub(std.mul(warp, 2), 1), 0.5);
   const warped = std.add(grid, d.vec2f(jitter, std.mul(jitter, 0.5)));
   const cell = std.floor(warped);
@@ -88,7 +91,14 @@ const sparkLayer = (
   const cy = std.fract(std.mul(rand, 3.61));
   const dx = std.sub(local.x, cx);
   const dy = std.sub(local.y, cy);
-  const core = std.smoothstep(0.32, 0, std.sqrt(std.add(std.mul(dx, dx), std.mul(dy, dy))));
+  // Reversed smoothstep edges are undefined behavior in WGSL (garbage on some
+  // drivers, e.g. DirectX — the black squares), so spell the falloff out
+  // explicitly instead of `smoothstep(0.32, 0, d)`. The core radius stays well
+  // below half a cell so each spark fits inside its own grid box.
+  const core = std.sub(
+    1,
+    std.smoothstep(0, 0.2, std.sqrt(std.add(std.mul(dx, dx), std.mul(dy, dy)))),
+  );
   const twinkle = std.add(
     0.4,
     std.mul(0.6, std.sin(std.add(std.mul(t, std.add(4, std.mul(rand, 8))), std.mul(rand, 29)))),
@@ -120,8 +130,9 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
     const resize = (): void => {
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(globalThis.devicePixelRatio ?? 1, 2);
-      canvas.width = Math.max(1, Math.round(rect.width * dpr));
-      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      const size = fitCanvasSize(rect.width, rect.height, dpr);
+      canvas.width = size.width;
+      canvas.height = size.height;
       resolution.write(d.vec2f(canvas.width, canvas.height));
     };
 
@@ -131,9 +142,10 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
         "use gpu";
         const t = time.$;
         const size = resolution.$;
-        // uv spans [0, 2] × [0, 1] (y down); remap to an aspect-corrected
-        // [0..aspect] × [0..1] so the spark density is uniform across screens.
-        const st = d.vec2f(uv.x * 0.5 * (size.x / size.y), uv.y);
+        // Visible uv is [0, 1] × [0, 1] (y down: uv.y = 1 at the NDC
+        // bottom); remap to an aspect-corrected [0..aspect] × [0..1] so the
+        // spark density is uniform across screens.
+        const st = d.vec2f(uv.x * (size.x / size.y), uv.y);
 
         // Slow swirling turbulence — a single shared noise sample.
         const warp = valueNoise(
@@ -154,11 +166,11 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
         const s3 = sparkLayer(st, t, 52, 0.12, 0.26, 6, warp);
         color = std.add(color, std.mul(d.vec3f(0.5, 0.22, 0.05), s3));
 
-        // Soft elliptical falloff keeps the corners calm.
-        const edge = std.smoothstep(
-          1.6,
-          0.55,
-          std.length(std.sub(st, d.vec2f(size.x / (size.y * 2), 0.5))),
+        // Soft elliptical falloff keeps the corners calm (spelled without
+        // reversed smoothstep edges — those are WGSL undefined behavior).
+        const edge = std.sub(
+          1,
+          std.smoothstep(0.55, 1.6, std.length(std.sub(st, d.vec2f(size.x / (size.y * 2), 0.5)))),
         );
         color = std.mul(color, std.add(0.3, std.mul(edge, 0.7)));
 

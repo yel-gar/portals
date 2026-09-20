@@ -17,8 +17,8 @@ describe("StatsPage", () => {
     expect(screen.getByText("Средний риск по лаборатории")).toBeInTheDocument();
     // MOCK_STATS: one open portal, one MEDIUM level → 1 шт · 100%.
     expect(screen.getByText("1 шт · 100%")).toBeInTheDocument();
-    // avg_risk 0.41 shows in the "Средний риск" stat card and the circle.
-    expect(screen.getAllByText("0.41").length).toBeGreaterThan(0);
+    // avg_risk 0.41 shows as «41%» in the "Средний риск" stat card and the circle.
+    expect(screen.getAllByText("41%").length).toBeGreaterThan(0);
   });
 
   it("shows a skeleton while the stats are loading", () => {

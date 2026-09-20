@@ -12,7 +12,7 @@ export interface DeltaIndicatorProps {
   /** Signed difference: positive = increase, negative = decrease. */
   value: number;
   polarity: DeltaPolarity;
-  /** Optional formatting (e.g. risk `toFixed(2)`) — defaults to the plain signed number. */
+  /** Optional formatting (e.g. risk percent points) — defaults to the plain signed number. */
   format?: (value: number) => string;
   /** Deltas smaller than this magnitude (by absolute value) render nothing — kills risk jitter. */
   minMagnitude?: number;

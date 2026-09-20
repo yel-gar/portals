@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { TableOutlined } from "@ant-design/icons";
 import { Alert, Button, Card, Skeleton, Space, Typography } from "antd";
+import { useQuery } from "@tanstack/react-query";
 
 import { ApiError } from "../api/client";
+import { portalsApi } from "../api/endpoints";
 import type { Portal, PortalListParams } from "../api/types";
 import {
   DEFAULT_PORTAL_FILTERS,
@@ -44,13 +46,39 @@ export function PortalsPage() {
   const portals = query.data?.items ?? [];
   const total = query.data?.total ?? 0;
   const selectedId = selectedPortal?.id ?? null;
-  // While open, prefer the freshest row from the current snapshot; if the portal
-  // has dropped off the visible page (risk-DESC reordering, a CLOSE sinking it
-  // to the end), fall back to the last known object so the modal stays usable.
+  // The open modal polls the single-portal endpoint: if the portal closes in
+  // the background (expiry while the modal is open), the fresh copy greys out
+  // the actions without waiting for the page snapshot to catch up.
+  const detail = useQuery({
+    queryKey: ["portals", "detail", selectedId],
+    queryFn: () => portalsApi.info(selectedId!),
+    enabled: selectedId !== null,
+    refetchInterval: 10_000,
+  });
+  // `closed` is terminal (expiry and CLOSE never revert), so latch it: once
+  // either source reports the portal closed, keep showing a closed copy. The
+  // page snapshot must never flip the open card back to open — only the
+  // detail endpoint (the correct per-portal data) moves it forward.
+  const snapshotRow =
+    selectedId !== null ? portals.find((portal) => portal.id === selectedId) : undefined;
+  const closedCopy =
+    snapshotRow?.closed === true
+      ? snapshotRow
+      : detail.data?.closed === true
+        ? detail.data
+        : undefined;
+  // Otherwise the freshest source wins: background expiry reaches the card
+  // through the detail poll, socket closes through the page snapshot. Ties
+  // fall back to the snapshot row, then to the last known object so the modal
+  // stays usable when the portal drops off the visible page (risk-DESC
+  // reordering, a CLOSE sinking it to the end).
   const selected =
-    selectedId !== null
-      ? (portals.find((portal) => portal.id === selectedId) ?? selectedPortal)
-      : null;
+    selectedId === null
+      ? null
+      : (closedCopy ??
+        (detail.data !== undefined && detail.dataUpdatedAt > query.dataUpdatedAt
+          ? detail.data
+          : (snapshotRow ?? selectedPortal)));
 
   return (
     <>

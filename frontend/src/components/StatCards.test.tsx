@@ -32,20 +32,20 @@ describe("StatCards", () => {
     // closed and marked stay), so exactly three cards gain +1: total, open,
     // with-observer.
     expect(screen.getAllByText("+1")).toHaveLength(3);
-    // avg risk grew by 0.03, formatted with the sign and two decimals.
-    expect(screen.getByText("+0.03")).toBeInTheDocument();
+    // avg risk grew by 0.03, formatted with the sign in percentage points.
+    expect(screen.getByText("+3")).toBeInTheDocument();
   });
 
   it("hides the delta badge for unchanged values", () => {
     renderWithProviders(<StatCards stats={CURRENT} prevStats={CURRENT} />);
     expect(screen.queryByText("+1")).not.toBeInTheDocument();
-    expect(screen.queryByText("+0.03")).not.toBeInTheDocument();
+    expect(screen.queryByText("+3")).not.toBeInTheDocument();
   });
 
   it("renders no deltas without a previous snapshot", () => {
     renderWithProviders(<StatCards stats={CURRENT} />);
     expect(screen.queryByText("+1")).not.toBeInTheDocument();
-    expect(screen.queryByText("+0.03")).not.toBeInTheDocument();
+    expect(screen.queryByText("+3")).not.toBeInTheDocument();
   });
 
   it("hides the avg-risk delta when its magnitude is below 0.01", () => {
@@ -68,6 +68,6 @@ describe("StatCards", () => {
       />,
     );
     expect(screen.getByLabelText("delta")).toBeInTheDocument();
-    expect(screen.getByText("+0.01")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
   });
 });

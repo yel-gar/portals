@@ -152,6 +152,20 @@ def test_randomize_clamps_lower_bound(monkeypatch: pytest.MonkeyPatch) -> None:
     assert portal.creatures_count == 0
 
 
+def test_randomize_creatures_never_increases_with_observer(monkeypatch: pytest.MonkeyPatch) -> None:
+    portal = _portal(creatures_count=50)
+    monkeypatch.setattr("random.randint", lambda _a, b: b)
+    simulator.randomize_creatures(portal, allow_increase=False)
+    assert portal.creatures_count == 50
+
+
+def test_randomize_creatures_can_decrease_with_observer(monkeypatch: pytest.MonkeyPatch) -> None:
+    portal = _portal(creatures_count=50)
+    monkeypatch.setattr("random.randint", lambda a, _b: a)
+    simulator.randomize_creatures(portal, allow_increase=False)
+    assert portal.creatures_count == 50 - SIMULATOR_CREATURES_DELTA
+
+
 @pytest.mark.asyncio
 async def test_simulate_once_updates_and_spawns(
     create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
@@ -339,6 +353,79 @@ async def test_simulate_once_locks_only_candidate_portals(
     assert portal_a_fresh.stability == 50 and portal_a_fresh.creatures_count == 0
     assert portal_b_fresh.stability == 50 + SIMULATOR_STABILITY_DELTA
     assert portal_b_fresh.creatures_count == SIMULATOR_CREATURES_DELTA
+
+
+@pytest.mark.asyncio
+async def test_simulate_once_observer_blocks_new_creatures(
+    create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An observer inside prevents new creatures from appearing mid-simulation."""
+    observed = await create_portal(name="Observed", stability=50, creatures_count=50, has_observer=True)
+    plain = await create_portal(name="Plain", stability=50, creatures_count=50)
+    monkeypatch.setattr(simulator, "random", _FakeRandom())
+
+    async with get_session_factory()() as session:
+        changed = await simulator.simulate_once(session, open_chance=0.0)
+
+    assert set(changed) == {observed.id, plain.id}
+    async with get_session_factory()() as session:
+        fresh_observed = await session.get(Portal, observed.id)
+        fresh_plain = await session.get(Portal, plain.id)
+    assert fresh_observed is not None and fresh_plain is not None
+    assert fresh_observed.creatures_count == 50
+    assert fresh_plain.creatures_count == 50 + SIMULATOR_CREATURES_DELTA
+
+
+@pytest.mark.asyncio
+async def test_simulate_once_notifies_recently_expired_portal(
+    create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A portal whose TTL ran out since the previous tick wakes subscribers.
+
+    Expiry is derived (`expires_at <= now`), so no write marks the moment a
+    portal closes by itself — the tick reports recently expired portals so the
+    live table flips them to closed without waiting for the REST poll.
+    """
+    expired = await create_portal(expires_at=utc_now() - timedelta(seconds=5), stability=50)
+    monkeypatch.setattr(simulator, "random", _FakeRandom())
+    notified: list[int] = []
+
+    async def record_notify(_session: AsyncSession, portal_id: int) -> None:
+        notified.append(portal_id)
+
+    monkeypatch.setattr(simulator, "notify_portal_changed", record_notify)
+
+    async with get_session_factory()() as session:
+        changed = await simulator.simulate_once(session, open_chance=0.0)
+
+    assert changed == [expired.id]
+    assert notified == [expired.id]
+    async with get_session_factory()() as session:
+        fresh = await session.get(Portal, expired.id)
+    assert fresh is not None
+    assert fresh.stability == 50
+    assert fresh.is_closed is False
+
+
+@pytest.mark.asyncio
+async def test_simulate_once_does_not_renotify_long_expired_portal(
+    create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Portals expired long ago are not reported on every tick."""
+    await create_portal(expires_at=utc_now() - timedelta(hours=1))
+    monkeypatch.setattr(simulator, "random", _FakeRandom())
+    notified: list[int] = []
+
+    async def record_notify(_session: AsyncSession, _portal_id: int) -> None:
+        notified.append(_portal_id)
+
+    monkeypatch.setattr(simulator, "notify_portal_changed", record_notify)
+
+    async with get_session_factory()() as session:
+        changed = await simulator.simulate_once(session, open_chance=0.0)
+
+    assert changed == []
+    assert notified == []
 
 
 @pytest.mark.asyncio

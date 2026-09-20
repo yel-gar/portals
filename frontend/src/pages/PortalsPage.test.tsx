@@ -151,7 +151,7 @@ describe("PortalsPage", () => {
     act(() => socket.open());
 
     // The second frame of the same snapshot scope: energy +3, stability −20,
-    // creatures +1, risk +0.04 → four delta badges appear.
+    // creatures +1, risk +4 points → four delta badges appear.
     const changed: Portal = {
       ...OPEN_PORTAL,
       energy_level: 85,
@@ -164,7 +164,7 @@ describe("PortalsPage", () => {
     expect(await screen.findByText("+3")).toBeInTheDocument();
     expect(screen.getByText("-20")).toBeInTheDocument();
     expect(screen.getByText("+1")).toBeInTheDocument();
-    expect(screen.getByText("+0.04")).toBeInTheDocument();
+    expect(screen.getByText("+4")).toBeInTheDocument();
   });
 
   it("hides risk deltas below the 0.01 magnitude threshold", async () => {
@@ -177,16 +177,16 @@ describe("PortalsPage", () => {
 
     // Frame 1: energy +2 (the visible «+2» proves the frame was applied) while
     // the risk moved by only +0.004 — below the 0.01 threshold, so no risk
-    // badge renders («+0.00» would appear if the too-small delta were shown).
+    // badge renders («+0» would appear if the too-small delta were shown).
     const tiny: Portal = { ...OPEN_PORTAL, energy_level: 84, risk_factor: 0.414 };
     act(() => socket.message(JSON.stringify(portalPage([tiny, CLOSED_PORTAL], 1, 20))));
     expect(await screen.findByText("+2")).toBeInTheDocument();
-    expect(screen.queryByText("+0.00")).not.toBeInTheDocument();
+    expect(screen.queryByText("+0")).not.toBeInTheDocument();
 
-    // Frame 2: risk moves by +0.011 — the badge appears with two decimals.
+    // Frame 2: risk moves by +0.011 — the badge appears in percentage points.
     const notable: Portal = { ...OPEN_PORTAL, energy_level: 84, risk_factor: 0.425 };
     act(() => socket.message(JSON.stringify(portalPage([notable, CLOSED_PORTAL], 1, 20))));
-    expect(await screen.findByText("+0.01")).toBeInTheDocument();
+    expect(await screen.findByText("+1")).toBeInTheDocument();
   });
 
   it("opens the portal modal when a row is clicked", async () => {
@@ -247,6 +247,7 @@ describe("PortalsPage", () => {
     const user = userEvent.setup();
     const closed: Portal = { ...OPEN_PORTAL, closed: true, has_observer: false };
     let listCalls = 0;
+    let closedByAction = false;
     server.use(
       // The initial page load sees the open portal; any refetch after the
       // action reflects the server truth (closed).
@@ -256,7 +257,15 @@ describe("PortalsPage", () => {
           listCalls === 1 ? portalPage() : portalPage([closed, CLOSED_PORTAL], 1, 20),
         );
       }),
-      http.post(API_URL("/portals/:id"), () => HttpResponse.json(closed)),
+      http.post(API_URL("/portals/:id"), () => {
+        closedByAction = true;
+        return HttpResponse.json(closed);
+      }),
+      // The open modal also polls the detail endpoint: open until the action
+      // commits, closed from the server truth afterwards.
+      http.get(API_URL("/portals/1"), () =>
+        HttpResponse.json(closedByAction ? closed : OPEN_PORTAL),
+      ),
     );
 
     renderWithProviders(<PortalsPage />);
@@ -278,6 +287,50 @@ describe("PortalsPage", () => {
       expect(within(dialog).getByRole("button", { name: /Стабилизировать/ })).toBeDisabled();
     });
     expect(within(dialog).getByRole("button", { name: /Отметить/ })).toBeEnabled();
+  });
+
+  it("greys out actions when the portal closes in the background", async () => {
+    const user = userEvent.setup();
+    const closed: Portal = { ...OPEN_PORTAL, closed: true, has_observer: false };
+    // The page snapshot still shows the portal open, but the polled detail
+    // endpoint already reports it closed (e.g. it expired in the background).
+    // Exact path: a `:id` pattern would also match `/portals/stats`.
+    server.use(http.get(API_URL("/portals/1"), () => HttpResponse.json(closed)));
+
+    renderWithProviders(<PortalsPage />);
+    await user.click(await screen.findByText("Портал Альфа"));
+    const dialog = await screen.findByRole("dialog");
+
+    await waitFor(() => {
+      expect(within(dialog).getByRole("button", { name: /Стабилизировать/ })).toBeDisabled();
+    });
+    expect(within(dialog).getByRole("button", { name: /Отметить/ })).toBeEnabled();
+  });
+
+  it("never flips a closed card back to open on a stale page snapshot", async () => {
+    const user = userEvent.setup();
+    const closed: Portal = { ...OPEN_PORTAL, closed: true, has_observer: false };
+    // Detail already reports the portal closed; the page snapshot below is
+    // stale (still open) and must not revive the card.
+    server.use(http.get(API_URL("/portals/1"), () => HttpResponse.json(closed)));
+
+    renderWithProviders(<PortalsPage />);
+    await user.click(await screen.findByText("Портал Альфа"));
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => {
+      expect(within(dialog).getByRole("button", { name: /Стабилизировать/ })).toBeDisabled();
+    });
+
+    const socket = FakeWebSocket.instances[0];
+    expect(socket).toBeDefined();
+    act(() => socket.open());
+    act(() => socket.message(JSON.stringify(portalPage([OPEN_PORTAL, CLOSED_PORTAL], 1, 20))));
+
+    await waitFor(() => {
+      expect(within(dialog).getByRole("button", { name: /Стабилизировать/ })).toBeDisabled();
+    });
+    // The latched closed copy (no observer inside) stays on screen.
+    expect(within(dialog).getByText("Отправить наблюдателя")).toBeInTheDocument();
   });
 
   it("keeps the modal open when a filter change empties the page", async () => {

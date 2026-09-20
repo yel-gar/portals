@@ -2,6 +2,7 @@ import { Card, Col, Row, Statistic, theme } from "antd";
 
 import type { Stats } from "../api/types";
 import { STAT_ICONS } from "../constants";
+import { formatRiskDelta, toRiskPercent } from "../format";
 import { DeltaIndicator, type DeltaPolarity } from "./DeltaIndicator";
 
 interface StatItem {
@@ -74,12 +75,12 @@ export function StatCards({ stats, prevStats }: { stats: Stats; prevStats?: Stat
     {
       key: "avgRisk",
       title: "Средний риск",
-      value: stats.avg_risk.toFixed(2),
+      value: toRiskPercent(stats.avg_risk),
       color: token.colorPrimary,
       delta: delta((prev, current) => current.avg_risk - prev.avg_risk),
       polarity: "good-when-down",
       minMagnitude: 0.01,
-      format: (value) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}`,
+      format: (value) => formatRiskDelta(value),
     },
   ];
 

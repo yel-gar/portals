@@ -128,9 +128,14 @@ def randomize_stability(portal: Portal) -> None:
     portal.stability = min(max(portal.stability + delta, 0), 100)
 
 
-def randomize_creatures(portal: Portal) -> None:
-    """Randomly nudge creatures_count by ±``SIMULATOR_CREATURES_DELTA``, clamped to 0..max."""
-    delta = random.randint(-SIMULATOR_CREATURES_DELTA, SIMULATOR_CREATURES_DELTA)
+def randomize_creatures(portal: Portal, *, allow_increase: bool = True) -> None:
+    """Randomly nudge creatures_count by ±``SIMULATOR_CREATURES_DELTA``, clamped to 0..max.
+
+    With an observer inside no new creatures may appear, so the delta is never
+    positive (the count can only stay or drop).
+    """
+    upper = SIMULATOR_CREATURES_DELTA if allow_increase else 0
+    delta = random.randint(-SIMULATOR_CREATURES_DELTA, upper)
     portal.creatures_count = min(max(portal.creatures_count + delta, 0), SIMULATOR_MAX_CREATURES)
 
 
@@ -169,8 +174,23 @@ async def simulate_once(session: AsyncSession, *, open_chance: float | None = No
         )
         for portal in (await session.scalars(stmt)).all():
             randomize_stability(portal)
-            randomize_creatures(portal)
+            randomize_creatures(portal, allow_increase=not portal.has_observer)
             changed_ids.add(portal.id)
+
+    # Expiry is derived (`expires_at <= now`), so no write ever marks the
+    # moment a portal closes by itself — without an explicit notification the
+    # subscribers would only learn about it from the 30 s REST poll. Portals
+    # that expired within the trailing window (two tick intervals cover tick
+    # jitter) are reported so the live table flips them to closed promptly.
+    expiry_cutoff = now - timedelta(seconds=SIMULATOR_TICK_SECONDS * 2)
+    expired_ids = (
+        await session.scalars(
+            select(Portal.id).where(
+                Portal.is_closed.is_(False), Portal.expires_at <= now, Portal.expires_at > expiry_cutoff
+            )
+        )
+    ).all()
+    changed_ids.update(expired_ids)
 
     if random.random() < chance:
         portal = make_new_portal(now)

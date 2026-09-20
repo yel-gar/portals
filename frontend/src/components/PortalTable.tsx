@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useMemo, useRef } from "react";
 
 import type { Portal } from "../api/types";
-import { formatDateTime, formatRelative, formatTimeLeft } from "../format";
+import { formatDateTime, formatRelative, formatRiskDelta, formatTimeLeft } from "../format";
 import { useFlip } from "../hooks/useFlip";
 import { useNow } from "../hooks/useNow";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
@@ -16,6 +16,13 @@ import { MarkedTag } from "./MarkedTag";
 function stabilityColor(value: number): string {
   if (value < 40) return "#fa541c";
   if (value < 70) return "#faad14";
+  return "#52c41a";
+}
+
+/** Energy bar mirrors stability: full energy burns bright orange, empty is calm green. */
+function energyColor(value: number): string {
+  if (value > 60) return "#fa541c";
+  if (value > 30) return "#faad14";
   return "#52c41a";
 }
 
@@ -67,13 +74,6 @@ export function PortalTable({
       title: "Портал",
       key: "name",
       width: 220,
-      fixed: "left",
-      // Sticky cells share the table's translucent surface so the pinned column
-      // does not look painted over (see app.css `.portal-table-fixed-bg`). The
-      // header gets no override class: it must keep the same background as the
-      // other headers.
-      onCell: () => ({ className: "portal-table-fixed-bg portal-table-fixed-left" }),
-      onHeaderCell: () => ({ className: "portal-table-fixed-left" }),
       render: (_, portal) => (
         <div>
           <Typography.Text strong>{portal.name}</Typography.Text>
@@ -101,7 +101,12 @@ export function PortalTable({
         const value = delta(portal, (prev, current) => current.energy_level - prev.energy_level);
         return (
           <div className="portal-cell-numeric">
-            <Progress percent={portal.energy_level} size="small" format={(v) => v} />
+            <Progress
+              percent={portal.energy_level}
+              size="small"
+              strokeColor={energyColor(portal.energy_level)}
+              format={(v) => v}
+            />
             {value !== null && <DeltaIndicator value={value} polarity="good-when-down" />}
           </div>
         );
@@ -163,7 +168,7 @@ export function PortalTable({
                 value={value}
                 polarity="good-when-down"
                 minMagnitude={0.01}
-                format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`}
+                format={(v) => formatRiskDelta(v)}
               />
             )}
           </div>
@@ -219,17 +224,15 @@ export function PortalTable({
       title: "",
       key: "actions",
       width: 100,
-      fixed: "right",
       align: "center",
-      // A 1px divider between the scrollable data columns and the fixed action
-      // column, plus the same translucent surface as the rest of the table.
+      // A 1px divider after the scrollable data columns (the cell gets a start
+      // border via CSS). No sticky positioning: every column shares the same
+      // translucent surface and hover highlight.
       onCell: () => ({
-        className: "portal-table-actions-sep portal-table-fixed-bg portal-table-fixed-right",
+        className: "portal-table-actions-sep",
       }),
-      // The header keeps the divider but no background override: it must match
-      // the other headers.
       onHeaderCell: () => ({
-        className: "portal-table-actions-sep portal-table-fixed-right",
+        className: "portal-table-actions-sep",
       }),
       render: (_, portal) => (
         <Button
@@ -254,7 +257,7 @@ export function PortalTable({
         dataSource={portals}
         loading={loading}
         size="medium"
-        scroll={{ x: 1450 }}
+        scroll={{ x: 1580 }}
         onRow={(portal) => ({
           "data-flip-key": String(portal.id),
           style: { cursor: "pointer" },
