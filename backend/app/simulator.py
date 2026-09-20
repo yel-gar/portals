@@ -172,6 +172,21 @@ async def simulate_once(session: AsyncSession, *, open_chance: float | None = No
             randomize_creatures(portal)
             changed_ids.add(portal.id)
 
+    # Expiry is derived (`expires_at <= now`), so no write ever marks the
+    # moment a portal closes by itself — without an explicit notification the
+    # subscribers would only learn about it from the 30 s REST poll. Portals
+    # that expired within the trailing window (two tick intervals cover tick
+    # jitter) are reported so the live table flips them to closed promptly.
+    expiry_cutoff = now - timedelta(seconds=SIMULATOR_TICK_SECONDS * 2)
+    expired_ids = (
+        await session.scalars(
+            select(Portal.id).where(
+                Portal.is_closed.is_(False), Portal.expires_at <= now, Portal.expires_at > expiry_cutoff
+            )
+        )
+    ).all()
+    changed_ids.update(expired_ids)
+
     if random.random() < chance:
         portal = make_new_portal(now)
         session.add(portal)

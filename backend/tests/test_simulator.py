@@ -342,6 +342,58 @@ async def test_simulate_once_locks_only_candidate_portals(
 
 
 @pytest.mark.asyncio
+async def test_simulate_once_notifies_recently_expired_portal(
+    create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A portal whose TTL ran out since the previous tick wakes subscribers.
+
+    Expiry is derived (`expires_at <= now`), so no write marks the moment a
+    portal closes by itself — the tick reports recently expired portals so the
+    live table flips them to closed without waiting for the REST poll.
+    """
+    expired = await create_portal(expires_at=utc_now() - timedelta(seconds=5), stability=50)
+    monkeypatch.setattr(simulator, "random", _FakeRandom())
+    notified: list[int] = []
+
+    async def record_notify(_session: AsyncSession, portal_id: int) -> None:
+        notified.append(portal_id)
+
+    monkeypatch.setattr(simulator, "notify_portal_changed", record_notify)
+
+    async with get_session_factory()() as session:
+        changed = await simulator.simulate_once(session, open_chance=0.0)
+
+    assert changed == [expired.id]
+    assert notified == [expired.id]
+    async with get_session_factory()() as session:
+        fresh = await session.get(Portal, expired.id)
+    assert fresh is not None
+    assert fresh.stability == 50
+    assert fresh.is_closed is False
+
+
+@pytest.mark.asyncio
+async def test_simulate_once_does_not_renotify_long_expired_portal(
+    create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Portals expired long ago are not reported on every tick."""
+    await create_portal(expires_at=utc_now() - timedelta(hours=1))
+    monkeypatch.setattr(simulator, "random", _FakeRandom())
+    notified: list[int] = []
+
+    async def record_notify(_session: AsyncSession, _portal_id: int) -> None:
+        notified.append(_portal_id)
+
+    monkeypatch.setattr(simulator, "notify_portal_changed", record_notify)
+
+    async with get_session_factory()() as session:
+        changed = await simulator.simulate_once(session, open_chance=0.0)
+
+    assert changed == []
+    assert notified == []
+
+
+@pytest.mark.asyncio
 async def test_simulator_loop_runs_ticks(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[int] = []
 
