@@ -128,9 +128,14 @@ def randomize_stability(portal: Portal) -> None:
     portal.stability = min(max(portal.stability + delta, 0), 100)
 
 
-def randomize_creatures(portal: Portal) -> None:
-    """Randomly nudge creatures_count by ±``SIMULATOR_CREATURES_DELTA``, clamped to 0..max."""
-    delta = random.randint(-SIMULATOR_CREATURES_DELTA, SIMULATOR_CREATURES_DELTA)
+def randomize_creatures(portal: Portal, *, allow_increase: bool = True) -> None:
+    """Randomly nudge creatures_count by ±``SIMULATOR_CREATURES_DELTA``, clamped to 0..max.
+
+    With an observer inside no new creatures may appear, so the delta is never
+    positive (the count can only stay or drop).
+    """
+    upper = SIMULATOR_CREATURES_DELTA if allow_increase else 0
+    delta = random.randint(-SIMULATOR_CREATURES_DELTA, upper)
     portal.creatures_count = min(max(portal.creatures_count + delta, 0), SIMULATOR_MAX_CREATURES)
 
 
@@ -169,7 +174,7 @@ async def simulate_once(session: AsyncSession, *, open_chance: float | None = No
         )
         for portal in (await session.scalars(stmt)).all():
             randomize_stability(portal)
-            randomize_creatures(portal)
+            randomize_creatures(portal, allow_increase=not portal.has_observer)
             changed_ids.add(portal.id)
 
     # Expiry is derived (`expires_at <= now`), so no write ever marks the

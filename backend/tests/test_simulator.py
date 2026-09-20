@@ -152,6 +152,20 @@ def test_randomize_clamps_lower_bound(monkeypatch: pytest.MonkeyPatch) -> None:
     assert portal.creatures_count == 0
 
 
+def test_randomize_creatures_never_increases_with_observer(monkeypatch: pytest.MonkeyPatch) -> None:
+    portal = _portal(creatures_count=50)
+    monkeypatch.setattr("random.randint", lambda _a, b: b)
+    simulator.randomize_creatures(portal, allow_increase=False)
+    assert portal.creatures_count == 50
+
+
+def test_randomize_creatures_can_decrease_with_observer(monkeypatch: pytest.MonkeyPatch) -> None:
+    portal = _portal(creatures_count=50)
+    monkeypatch.setattr("random.randint", lambda a, _b: a)
+    simulator.randomize_creatures(portal, allow_increase=False)
+    assert portal.creatures_count == 50 - SIMULATOR_CREATURES_DELTA
+
+
 @pytest.mark.asyncio
 async def test_simulate_once_updates_and_spawns(
     create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
@@ -339,6 +353,27 @@ async def test_simulate_once_locks_only_candidate_portals(
     assert portal_a_fresh.stability == 50 and portal_a_fresh.creatures_count == 0
     assert portal_b_fresh.stability == 50 + SIMULATOR_STABILITY_DELTA
     assert portal_b_fresh.creatures_count == SIMULATOR_CREATURES_DELTA
+
+
+@pytest.mark.asyncio
+async def test_simulate_once_observer_blocks_new_creatures(
+    create_portal: Callable[..., Awaitable[Portal]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An observer inside prevents new creatures from appearing mid-simulation."""
+    observed = await create_portal(name="Observed", stability=50, creatures_count=50, has_observer=True)
+    plain = await create_portal(name="Plain", stability=50, creatures_count=50)
+    monkeypatch.setattr(simulator, "random", _FakeRandom())
+
+    async with get_session_factory()() as session:
+        changed = await simulator.simulate_once(session, open_chance=0.0)
+
+    assert set(changed) == {observed.id, plain.id}
+    async with get_session_factory()() as session:
+        fresh_observed = await session.get(Portal, observed.id)
+        fresh_plain = await session.get(Portal, plain.id)
+    assert fresh_observed is not None and fresh_plain is not None
+    assert fresh_observed.creatures_count == 50
+    assert fresh_plain.creatures_count == 50 + SIMULATOR_CREATURES_DELTA
 
 
 @pytest.mark.asyncio
