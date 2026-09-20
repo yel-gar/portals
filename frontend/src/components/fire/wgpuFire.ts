@@ -65,6 +65,10 @@ const valueNoise = (p: v2f): number => {
  * Brightness of one rarefied spark layer covering the whole canvas. Each cell
  * of a hash grid may host one soft particle; `warp` nudges the sampled
  * position so the whole field shimmers with the shared turbulence.
+ *
+ * Every pixel considers the 3×3 cells around it and keeps the brightest
+ * spark: dots centered near a cell border render whole instead of being cut
+ * at the grid line (the visible square edges).
  */
 const sparkLayer = (
   st: v2f,
@@ -82,28 +86,36 @@ const sparkLayer = (
   const grid = std.mul(std.add(st, d.vec2f(0, std.mul(t, speed))), scale);
   const jitter = std.mul(std.sub(std.mul(warp, 2), 1), 0.5);
   const warped = std.add(grid, d.vec2f(jitter, std.mul(jitter, 0.5)));
-  const cell = std.floor(warped);
-  const local = std.fract(warped);
-  const rand = hash21(std.add(cell, d.vec2f(seed, 0)));
-  // Only a fraction of the cells host a spark — keeps the field rarefied.
-  const density = std.step(0.62, hash21(std.add(cell, d.vec2f(std.add(seed, 7.3), 3.7))));
-  const cx = std.fract(std.mul(rand, 7.17));
-  const cy = std.fract(std.mul(rand, 3.61));
-  const dx = std.sub(local.x, cx);
-  const dy = std.sub(local.y, cy);
-  // Reversed smoothstep edges are undefined behavior in WGSL (garbage on some
-  // drivers, e.g. DirectX — the black squares), so spell the falloff out
-  // explicitly instead of `smoothstep(0.32, 0, d)`. The core radius stays well
-  // below half a cell so each spark fits inside its own grid box.
-  const core = std.sub(
-    1,
-    std.smoothstep(0, 0.2, std.sqrt(std.add(std.mul(dx, dx), std.mul(dy, dy)))),
-  );
-  const twinkle = std.add(
-    0.4,
-    std.mul(0.6, std.sin(std.add(std.mul(t, std.add(4, std.mul(rand, 8))), std.mul(rand, 29)))),
-  );
-  return std.mul(std.mul(std.mul(core, density), twinkle), gain);
+  const base = std.floor(warped);
+  let best = 0;
+  for (let i = -1; i <= 1; i += 1) {
+    for (let j = -1; j <= 1; j += 1) {
+      const cell = std.add(base, d.vec2f(i, j));
+      const rand = hash21(std.add(cell, d.vec2f(seed, 0)));
+      // Only a fraction of the cells host a spark — keeps the field rarefied.
+      const density = std.step(0.62, hash21(std.add(cell, d.vec2f(std.add(seed, 7.3), 3.7))));
+      const cx = std.fract(std.mul(rand, 7.17));
+      const cy = std.fract(std.mul(rand, 3.61));
+      const shift = std.sub(std.sub(warped, cell), d.vec2f(cx, cy));
+      // Reversed smoothstep edges are undefined behavior in WGSL (garbage on
+      // some drivers, e.g. DirectX — the black squares), so spell the falloff
+      // out explicitly. The core radius stays well below half a cell.
+      const core = std.sub(
+        1,
+        std.smoothstep(
+          0,
+          0.2,
+          std.sqrt(std.add(std.mul(shift.x, shift.x), std.mul(shift.y, shift.y))),
+        ),
+      );
+      const twinkle = std.add(
+        0.4,
+        std.mul(0.6, std.sin(std.add(std.mul(t, std.add(4, std.mul(rand, 8))), std.mul(rand, 29)))),
+      );
+      best = std.max(best, std.mul(std.mul(std.mul(core, density), twinkle), gain));
+    }
+  }
+  return best;
 };
 
 /**
@@ -129,8 +141,9 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
 
     const resize = (): void => {
       const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(globalThis.devicePixelRatio ?? 1, 2);
-      const size = fitCanvasSize(rect.width, rect.height, dpr);
+      // Soft embers need no retina density: CSS resolution quarters the fill
+      // cost, which matters every frame and on every recomposite.
+      const size = fitCanvasSize(rect.width, rect.height, 1);
       canvas.width = size.width;
       canvas.height = size.height;
       resolution.write(d.vec2f(canvas.width, canvas.height));
