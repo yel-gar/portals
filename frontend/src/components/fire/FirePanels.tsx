@@ -115,8 +115,9 @@ function FirePanel({ backend }: FirePanelProps) {
 
 /**
  * Decorative full-background layer mounted behind the signed-in layout: a
- * WebGPU spark-particle shader when the browser supports it, a 2D-canvas ember
- * fallback otherwise, and a static gradient under reduced motion.
+ * WebGPU spark-particle shader when the browser supports it (except Windows,
+ * which stays on the ember fallback), a 2D-canvas ember fallback otherwise,
+ * and a static gradient under reduced motion.
  */
 export function FirePanels() {
   const reduced = usePrefersReducedMotion();
