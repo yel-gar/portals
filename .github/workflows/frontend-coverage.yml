@@ -35,7 +35,18 @@ jobs:
 
       - name: Run tests with coverage
         working-directory: frontend
-        run: npm run coverage
+        shell: bash
+        run: set -o pipefail && npm run coverage | tee coverage-output.txt
+
+      - name: Add coverage to job summary
+        working-directory: frontend
+        run: |
+          {
+            echo "### Frontend coverage"
+            echo '```'
+            cat coverage-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

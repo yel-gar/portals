@@ -1,4 +1,4 @@
-name: Backend CI
+name: Backend Coverage
 
 on:
   push:
@@ -15,43 +15,8 @@ permissions:
   contents: read
 
 jobs:
-  checks:
-    name: ${{ matrix.name }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: format (black)
-            command: black --check .
-          - name: lint (ruff)
-            command: ruff check .
-          - name: typecheck (mypy)
-            command: mypy .
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Poetry
-        run: pipx install poetry
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-          cache: poetry
-          cache-dependency-path: backend/poetry.lock
-
-      - name: Install dependencies
-        working-directory: backend
-        run: poetry install --no-root
-
-      - name: Run ${{ matrix.name }}
-        working-directory: backend
-        run: poetry run ${{ matrix.command }}
-
-  tests:
-    name: tests (pytest)
+  coverage:
+    name: coverage report
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -71,6 +36,31 @@ jobs:
         working-directory: backend
         run: poetry install --no-root
 
-      - name: Run tests
+      - name: Run tests with coverage
         working-directory: backend
-        run: poetry run pytest
+        run: poetry run coverage run -m pytest
+
+      - name: Show coverage report
+        working-directory: backend
+        run: poetry run coverage report
+
+      - name: Add coverage to job summary
+        working-directory: backend
+        run: |
+          {
+            echo "### Backend coverage"
+            echo '```'
+            poetry run coverage report
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate XML report
+        working-directory: backend
+        run: poetry run coverage xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/coverage.xml
+          if-no-files-found: error
