@@ -4,6 +4,7 @@
  * WebGPU is unavailable or fails to init. The class is inert where there is
  * no canvas 2D context (e.g. jsdom in tests).
  */
+import { fitCanvasSize } from "./canvasSize";
 
 const SPARKS = 140;
 const FLICKER_MIN = 0.45;
@@ -125,11 +126,10 @@ export class EmberLayer {
   private resize(): void {
     const rect = this.canvas.getBoundingClientRect();
     const dpr = Math.min(globalThis.devicePixelRatio ?? 1, 2);
-    const width = Math.max(1, Math.round(rect.width * dpr));
-    const height = Math.max(1, Math.round(rect.height * dpr));
-    if (this.canvas.width !== width || this.canvas.height !== height) {
-      this.canvas.width = width;
-      this.canvas.height = height;
+    const size = fitCanvasSize(rect.width, rect.height, dpr);
+    if (this.canvas.width !== size.width || this.canvas.height !== size.height) {
+      this.canvas.width = size.width;
+      this.canvas.height = size.height;
     }
   }
 

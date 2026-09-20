@@ -11,6 +11,8 @@ import { common, d, std, tgpu } from "typegpu";
 import type { TgpuRoot } from "typegpu";
 import type { v2f } from "typegpu/data";
 
+import { fitCanvasSize } from "./canvasSize";
+
 export interface WgpuFireHandle {
   stop(): void;
 }
@@ -127,8 +129,9 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
     const resize = (): void => {
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(globalThis.devicePixelRatio ?? 1, 2);
-      canvas.width = Math.max(1, Math.round(rect.width * dpr));
-      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      const size = fitCanvasSize(rect.width, rect.height, dpr);
+      canvas.width = size.width;
+      canvas.height = size.height;
       resolution.write(d.vec2f(canvas.width, canvas.height));
     };
 
