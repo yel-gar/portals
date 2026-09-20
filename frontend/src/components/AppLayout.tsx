@@ -129,7 +129,9 @@ export function AppLayout() {
       <div className="app-main">
         <div className="app-topline" />
         <header className="app-header">
-          <div>
+          {/* Keying by pathname remounts the title block on navigation so the
+              page transition pop replays alongside the content below. */}
+          <div className="app-page-title" key={location.pathname}>
             <div className="app-title">{meta.title}</div>
             <div className="app-subtitle">{meta.subtitle}</div>
           </div>
@@ -146,7 +148,13 @@ export function AppLayout() {
           </div>
         </header>
         <Layout.Content className="app-content">
-          <Outlet />
+          {/* Remounting the routed subtree on route change replays the bouncy
+              per-block entrance animation for every page. The wrapper stays
+              layout-transparent (`.page-enter { display: contents }`), so the
+              page blocks keep their `.app-content` flex gap. */}
+          <div className="page-enter" key={location.pathname}>
+            <Outlet />
+          </div>
         </Layout.Content>
         <footer className="app-footer">
           Лаборатория порталов · единственный источник данных — бэкенд

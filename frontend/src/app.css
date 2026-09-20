@@ -244,6 +244,73 @@ body {
   gap: 16px;
 }
 
+/* Page transition: the routed subtree is remounted on every route change
+   (`key={pathname}` in AppLayout), so each top-level block pops in with a
+   bouncy entrance. `--rise` / `--jitter` give every block a slightly
+   different entry trajectory and the nth-child delays stagger the sequence,
+   so the page feels like its elements settle one after another. */
+.page-enter {
+  /* Layout-transparent: only the children box, so `.app-content` keeps
+     gapping the page blocks directly (the wrapper exists to replay the
+     animation on remount). */
+  display: contents;
+}
+
+.page-enter > * {
+  --rise: 14px;
+  --jitter: 0deg;
+  animation: page-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+.page-enter > *:nth-child(2) {
+  --rise: 9px;
+  --jitter: -0.7deg;
+  animation-delay: 45ms;
+}
+
+.page-enter > *:nth-child(3) {
+  --rise: 18px;
+  --jitter: 0.65deg;
+  animation-delay: 90ms;
+}
+
+.page-enter > *:nth-child(4) {
+  --rise: 12px;
+  --jitter: -0.45deg;
+  animation-delay: 135ms;
+}
+
+.page-enter > *:nth-child(n + 5) {
+  --rise: 16px;
+  --jitter: 0.4deg;
+  animation-delay: 180ms;
+}
+
+.app-page-title {
+  --rise: 8px;
+  --jitter: -0.5deg;
+  animation: page-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  transform-origin: left center;
+}
+
+@keyframes page-pop {
+  from {
+    opacity: 0;
+    transform: translateY(var(--rise)) scale(0.94) rotate(var(--jitter));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter > *,
+  .app-page-title {
+    animation: none;
+  }
+}
+
 .app-footer {
   text-align: center;
   padding: 14px;
