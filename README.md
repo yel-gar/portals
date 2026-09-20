@@ -7,7 +7,7 @@
 ## Быстрый старт
 
 ```bash
-git clone <repo-url> && cd portals
+git clone https://github.com/yel-gar/portals.git && cd portals
 cp .env.example .env # укажите непустой POSTGRES_PASSWORD, также INITIAL_SUPERUSER_USERNAME и INITIAL_SUPERUSER_PASSWORD если нужно
 docker compose up --build -d
 ./populate.sh # заполняет БД демо-порталами, безопасно перезапускать
