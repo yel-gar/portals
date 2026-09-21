@@ -503,6 +503,29 @@ Ideas for future (don't start executing yet)
 3) If observer is inside, no new creatures should appear during simulation (they can only leave)
 ```
 
+```
+1. Currently there's a global action log for all portals, but there must also be individual history for each portal in the modal. To implement this, follow two steps:
+1.1. Add id filter to logs endpoint.
+1.2. Connect frontend to that UI: add a collapsible right panel to modal that will open outwards. It's open by default and closes/opens with animation. It displays 5 last actions and a link to logs page to view full history for this exact portal.
+2. We need "Recommended action" approach. Let's handle it this way: backend supplies recommended action via individual portal endpoint and frontend flashes that button with purple color (add a purple note that purple is recommended action).
+The solution to recommended action is we have a bunch of conditions and each condition corresponds to a dict of recommended actions and points for each. All conditions are checked and action points are summated. If no action points are earned, recommend DISMISSED. Action with highest points is selected, on conflict resolve in following priority: CLOSE > SEND_OBSERVER > WARN_CREATURES > RECALL_OBSERVER > STABILIZE > DISMISS. MARK / UNMARK is never recommended.
+1. Observer not inside
+Stability < 50: STABILIZE 1
+CREATURES == 0: CLOSE 10
+TTL < 5 minutes: SEND_OBSERVER 1
+2. Observer inside
+Stability < 50: STABILIZE 1
+TTL < 30 seconds: RECALL_OBSERVER 1
+TTL < 5 minutes: WARN_CREATURES 1
+CREATURES == 0: RECALL_OBSERVER 10
+
+Recommended action must update after each click. Make sure portals with less than 5 minutes TTL ignore the dismissed behaviour even if they were dismissed previously.
+
+3. Add possibility to force-close the portal with creatures inside, but only for critical portals. Display warning modal before doing that.
+
+As usual, add test cases for everything, commit after each change. Describe the decision tree mechanism in AI-WORKLOG.md in russian after you're done with main tasks.
+```
+
 ## Осознанно допущенные ситуации
 Есть ситуация, что портал критического риска нельзя закрыть, поскольку чтобы предупредить существ, нужно сперва отправить наблюдателя, а наблюдателя в портал с критическим риском отправлять нельзя. Также наблюдатель автоматически возвращается при закрытии портала. (Обновление: принудительное закрытие ниже частично решает первую половину — критический портал с существами теперь закрывается через confirm + `force=true`; отправить наблюдателя в критический по-прежнему нельзя.)
 
