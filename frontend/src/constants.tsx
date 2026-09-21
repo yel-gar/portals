@@ -89,11 +89,26 @@ export const ACTION_ORDER: Action[] = [
   "WARN_CREATURES",
 ];
 
-/** Primary (filled) actions in the modal. */
-export const PRIMARY_ACTIONS: ReadonlySet<Action> = new Set<Action>(["STABILIZE", "CLOSE"]);
+/**
+ * Filled (primary) actions in the modal: every constructive direction plus the
+ * destructive CLOSE (which is filled red via `DANGER_FILLED_ACTIONS`).
+ */
+export const PRIMARY_ACTIONS: ReadonlySet<Action> = new Set<Action>([
+  "STABILIZE",
+  "CLOSE",
+  "MARK",
+  "SEND_OBSERVER",
+  "WARN_CREATURES",
+]);
 
-/** Actions rendered with the AntD `danger` style. */
-export const DANGER_ACTIONS: ReadonlySet<Action> = new Set<Action>(["CLOSE"]);
+/** Filled actions that also carry the AntD `danger` (red) style. */
+export const DANGER_FILLED_ACTIONS: ReadonlySet<Action> = new Set<Action>(["CLOSE"]);
+
+/** Cancel-direction toggles rendered as a red outline (AntD `danger` + default). */
+export const DANGER_OUTLINE_ACTIONS: ReadonlySet<Action> = new Set<Action>([
+  "UNMARK",
+  "RECALL_OBSERVER",
+]);
 
 export const NAV_ICONS = {
   portals: DashboardOutlined,

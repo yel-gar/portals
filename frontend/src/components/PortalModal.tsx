@@ -18,7 +18,13 @@ import { Link } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { portalsApi } from "../api/endpoints";
 import type { Action, Portal } from "../api/types";
-import { ACTION_META, ACTION_ORDER, DANGER_ACTIONS, PRIMARY_ACTIONS } from "../constants";
+import {
+  ACTION_META,
+  ACTION_ORDER,
+  DANGER_FILLED_ACTIONS,
+  DANGER_OUTLINE_ACTIONS,
+  PRIMARY_ACTIONS,
+} from "../constants";
 import { formatDateTime, formatRelative, formatTimeLeft } from "../format";
 import { usePortalAction } from "../hooks/usePortalAction";
 import { useNow } from "../hooks/useNow";
@@ -281,7 +287,8 @@ export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalPro
                       : entry;
                 const meta = ACTION_META[resolved];
                 const { Icon } = meta;
-                const danger = DANGER_ACTIONS.has(resolved);
+                const dangerOutline = DANGER_OUTLINE_ACTIONS.has(resolved);
+                const danger = dangerOutline || DANGER_FILLED_ACTIONS.has(resolved);
                 // Actions other than (un)marking are meaningless on a closed portal;
                 // the backend would answer 409 anyway — disable them up front.
                 const closedUnavailable =
@@ -292,7 +299,7 @@ export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalPro
                     <Button
                       block
                       danger={danger}
-                      type={danger || PRIMARY_ACTIONS.has(resolved) ? "primary" : "default"}
+                      type={PRIMARY_ACTIONS.has(resolved) ? "primary" : "default"}
                       icon={<Icon />}
                       loading={pending === resolved}
                       disabled={closedUnavailable || (pending !== null && pending !== resolved)}

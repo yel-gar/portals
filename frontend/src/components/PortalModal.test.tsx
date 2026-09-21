@@ -60,6 +60,44 @@ describe("PortalModal", () => {
     expect(screen.queryByRole("button", { name: /Отметить/ })).not.toBeInTheDocument();
   });
 
+  it("fills the constructive actions and keeps DISMISS outlined", async () => {
+    renderModal({ ...OPEN_PORTAL, has_observer: false, is_marked: false });
+
+    const filled = ["Стабилизировать", "Отправить наблюдателя", "Отметить", "Предупредить существ"];
+    const filledButtons = await Promise.all(filled.map((label) => screen.findByText(label)));
+    for (const el of filledButtons) {
+      const button = el.closest("button");
+      expect(button).not.toBeNull();
+      expect(button!).toHaveClass("ant-btn-variant-solid");
+      expect(button!).not.toHaveClass("ant-btn-dangerous");
+    }
+
+    // CLOSE is filled but destructive (red).
+    const close = (await screen.findByText("Закрыть")).closest("button");
+    expect(close).not.toBeNull();
+    expect(close!).toHaveClass("ant-btn-variant-solid");
+    expect(close!).toHaveClass("ant-btn-dangerous");
+
+    const dismiss = (await screen.findByText("Оставить открытым")).closest("button");
+    expect(dismiss).not.toBeNull();
+    expect(dismiss!).toHaveClass("ant-btn-variant-outlined");
+    expect(dismiss!).not.toHaveClass("ant-btn-dangerous");
+  });
+
+  it("renders the cancel-direction toggles as a red outline", async () => {
+    renderModal({ ...OPEN_PORTAL, has_observer: true, is_marked: true });
+
+    const toggles = ["Снять отметку", "Отозвать наблюдателя"];
+    const toggleButtons = await Promise.all(toggles.map((label) => screen.findByText(label)));
+    for (const el of toggleButtons) {
+      const button = el.closest("button");
+      expect(button).not.toBeNull();
+      expect(button!).toHaveClass("ant-btn-variant-outlined");
+      expect(button!).toHaveClass("ant-btn-dangerous");
+      expect(button!).not.toHaveClass("ant-btn-variant-solid");
+    }
+  });
+
   it("runs an action and reports success", async () => {
     const user = userEvent.setup();
     let requestedAction: string | null = null;
