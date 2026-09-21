@@ -1,11 +1,11 @@
 /**
  * WebGPU background renderer built on TypeGPU (TS-first WGSL).
  *
- * Paints the entire background as a rarefied field of ember spark particles
- * drifting upward through slow swirling turbulence. This module is only ever
- * loaded via dynamic `import()` from `FirePanels`, so browsers without WebGPU
- * never download the TypeGPU chunk. Any failure here degrades to `null` and
- * the caller rolls back to the ember canvas.
+ * Paints the entire background as slow orange streams of light flowing
+ * through swirling turbulence. This module is only ever loaded via dynamic
+ * `import()` from `FirePanels`, so browsers without WebGPU never download the
+ * TypeGPU chunk. Any failure here degrades to `null` and the caller rolls back
+ * to the ember canvas.
  */
 import { common, d, std, tgpu } from "typegpu";
 import type { TgpuRoot } from "typegpu";
@@ -87,71 +87,7 @@ const valueNoise = (p: v2f): number => {
 };
 
 /**
- * Brightness of one rarefied spark layer covering the whole canvas. Each cell
- * of a hash grid may host one soft particle; `warp` nudges the sampled
- * position so the whole field shimmers with the shared turbulence.
- *
- * Spark centers are constrained to [R, 1 - R] inside their cell, where R is
- * the falloff radius: no dot ever crosses a cell border, so a single tap per
- * pixel is exact (no neighbourhood search, no cut-off square edges).
- * `warpScale` scales the turbulence nudge: 0 keeps dots perfectly round in
- * rigid (rotated/scrolled) space, 1 lets the warp knead them. `cutoff` is the
- * occupancy threshold: cells whose hash falls below it stay empty.
- */
-const sparkLayer = (
-  st: v2f,
-  t: number,
-  scale: number,
-  speed: number,
-  gain: number,
-  seed: number,
-  warp: number,
-  warpScale: number,
-  cutoff: number,
-): number => {
-  "use gpu";
-  // The field scrolls upward continuously: adding `t * speed` shifts the
-  // sampled window downward in texture space, so on the y-down screen the
-  // sparks drift up and never pop while crossing cell borders.
-  const grid = std.mul(std.add(st, d.vec2f(0, std.mul(t, speed))), scale);
-  const jitter = std.mul(std.mul(std.sub(std.mul(warp, 2), 1), 0.5), warpScale);
-  const warped = std.add(grid, d.vec2f(jitter, std.mul(jitter, 0.5)));
-  const cell = std.floor(warped);
-  const local = std.fract(warped);
-  // One hash feeds every per-cell value (density, center, phase).
-  const rand = hash21(std.add(cell, d.vec2f(seed, 0)));
-  // Only a fraction of the cells host a spark — keeps the field rarefied.
-  const density = std.step(cutoff, std.fract(std.mul(rand, 9.17)));
-  const R = 0.24;
-  const span = std.sub(1, std.add(R, R));
-  const cx = std.add(R, std.mul(span, std.fract(std.mul(rand, 7.17))));
-  const cy = std.add(R, std.mul(span, std.fract(std.mul(rand, 3.61))));
-  const dx = std.sub(local.x, cx);
-  const dy = std.sub(local.y, cy);
-  // Reversed smoothstep edges are undefined behavior in WGSL (garbage on some
-  // drivers, e.g. DirectX — the black squares), so spell the falloff out
-  // explicitly.
-  const core = std.sub(
-    1,
-    std.smoothstep(0, R, std.sqrt(std.add(std.mul(dx, dx), std.mul(dy, dy)))),
-  );
-  // Same gentle twinkle as the 2D fallback: slow, shallow, floored.
-  const phase = std.mul(rand, 6.2831);
-  const twinkle = std.max(
-    0.45,
-    std.add(
-      0.72,
-      std.add(
-        std.mul(0.18, std.sin(std.add(std.mul(t, 1.9), phase))),
-        std.mul(0.1, std.sin(std.add(std.mul(t, 3.4), std.mul(phase, 1.7)))),
-      ),
-    ),
-  );
-  return std.mul(std.mul(std.mul(core, density), twinkle), gain);
-};
-
-/**
- * Creates a background spark pipeline on the given canvas and starts rendering
+ * Creates a background fire pipeline on the given canvas and starts rendering
  * frames. Returns `null` (after cleanup) when WebGPU is unavailable or fails
  * to init.
  */
@@ -177,10 +113,7 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
       d.vec4f,
       d.vec4f(fireTuning.flowA, fireTuning.flowB, fireTuning.swirl, fireTuning.warpFreq),
     );
-    const tuneB = root.createUniform(
-      d.vec4f,
-      d.vec4f(fireTuning.cutA, fireTuning.cutB, fireTuning.bright, fireTuning.dotScale),
-    );
+    const bright = root.createUniform(d.f32, fireTuning.bright);
     const adapterInfo = adapterDescription ?? "unknown adapter";
     const debug = {
       frames: 0,
@@ -210,10 +143,10 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
         const size = resolution.$;
         // Live knobs from the experiment panel (rewritten every frame).
         const ta = tuneA.$;
-        const tb = tuneB.$;
+        const brightK = bright.$;
         // Visible uv is [0, 1] × [0, 1] (y down: uv.y = 1 at the NDC
         // bottom); remap to an aspect-corrected [0..aspect] × [0..1] so the
-        // spark density is uniform across screens.
+        // flow pattern is uniform across screens.
         const base = d.vec2f(uv.x * (size.x / size.y), uv.y);
 
         // Fast-evolving turbulence — a single shared noise sample.
@@ -256,7 +189,7 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
         const streamA = std.mul(bandA, bandA);
         color = std.add(
           color,
-          std.mul(d.vec3f(0.95, 0.42, 0.08), std.mul(streamA, std.mul(0.55, tb.z))),
+          std.mul(d.vec3f(0.95, 0.42, 0.08), std.mul(streamA, std.mul(0.55, brightK))),
         );
 
         const flowB = valueNoise(
@@ -272,15 +205,8 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
         const streamB = std.mul(bandB, bandB);
         color = std.add(
           color,
-          std.mul(d.vec3f(0.7, 0.25, 0.05), std.mul(streamB, std.mul(0.4, tb.z))),
+          std.mul(d.vec3f(0.7, 0.25, 0.05), std.mul(streamB, std.mul(0.4, brightK))),
         );
-
-        // Dense fine glitter in two sizes drifting over the streams —
-        // undistorted by the turbulence so every dot stays round and crisp.
-        const glintA = sparkLayer(st, t, 260 * tb.w, 0.045, 0.75 * tb.z, 1.5, warp, 0, tb.x);
-        color = std.add(color, std.mul(d.vec3f(1.0, 0.8, 0.45), glintA));
-        const glintB = sparkLayer(st, t, 520 * tb.w, 0.06, 0.55 * tb.z, 4.5, warp, 0, tb.y);
-        color = std.add(color, std.mul(d.vec3f(1.0, 0.85, 0.55), glintB));
 
         // Soft elliptical falloff keeps the corners calm (spelled without
         // reversed smoothstep edges — those are WGSL undefined behavior).
@@ -315,9 +241,7 @@ export async function createWgpuFire(canvas: HTMLCanvasElement): Promise<WgpuFir
       tuneA.write(
         d.vec4f(fireTuning.flowA, fireTuning.flowB, fireTuning.swirl, fireTuning.warpFreq),
       );
-      tuneB.write(
-        d.vec4f(fireTuning.cutA, fireTuning.cutB, fireTuning.bright, fireTuning.dotScale),
-      );
+      bright.write(fireTuning.bright);
       if (context !== null) {
         pipeline.withColorAttachment({ view: context }).draw(3);
       }

@@ -13,14 +13,8 @@ export interface FireTuning {
   swirl: number;
   /** Turbulence noise frequency. */
   warpFreq: number;
-  /** Glitter density cutoff of the large layer (lower = more dots). */
-  cutA: number;
-  /** Glitter density cutoff of the small layer. */
-  cutB: number;
-  /** Master brightness multiplier for streams and glitter. */
+  /** Master brightness multiplier for the streams. */
   bright: number;
-  /** Glitter grid scale multiplier (lower = bigger dots). */
-  dotScale: number;
 }
 
 export const DEFAULT_TUNING: FireTuning = {
@@ -28,10 +22,7 @@ export const DEFAULT_TUNING: FireTuning = {
   flowB: 0.1,
   swirl: 0.05,
   warpFreq: 2.2,
-  cutA: 0.35,
-  cutB: 0.45,
   bright: 0.85,
-  dotScale: 0.95,
 };
 
 export const fireTuning: FireTuning = { ...DEFAULT_TUNING };
