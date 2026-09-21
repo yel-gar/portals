@@ -4,6 +4,9 @@
 
 В интерфейсе приложения есть отдельная вкладка **AI Worklog** - рендерит `AI-WORKLOG.md` прямо из корня репозитория, без отдельной копии для поддержки в актуальном состоянии.
 
+https://github.com/user-attachments/assets/d50da6ad-2403-4b77-8652-c62406576933
+
+
 ## Быстрый старт
 
 ```bash
@@ -34,6 +37,22 @@ def verify_password(password: str, password_hash: str) -> bool:
 Проект требует **Python 3.14+** (`requires-python` в `pyproject.toml`), а Dockerfile использует соответствующий Python 3.14 образ.
 Также данный синтаксис нормализуется используемым форматтером: при добавлении скобок вокруг списка исключений они удаляются при форматировании.
 При оценке корректности этого фрагмента следует учитывать минимальную версию Python проекта.
+
+## Скриншоты
+### Главная страница
+
+<img width="1868" height="941" alt="image" src="https://github.com/user-attachments/assets/0e60dd04-5840-499c-a755-4beadc85434b" />
+<hr>
+
+### Логи
+
+<img width="1913" height="940" alt="image" src="https://github.com/user-attachments/assets/b934315e-c773-42d0-90d2-38c739873957" />
+<hr>
+
+### Карточка портала
+
+<img width="1005" height="483" alt="image" src="https://github.com/user-attachments/assets/57b28de2-47e3-4825-92a0-c2def2c8124c" />
+
 
 ## Deployment
 
