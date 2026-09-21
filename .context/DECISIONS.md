@@ -8,7 +8,7 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 ## Portal semantics
 - `closed` is a **derived** property: `expires_at <= now or is_closed`. It is exposed in `PortalSchema` as `closed`; the raw DB column stays `is_closed`.
 - Risk factor is calculated as
-  `(energy/100)*0.2 + (1 - stability/100)*0.2 + (0.1*c/(0.1*c+1))*0.3 + (1 - 0.04*TTL/(0.04*TTL+1))*0.3`,
+  `(energy/100)*0.2 + (1 - stability/100)*0.2 + (0.1*c/(0.1*c+1))*0.3 + (1 - 0.01*TTL/(0.01*TTL+1))*0.3`,
   where `TTL = max((expires_at - now).total_seconds(), 0.0)` — clamped, expired portals never produce negative TTL.
 - Danger levels: `<= 0.3` LOW, `<= 0.6` MEDIUM, `<= 0.85` HIGH, `> 0.85` CRITICAL.
 - `STABILIZE` condition "stability below 0.5" is interpreted for the 0-100 int scale as `stability < 50`; stabilizing increases stability by a random value from `STABILITY_INCREASE_RAND_RANGE = (10, 30)`, capped at `100`.

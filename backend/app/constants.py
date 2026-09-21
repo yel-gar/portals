@@ -35,7 +35,10 @@ RISK_STABILITY_WEIGHT = 0.2
 RISK_CREATURES_WEIGHT = 0.3
 RISK_TTL_WEIGHT = 0.3
 RISK_CREATURES_SCALE = 0.1
-RISK_TTL_SCALE = 0.04
+# TTL urgency ramp: at 0.01 a maxed-out portal turns CRITICAL while its TTL is
+# under ~100 s (0.931 at 30 s), reads HIGH at 2-5 min, and the TTL term is
+# negligible beyond ~1 h — urgency without permanent criticals.
+RISK_TTL_SCALE = 0.01
 
 DANGER_LOW_THRESHOLD = 0.3
 DANGER_MEDIUM_THRESHOLD = 0.6
