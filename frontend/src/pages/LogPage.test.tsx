@@ -78,4 +78,29 @@ describe("LogPage", () => {
       expect(params.get("order_by")).toBe("newest");
     });
   });
+
+  it("pre-filters by portal_id from the URL and clears it on demand", async () => {
+    const user = userEvent.setup();
+    let captured: string | null = null;
+    server.use(
+      http.get(API_URL("/portals/log"), ({ request }) => {
+        captured = request.url;
+        return HttpResponse.json({ items: [], page: 1, items_per_page: 20, total: 0 });
+      }),
+    );
+
+    renderWithProviders(<LogPage />, { initialEntries: ["/log?portal_id=3"] });
+
+    await waitFor(() => {
+      expect(new URL(captured!).searchParams.get("portal_id")).toBe("3");
+    });
+    expect(await screen.findByText("Показаны действия портала #3")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Показать все" }));
+
+    await waitFor(() => {
+      expect(new URL(captured!).searchParams.has("portal_id")).toBe(false);
+    });
+    expect(screen.queryByText("Показаны действия портала #3")).not.toBeInTheDocument();
+  });
 });

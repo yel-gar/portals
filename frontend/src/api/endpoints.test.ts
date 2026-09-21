@@ -52,7 +52,22 @@ describe("actionLogQuery", () => {
       page: 3,
       items_per_page: 50,
       action: "CLOSE",
+      portal_id: undefined,
+      user_id: undefined,
       order_by: "oldest",
+    });
+  });
+
+  it("maps the portal and user filters", () => {
+    expect(
+      actionLogQuery({ page: 1, itemsPerPage: 5, portalId: 7, userId: 2, orderBy: "newest" }),
+    ).toEqual({
+      page: 1,
+      items_per_page: 5,
+      action: undefined,
+      portal_id: 7,
+      user_id: 2,
+      order_by: "newest",
     });
   });
 

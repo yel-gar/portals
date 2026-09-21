@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
@@ -134,5 +134,106 @@ describe("PortalModal", () => {
       expect(button).not.toBeNull();
       expect(button!).toBeDisabled();
     }
+  });
+
+  it("highlights the backend-recommended action in purple", async () => {
+    // OPEN_PORTAL recommends STABILIZE.
+    renderModal();
+    const stabilize = (await screen.findByText("Стабилизировать")).closest("button");
+    expect(stabilize).not.toBeNull();
+    expect(stabilize!.classList.contains("portal-action-recommended")).toBe(true);
+    const close = (await screen.findByText("Закрыть")).closest("button");
+    expect(close!.classList.contains("portal-action-recommended")).toBe(false);
+    expect(await screen.findByText(/Фиолетовая подсветка — рекомендованное/)).toBeInTheDocument();
+  });
+
+  it("shows the last portal actions and collapses the history panel", async () => {
+    const user = userEvent.setup();
+    const entry = {
+      id: 9,
+      portal_id: OPEN_PORTAL.id,
+      action: "MARK" as const,
+      timestamp: "2026-09-19T11:50:00Z",
+      user: { id: 1, username: "demo", is_superuser: false },
+    };
+    let captured: string | null = null;
+    server.use(
+      http.get(API_URL("/portals/log"), ({ request }) => {
+        captured = request.url;
+        return HttpResponse.json({ items: [entry], page: 1, items_per_page: 5, total: 1 });
+      }),
+    );
+
+    renderModal();
+    expect(await screen.findByText("История портала")).toBeInTheDocument();
+    expect(await screen.findByText("Отметить")).toBeInTheDocument();
+    const fullHistory = (await screen.findByText("Полная история портала")).closest("a");
+    expect(fullHistory).not.toBeNull();
+    expect(fullHistory!.getAttribute("href")).toBe(`/log?portal_id=${OPEN_PORTAL.id}`);
+    await waitFor(() => {
+      expect(new URL(captured!).searchParams.get("portal_id")).toBe(String(OPEN_PORTAL.id));
+    });
+
+    await user.click(screen.getByRole("button", { name: /Скрыть историю/ }));
+    // jsdom performs no layout, so visibility cannot be asserted — the open
+    // state is pinned on the panel's modifier class and the toggle label.
+    const panel = () => document.querySelector(".portal-history");
+    await waitFor(() => expect(panel()).toHaveClass("portal-history--closed"));
+    expect(screen.queryByRole("button", { name: /Скрыть историю/ })).not.toBeInTheDocument();
+    // The toggle carries the icon's accessible name too ("history История"),
+    // so match by substring rather than by exact name.
+    await user.click(screen.getByRole("button", { name: /История/ }));
+    await waitFor(() => expect(panel()).toHaveClass("portal-history--open"));
+    expect(screen.getByRole("button", { name: /Скрыть историю/ })).toBeInTheDocument();
+  });
+
+  it("asks for confirmation before force-closing a critical portal with creatures", async () => {
+    const user = userEvent.setup();
+    let requestedUrl: string | null = null;
+    server.use(
+      http.post(API_URL("/portals/:id"), ({ request }) => {
+        requestedUrl = request.url;
+        return HttpResponse.json(OPEN_PORTAL);
+      }),
+    );
+
+    renderModal({ ...OPEN_PORTAL, danger_level: "CRITICAL", creatures_count: 5 });
+    const closeAction = (await screen.findByText("Закрыть")).closest("button");
+    expect(closeAction).not.toBeNull();
+    await user.click(closeAction!);
+
+    // The confirm title is rendered twice by antd (dialog + confirm title
+    // nodes share the text), so assert on the unique body copy instead.
+    expect(await screen.findByText(/Внутри портала есть существа/)).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Закрыть принудительно" }));
+
+    await waitFor(() => {
+      const params = new URL(requestedUrl!).searchParams;
+      expect(params.get("action")).toBe("CLOSE");
+      expect(params.get("force")).toBe("true");
+    });
+  });
+
+  it("sends a plain close without confirmation on a non-critical portal", async () => {
+    const user = userEvent.setup();
+    let requestedUrl: string | null = null;
+    server.use(
+      http.post(API_URL("/portals/:id"), ({ request }) => {
+        requestedUrl = request.url;
+        return HttpResponse.json(OPEN_PORTAL);
+      }),
+    );
+
+    renderModal();
+    const closeAction = (await screen.findByText("Закрыть")).closest("button");
+    expect(closeAction).not.toBeNull();
+    await user.click(closeAction!);
+
+    await waitFor(() => {
+      const params = new URL(requestedUrl!).searchParams;
+      expect(params.get("action")).toBe("CLOSE");
+      expect(params.has("force")).toBe(false);
+    });
+    expect(screen.queryByText("Принудительно закрыть портал?")).not.toBeInTheDocument();
   });
 });

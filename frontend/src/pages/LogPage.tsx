@@ -137,7 +137,7 @@ export function LogPage() {
               type="info"
               showIcon
               style={{ marginBottom: 16 }}
-              message={`Показаны действия портала #${filters.portalId}`}
+              title={`Показаны действия портала #${filters.portalId}`}
               action={<Button onClick={clearPortalFilter}>Показать все</Button>}
             />
           )}
