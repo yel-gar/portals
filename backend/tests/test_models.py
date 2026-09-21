@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 
 from app.exceptions import BadAction
-from app.models import DangerLevel, Portal, utc_now
+from app.models import Action, DangerLevel, Portal, utc_now
 
 
 def _portal(**overrides: Any) -> Portal:
@@ -88,6 +88,86 @@ async def test_dismiss_parks_portal_and_rejects_urgent() -> None:
     again.dismiss()
     assert again.dismissed_until is not None
     assert again.dismissed_until >= first
+
+
+@pytest.mark.asyncio
+async def test_recommended_action_no_observer_branches() -> None:
+    calm_open = _portal(stability=80, creatures_count=3, has_observer=False, expires_at=utc_now() + timedelta(hours=2))
+    assert calm_open.recommended_action == Action.DISMISS
+
+    unstable = _portal(stability=30, creatures_count=3, has_observer=False, expires_at=utc_now() + timedelta(hours=2))
+    assert unstable.recommended_action == Action.STABILIZE
+
+    empty = _portal(stability=80, creatures_count=0, has_observer=False, expires_at=utc_now() + timedelta(hours=2))
+    assert empty.recommended_action == Action.CLOSE
+
+    urgent = _portal(stability=80, creatures_count=3, has_observer=False, expires_at=utc_now() + timedelta(minutes=4))
+    assert urgent.recommended_action == Action.SEND_OBSERVER
+
+    # CLOSE (10) dominates STABILIZE (1) + SEND_OBSERVER (1).
+    urgent_empty_unstable = _portal(
+        stability=30, creatures_count=0, has_observer=False, expires_at=utc_now() + timedelta(minutes=4)
+    )
+    assert urgent_empty_unstable.recommended_action == Action.CLOSE
+
+    # Tie STABILIZE (1) vs SEND_OBSERVER (1) resolves to SEND_OBSERVER by priority.
+    tie = _portal(stability=30, creatures_count=3, has_observer=False, expires_at=utc_now() + timedelta(minutes=4))
+    assert tie.recommended_action == Action.SEND_OBSERVER
+
+
+@pytest.mark.asyncio
+async def test_recommended_action_observer_branches() -> None:
+    calm_watched = _portal(
+        stability=80, creatures_count=3, has_observer=True, expires_at=utc_now() + timedelta(hours=2)
+    )
+    assert calm_watched.recommended_action == Action.DISMISS
+
+    unstable_watched = _portal(
+        stability=30, creatures_count=3, has_observer=True, expires_at=utc_now() + timedelta(hours=2)
+    )
+    assert unstable_watched.recommended_action == Action.STABILIZE
+
+    warn = _portal(stability=80, creatures_count=3, has_observer=True, expires_at=utc_now() + timedelta(minutes=4))
+    assert warn.recommended_action == Action.WARN_CREATURES
+
+    # TTL < 30 s scores both RECALL (1) and WARN (1): WARN wins by priority.
+    recall_vs_warn = _portal(
+        stability=80, creatures_count=3, has_observer=True, expires_at=utc_now() + timedelta(seconds=20)
+    )
+    assert recall_vs_warn.recommended_action == Action.WARN_CREATURES
+
+    empty_watched = _portal(
+        stability=80, creatures_count=0, has_observer=True, expires_at=utc_now() + timedelta(hours=2)
+    )
+    assert empty_watched.recommended_action == Action.RECALL_OBSERVER
+
+    closed = _portal(is_closed=True, has_observer=False)
+    assert closed.recommended_action == Action.DISMISS
+    expired = _portal(expires_at=utc_now() - timedelta(seconds=1))
+    assert expired.recommended_action == Action.DISMISS
+
+
+@pytest.mark.asyncio
+async def test_force_close_only_critical() -> None:
+    critical = _portal(
+        energy_level=100,
+        stability=0,
+        creatures_count=1000,
+        expires_at=utc_now() + timedelta(seconds=1),
+    )
+    assert critical.danger_level == DangerLevel.CRITICAL
+    critical.close(force=True)
+    assert critical.is_closed is True
+
+    non_critical = _portal(creatures_count=2, expires_at=utc_now() + timedelta(hours=1))
+    assert non_critical.danger_level != DangerLevel.CRITICAL
+    with pytest.raises(BadAction):
+        non_critical.close(force=True)
+    assert non_critical.is_closed is False
+    with pytest.raises(BadAction):
+        non_critical.close()
+    with pytest.raises(BadAction):
+        _portal(is_closed=True).close(force=True)
 
 
 @pytest.mark.asyncio

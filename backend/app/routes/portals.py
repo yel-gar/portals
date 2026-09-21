@@ -4,7 +4,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect, status
@@ -17,6 +17,7 @@ from ..constants import (
     DANGER_HIGH_THRESHOLD,
     DANGER_LOW_THRESHOLD,
     DANGER_MEDIUM_THRESHOLD,
+    DISMISS_MIN_TTL_SECONDS,
     RISK_CREATURES_SCALE,
     RISK_CREATURES_WEIGHT,
     RISK_ENERGY_WEIGHT,
@@ -134,8 +135,11 @@ def _portal_order_clauses(order_by: PortalOrder, now: datetime) -> list[Any]:
     open_first = case((and_(Portal.is_closed.is_(False), Portal.expires_at > now), 0), else_=1).asc()
     # DISMISS («оставить открытым») parks the portal below open non-dismissed
     # ones while the dismissal window (dismissed_until) is active. A NULL
-    # dismissed_until simply falls into the else branch (0).
-    dismissed_sinks = case((Portal.dismissed_until > now, 1), else_=0).asc()
+    # dismissed_until simply falls into the else branch (0). Portals expiring
+    # within DISMISS_MIN_TTL_SECONDS ignore a stale window even if dismissed
+    # earlier — there is no room left to defer the inevitable.
+    dismiss_cutoff = now + timedelta(seconds=DISMISS_MIN_TTL_SECONDS)
+    dismissed_sinks = case((and_(Portal.dismissed_until > now, Portal.expires_at > dismiss_cutoff), 1), else_=0).asc()
     if order_by is PortalOrder.RISK:
         return [
             open_first,
@@ -551,15 +555,22 @@ async def stats(session: DbSession, _user: CurrentUser) -> StatsSchema:
         status.HTTP_409_CONFLICT: {"description": "Действие недопустимо для данного портала"},
         status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Неизвестное действие или некорректный id"},
     },
-    description="Выполнить действие над порталом. Действие записывается в журнал.",
+    description="Выполнить действие над порталом. Действие записывается в журнал. "
+    "`force=true` разрешает закрыть портал с существами внутри, но только при критическом уровне "
+    "опасности (иначе 409).",
     summary="Действие над порталом",
 )
-async def execute_action(portal_id: int, action: Action, session: DbSession, user: CurrentUser) -> Portal:
+async def execute_action(
+    portal_id: int, action: Action, session: DbSession, user: CurrentUser, force: bool = Query(False)
+) -> Portal:
     portal = await session.get(Portal, portal_id, with_for_update=True)
     if portal is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Портал не найден")
     try:
-        getattr(portal, action.value.lower())()
+        if action is Action.CLOSE:
+            portal.close(force=force)
+        else:
+            getattr(portal, action.value.lower())()
     except BadAction as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     # «Обновлено» reflects operator actions only — the simulator never touches it.

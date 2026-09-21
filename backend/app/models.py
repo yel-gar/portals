@@ -28,6 +28,8 @@ from .constants import (
     LOGIN_TOKEN_LENGTH,
     PASSWORD_HASH_MAX_LENGTH,
     PORTAL_NAME_MAX_LENGTH,
+    RECOMMEND_TTL_RECALL_SECONDS,
+    RECOMMEND_TTL_SEND_WARN_SECONDS,
     RISK_CREATURES_SCALE,
     RISK_CREATURES_WEIGHT,
     RISK_ENERGY_WEIGHT,
@@ -144,14 +146,65 @@ class Portal(Base):
         if self.closed:
             raise BadAction("Портал закрыт, выполнить действие невозможно")
 
-    def close(self) -> None:
+    def close(self, *, force: bool = False) -> None:
         self._deny_if_closed()
         if self.creatures_count > 0:
-            raise BadAction("Нельзя закрыть портал: внутри есть существа")
+            if not force:
+                raise BadAction("Нельзя закрыть портал: внутри есть существа")
+            if self.danger_level != DangerLevel.CRITICAL:
+                raise BadAction("Принудительное закрытие разрешено только для порталов с критическим уровнем опасности")
         # An operator closing a portal pulls the observer out with it — a closed
         # portal can never keep an observer inside.
         self.has_observer = False
         self.is_closed = True
+
+    @property
+    def recommended_action(self) -> Action:
+        """Scored recommendation over the portal state (MARK/UNMARK never suggested).
+
+        Every matching condition below adds its points, the highest total wins;
+        ties resolve in CLOSE > SEND_OBSERVER > WARN_CREATURES > RECALL_OBSERVER
+        > STABILIZE > DISMISS order. No points at all falls back to DISMISS.
+        Closed portals always fall back to DISMISS — no action is valid on them.
+        """
+        if self.closed:
+            return Action.DISMISS
+        scores: dict[Action, int] = {}
+
+        def add(action: Action, points: int) -> None:
+            scores[action] = scores.get(action, 0) + points
+
+        ttl_seconds = (self.expires_at - utc_now()).total_seconds()
+        if not self.has_observer:
+            if self.stability < 50:
+                add(Action.STABILIZE, 1)
+            if self.creatures_count == 0:
+                add(Action.CLOSE, 10)
+            if ttl_seconds < RECOMMEND_TTL_SEND_WARN_SECONDS:
+                add(Action.SEND_OBSERVER, 1)
+        else:
+            if self.stability < 50:
+                add(Action.STABILIZE, 1)
+            if ttl_seconds < RECOMMEND_TTL_RECALL_SECONDS:
+                add(Action.RECALL_OBSERVER, 1)
+            if ttl_seconds < RECOMMEND_TTL_SEND_WARN_SECONDS:
+                add(Action.WARN_CREATURES, 1)
+            if self.creatures_count == 0:
+                add(Action.RECALL_OBSERVER, 10)
+        if not scores:
+            return Action.DISMISS
+        best = max(scores.values())
+        for candidate in (
+            Action.CLOSE,
+            Action.SEND_OBSERVER,
+            Action.WARN_CREATURES,
+            Action.RECALL_OBSERVER,
+            Action.STABILIZE,
+            Action.DISMISS,
+        ):
+            if scores.get(candidate) == best:
+                return candidate
+        return Action.DISMISS
 
     def stabilize(self) -> None:
         self._deny_if_closed()

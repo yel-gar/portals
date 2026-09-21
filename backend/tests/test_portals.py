@@ -71,6 +71,7 @@ async def test_portal_payload_matches_schema(
         "dismissed_until",
         "risk_factor",
         "danger_level",
+        "recommended_action",
     }
 
 
@@ -559,6 +560,101 @@ async def test_stats(client: AsyncClient, create_portal: Callable[..., Awaitable
 async def test_stats_requires_auth(client: AsyncClient) -> None:
     response = await client.get("/portals/stats")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_portal_payload_includes_recommended_action(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    await _login(client)
+    # No observer, stable, creatures present, long TTL -> no points -> DISMISS.
+    portal = await create_portal(stability=80, creatures_count=3, has_observer=False)
+
+    response = await client.get(f"/portals/{portal.id}")
+    assert response.status_code == 200, response.text
+    assert response.json()["recommended_action"] == Action.DISMISS.value
+
+    listed = await client.get("/portals")
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["items"][0]["recommended_action"] == Action.DISMISS.value
+
+
+@pytest.mark.asyncio
+async def test_recommended_action_updates_after_action(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    await _login(client)
+    portal = await create_portal(stability=30, creatures_count=3, has_observer=False)
+
+    before = await client.get(f"/portals/{portal.id}")
+    assert before.json()["recommended_action"] == Action.STABILIZE.value
+
+    stabilized = await client.post(f"/portals/{portal.id}", params={"action": Action.STABILIZE.value})
+    assert stabilized.status_code == 200, stabilized.text
+    assert stabilized.json()["recommended_action"] == Action.DISMISS.value
+
+
+@pytest.mark.asyncio
+async def test_force_close_critical_portal_with_creatures(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    await _login(client)
+    critical = await create_portal(
+        energy_level=100,
+        stability=0,
+        creatures_count=1000,
+        expires_at=utc_now() + timedelta(seconds=1),
+    )
+    normal = await client.post(f"/portals/{critical.id}", params={"action": Action.CLOSE.value})
+    assert normal.status_code == 409
+
+    forced = await client.post(f"/portals/{critical.id}", params={"action": Action.CLOSE.value, "force": "true"})
+    assert forced.status_code == 200, forced.text
+    assert forced.json()["closed"] is True
+
+    log = await client.get("/portals/log", params={"portal_id": critical.id})
+    assert log.json()["total"] == 1
+    assert log.json()["items"][0]["action"] == Action.CLOSE.value
+
+
+@pytest.mark.asyncio
+async def test_force_close_rejected_for_non_critical(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    await _login(client)
+    portal = await create_portal(creatures_count=2, energy_level=10, stability=90)
+    assert portal.danger_level != "CRITICAL"
+
+    forced = await client.post(f"/portals/{portal.id}", params={"action": Action.CLOSE.value, "force": "true"})
+    assert forced.status_code == 409
+    assert "критическ" in forced.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_dismissed_urgent_portal_ignores_parking(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    await _login(client)
+    await create_portal(
+        name="A_Calm", energy_level=0, stability=100, creatures_count=0, expires_at=utc_now() + timedelta(hours=5)
+    )
+    urgent = await create_portal(
+        name="B_Urgent",
+        energy_level=100,
+        stability=0,
+        creatures_count=50,
+        expires_at=utc_now() + timedelta(minutes=4),
+    )
+    async with get_session_factory()() as session:
+        stored = await session.get(Portal, urgent.id)
+        assert stored is not None
+        stored.dismissed_until = utc_now() + timedelta(minutes=5)
+        await session.commit()
+
+    response = await client.get("/portals", params={"order_by": "risk"})
+    assert response.status_code == 200, response.text
+    names = [item["name"] for item in response.json()["items"]]
+    assert names == ["B_Urgent", "A_Calm"]
 
 
 @pytest.mark.asyncio

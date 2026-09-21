@@ -31,6 +31,9 @@ class PortalSchema(BaseModel):
     dismissed_until: datetime | None
     risk_factor: float
     danger_level: DangerLevel
+    # Scored recommendation computed from the current portal state. MARK/UNMARK
+    # are never suggested; DISMISS is the fallback when no condition scores.
+    recommended_action: Action
 
 
 class PortalListSchema(BaseModel):
