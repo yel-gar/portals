@@ -17,7 +17,7 @@ export type Action =
 export type DangerLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 /** `PortalOrder` (`backend/app/models.py`): server-side portal list sort. */
-export type PortalOrder = "risk" | "expires_at" | "creatures" | "name";
+export type PortalOrder = "risk" | "risk_value" | "expires_at" | "creatures" | "name";
 
 /** `LogOrder`: server-side action-log sort. */
 export type LogOrder = "newest" | "oldest";

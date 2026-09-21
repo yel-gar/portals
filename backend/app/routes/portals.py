@@ -152,6 +152,18 @@ def _portal_order_clauses(order_by: PortalOrder, now: datetime) -> list[Any]:
             Portal.creatures_count.desc(),
             Portal.id.asc(),
         ]
+    if order_by is PortalOrder.RISK_VALUE:
+        return [
+            open_first,
+            dismissed_sinks,
+            # Raw risk value, bypassing the discrete danger-level bucket, so the
+            # «Риск» column stays monotonic within the open, non-dismissed rows.
+            _risk_expression(now).desc(),
+            Portal.expires_at.asc(),
+            Portal.has_observer.desc(),
+            Portal.creatures_count.desc(),
+            Portal.id.asc(),
+        ]
     if order_by is PortalOrder.EXPIRES_AT:
         return [open_first, dismissed_sinks, Portal.expires_at.asc(), Portal.id.asc()]
     if order_by is PortalOrder.CREATURES:
@@ -345,9 +357,10 @@ async def _notify_action_committed(session: AsyncSession, portal_id: int) -> Non
         "`search` (подстрока в названии или целевом мире, без учёта регистра).\n\n"
         "Сортировка `order_by`: `risk` (по умолчанию — по уровню опасности DESC: CRITICAL, HIGH, "
         "MEDIUM, LOW; внутри одного уровня — срок истечения ASC, наблюдатель внутри DESC, "
-        "существа внутри DESC), `expires_at` (срок истечения ASC), "
-        "`creatures` (существа внутри DESC), `name` (название ASC). Во всех режимах "
-        "закрытые/истёкшие порталы выводятся в конце списка — открытые всегда первыми."
+        "существа внутри DESC), `risk_value` (по значению риска DESC, без группировки по "
+        "уровням), `expires_at` (срок истечения ASC), `creatures` (существа внутри DESC), "
+        "`name` (название ASC). Во всех режимах открытые порталы выводятся первыми "
+        "(закрытые/истёкшие — в конце), а отложенные через DISMISS — ниже остальных открытых."
     ),
     summary="Список порталов",
 )

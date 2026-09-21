@@ -180,6 +180,43 @@ async def test_list_portals_default_sorts_by_danger_level_not_risk_value(
 
 
 @pytest.mark.asyncio
+async def test_list_portals_order_by_risk_value(
+    client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
+) -> None:
+    """`risk_value` sorts by raw risk, ignoring the danger-level bucket."""
+    await _login(client)
+    # Same danger level (MEDIUM): the later-expiring portal carries the higher
+    # raw risk (~0.52 vs ~0.35), so the default (expiry ASC within a level)
+    # puts SoonerLower first while `risk_value` reverses the pair.
+    await create_portal(
+        name="SoonerLower",
+        energy_level=40,
+        stability=60,
+        creatures_count=2,
+        expires_at=utc_now() + timedelta(minutes=2),
+    )
+    await create_portal(
+        name="LaterHigher",
+        energy_level=90,
+        stability=30,
+        creatures_count=20,
+        expires_at=utc_now() + timedelta(hours=10),
+    )
+
+    default = await client.get("/portals")
+    assert default.status_code == 200, default.text
+    default_items = default.json()["items"]
+    assert [item["name"] for item in default_items] == ["SoonerLower", "LaterHigher"]
+    assert [item["danger_level"] for item in default_items] == ["MEDIUM", "MEDIUM"]
+
+    by_risk = await client.get("/portals", params={"order_by": "risk_value"})
+    assert by_risk.status_code == 200, by_risk.text
+    items = by_risk.json()["items"]
+    assert [item["name"] for item in items] == ["LaterHigher", "SoonerLower"]
+    assert items[0]["risk_factor"] > items[1]["risk_factor"]
+
+
+@pytest.mark.asyncio
 async def test_list_portals_order_by_variants(
     client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
 ) -> None:
@@ -239,7 +276,7 @@ async def test_list_portals_open_before_closed(
     await create_portal(name="ClosedRisky", energy_level=100, stability=0, creatures_count=10, is_closed=True)
     await create_portal(name="OpenSafe", energy_level=0, stability=100, creatures_count=0)
 
-    for order_by in ("risk", "expires_at"):
+    for order_by in ("risk", "risk_value", "expires_at"):
         response = await client.get("/portals", params={"order_by": order_by})
         assert response.status_code == 200, response.text
         names = [item["name"] for item in response.json()["items"]]
@@ -415,7 +452,7 @@ async def test_dismissed_portals_sink_in_every_order(
         portal_b.dismiss()
         await session.commit()
 
-    for order_by in ("risk", "expires_at", "name", "creatures"):
+    for order_by in ("risk", "risk_value", "expires_at", "name", "creatures"):
         response = await client.get("/portals", params={"order_by": order_by})
         assert response.status_code == 200, response.text
         names = [item["name"] for item in response.json()["items"]]

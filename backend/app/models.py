@@ -63,6 +63,7 @@ class DangerLevel(enum.StrEnum):
 
 class PortalOrder(enum.StrEnum):
     RISK = "risk"
+    RISK_VALUE = "risk_value"
     EXPIRES_AT = "expires_at"
     CREATURES = "creatures"
     NAME = "name"

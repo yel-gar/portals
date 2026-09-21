@@ -33,7 +33,8 @@ export const DEFAULT_PORTAL_FILTERS: PortalFiltersState = {
 };
 
 const ORDER_OPTIONS: Array<{ value: PortalOrder; label: string }> = [
-  { value: "risk", label: "По риску" },
+  { value: "risk", label: "По умолчанию" },
+  { value: "risk_value", label: "По риску" },
   { value: "expires_at", label: "Срок истечения" },
   { value: "creatures", label: "Число существ" },
   { value: "name", label: "По алфавиту" },

@@ -58,6 +58,44 @@ describe("PortalsPage", () => {
     expect(within(alphaRow!).queryByText("Отмечено")).not.toBeInTheDocument();
   });
 
+  it("shows the parked badge only while the dismissal window is active", async () => {
+    const parked: Portal = {
+      ...OPEN_PORTAL,
+      id: 8,
+      name: "Портал Отложенный",
+      dismissed_until: new Date(Date.now() + 5 * 60_000).toISOString(),
+    };
+    const pastWindow: Portal = {
+      ...OPEN_PORTAL,
+      id: 9,
+      name: "Портал Ранее",
+      dismissed_until: new Date(Date.now() - 60_000).toISOString(),
+    };
+    // A closed portal is never parked by the backend, even with a live window.
+    const closedParked: Portal = {
+      ...OPEN_PORTAL,
+      id: 10,
+      name: "Портал Закрытый",
+      closed: true,
+      dismissed_until: new Date(Date.now() + 5 * 60_000).toISOString(),
+    };
+    server.use(
+      http.get(API_URL("/portals"), () =>
+        HttpResponse.json(portalPage([parked, pastWindow, closedParked], 1, 20)),
+      ),
+    );
+
+    renderWithProviders(<PortalsPage />);
+    expect(await screen.findByText("Портал Отложенный")).toBeInTheDocument();
+
+    const parkedRow = screen.getByText("Портал Отложенный").closest("tr");
+    const pastRow = screen.getByText("Портал Ранее").closest("tr");
+    const closedRow = screen.getByText("Портал Закрытый").closest("tr");
+    expect(within(parkedRow!).getByText("Отложен")).toBeInTheDocument();
+    expect(within(pastRow!).queryByText("Отложен")).not.toBeInTheDocument();
+    expect(within(closedRow!).queryByText("Отложен")).not.toBeInTheDocument();
+  });
+
   it("keeps bar colors at 100 instead of flipping to success-green", async () => {
     // antd flips an unfinished Progress to `success` at exactly 100 % unless
     // `status="normal"` is pinned: a maxed-out energy bar must stay orange.
@@ -110,6 +148,27 @@ describe("PortalsPage", () => {
 
     await waitFor(() => {
       expect(new URL(captured!).searchParams.get("order_by")).toBe("name");
+    });
+  });
+
+  it("sends the raw-risk sort mode to the backend", async () => {
+    const user = userEvent.setup();
+    let captured: string | null = null;
+    server.use(
+      http.get(API_URL("/portals"), ({ request }) => {
+        captured = request.url;
+        return HttpResponse.json(portalPage());
+      }),
+    );
+
+    renderWithProviders(<PortalsPage />);
+    await screen.findByText("Портал Альфа");
+
+    await user.click(screen.getByLabelText("Сортировка"));
+    await user.click(await screen.findByText("По риску"));
+
+    await waitFor(() => {
+      expect(new URL(captured!).searchParams.get("order_by")).toBe("risk_value");
     });
   });
 

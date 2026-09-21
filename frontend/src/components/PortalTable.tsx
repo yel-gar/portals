@@ -11,6 +11,7 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { DeltaIndicator } from "./DeltaIndicator";
 import { DangerTag, RiskValue } from "./DangerTag";
 import { MarkedTag } from "./MarkedTag";
+import { ParkedTag } from "./ParkedTag";
 
 /** Client-side presentation bands for the stability bar (not backend rules). */
 function stabilityColor(value: number): string {
@@ -87,6 +88,11 @@ export function PortalTable({
               #{portal.id}
             </Typography.Text>
             {portal.is_marked && <MarkedTag />}
+            {!portal.closed &&
+              portal.dismissed_until !== null &&
+              new Date(portal.dismissed_until).getTime() > now && (
+                <ParkedTag until={portal.dismissed_until} />
+              )}
           </div>
         </div>
       ),
