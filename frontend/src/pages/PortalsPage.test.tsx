@@ -58,6 +58,29 @@ describe("PortalsPage", () => {
     expect(within(alphaRow!).queryByText("Отмечено")).not.toBeInTheDocument();
   });
 
+  it("keeps bar colors at 100 instead of flipping to success-green", async () => {
+    // antd flips an unfinished Progress to `success` at exactly 100 % unless
+    // `status="normal"` is pinned: a maxed-out energy bar must stay orange.
+    const maxed: Portal = {
+      ...OPEN_PORTAL,
+      id: 7,
+      name: "Портал Максимум",
+      energy_level: 100,
+      stability: 100,
+    };
+    server.use(http.get(API_URL("/portals"), () => HttpResponse.json(portalPage([maxed]))));
+
+    const { container } = renderWithProviders(<PortalsPage />);
+    expect(await screen.findByText("Портал Максимум")).toBeInTheDocument();
+    expect(container.querySelectorAll(".ant-progress-status-success")).toHaveLength(0);
+    // antd v6 paints the line fill as `.ant-progress-track` (no more `-bg`).
+    const strokes = [...container.querySelectorAll(".ant-progress-track")].map(
+      (el) => (el as HTMLElement).style.background,
+    );
+    expect(strokes.some((s) => s.includes("fa541c") || s.includes("250, 84, 28"))).toBe(true);
+    expect(strokes.some((s) => s.includes("52c41a") || s.includes("82, 196, 26"))).toBe(true);
+  });
+
   it("shows an error banner when the portals request fails", async () => {
     server.use(
       http.get(API_URL("/portals"), () =>

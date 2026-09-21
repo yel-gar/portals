@@ -67,6 +67,7 @@ export function StatsPage() {
                   <Progress
                     percent={percent}
                     size="small"
+                    status="normal"
                     strokeColor={DANGER_META[level].hex}
                     showInfo={false}
                   />
@@ -86,6 +87,7 @@ export function StatsPage() {
                 type="circle"
                 size={150}
                 percent={avgPercent}
+                status="normal"
                 strokeColor={token.colorPrimary}
                 format={() => (
                   <span style={{ fontSize: 22, fontWeight: 700 }}>

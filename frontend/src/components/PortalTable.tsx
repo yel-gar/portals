@@ -19,7 +19,12 @@ function stabilityColor(value: number): string {
   return "#52c41a";
 }
 
-/** Energy bar mirrors stability: full energy burns bright orange, empty is calm green. */
+/**
+ * Energy bar mirrors stability: full energy burns bright orange, empty is calm
+ * green. Both bars pin `status="normal"`: antd flips an unfinished Progress to
+ * `success` (green) at exactly 100 %, which would paint a maxed-out energy bar
+ * green and lie about the danger.
+ */
 function energyColor(value: number): string {
   if (value > 60) return "#fa541c";
   if (value > 30) return "#faad14";
@@ -104,6 +109,7 @@ export function PortalTable({
             <Progress
               percent={portal.energy_level}
               size="small"
+              status="normal"
               strokeColor={energyColor(portal.energy_level)}
               format={(v) => v}
             />
@@ -123,6 +129,7 @@ export function PortalTable({
             <Progress
               percent={portal.stability}
               size="small"
+              status="normal"
               strokeColor={stabilityColor(portal.stability)}
               format={(v) => v}
             />
