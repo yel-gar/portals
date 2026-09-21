@@ -60,7 +60,7 @@ describe("PortalModal", () => {
     expect(screen.queryByRole("button", { name: /Отметить/ })).not.toBeInTheDocument();
   });
 
-  it("fills the constructive actions in their own hue and keeps DISMISS outlined", async () => {
+  it("renders the constructive actions as dark tonal fills and keeps DISMISS outlined", async () => {
     renderModal({ ...OPEN_PORTAL, has_observer: false, is_marked: false });
 
     const filled: Array<[string, string]> = [
@@ -73,15 +73,15 @@ describe("PortalModal", () => {
     filledButtons.forEach((el, index) => {
       const button = el.closest("button");
       expect(button).not.toBeNull();
-      expect(button!).toHaveClass("ant-btn-variant-solid");
+      expect(button!).toHaveClass("ant-btn-variant-filled");
       expect(button!).toHaveClass(filled[index][1]);
       expect(button!).not.toHaveClass("ant-btn-color-dangerous");
     });
 
-    // CLOSE is filled but destructive (red).
+    // CLOSE is tonally filled but destructive (red).
     const close = (await screen.findByText("Закрыть")).closest("button");
     expect(close).not.toBeNull();
-    expect(close!).toHaveClass("ant-btn-variant-solid");
+    expect(close!).toHaveClass("ant-btn-variant-filled");
     expect(close!).toHaveClass("ant-btn-color-dangerous");
 
     const dismiss = (await screen.findByText("Оставить открытым")).closest("button");
@@ -101,7 +101,7 @@ describe("PortalModal", () => {
       expect(button).not.toBeNull();
       expect(button!).toHaveClass("ant-btn-variant-outlined");
       expect(button!).toHaveClass("ant-btn-color-dangerous");
-      expect(button!).not.toHaveClass("ant-btn-variant-solid");
+      expect(button!).not.toHaveClass("ant-btn-variant-filled");
     }
   });
 

@@ -91,22 +91,24 @@ export const ACTION_ORDER: Action[] = [
 ];
 
 /**
- * Modal action-button palette. Constructive directions are filled (solid) in
- * their own hue, the cancel direction of each toggle is a red outline, and
- * DISMISS stays neutral.
+ * Modal action-button palette. Constructive directions use AntD's tonal
+ * `filled` variant (dark tinted background + colored text) so the bright hues
+ * settle into the dark theme and the purple "recommended" ring stays legible;
+ * the cancel direction of each toggle is a red outline, and DISMISS stays
+ * neutral.
  */
 export const ACTION_BUTTON_STYLE: Record<
   Action,
   Required<Pick<ButtonProps, "color" | "variant">>
 > = {
   DISMISS: { color: "default", variant: "outlined" },
-  STABILIZE: { color: "green", variant: "solid" },
-  SEND_OBSERVER: { color: "blue", variant: "solid" },
+  STABILIZE: { color: "green", variant: "filled" },
+  SEND_OBSERVER: { color: "blue", variant: "filled" },
   RECALL_OBSERVER: { color: "danger", variant: "outlined" },
-  CLOSE: { color: "danger", variant: "solid" },
-  MARK: { color: "yellow", variant: "solid" },
+  CLOSE: { color: "danger", variant: "filled" },
+  MARK: { color: "yellow", variant: "filled" },
   UNMARK: { color: "danger", variant: "outlined" },
-  WARN_CREATURES: { color: "primary", variant: "solid" },
+  WARN_CREATURES: { color: "primary", variant: "filled" },
 };
 
 export const NAV_ICONS = {
