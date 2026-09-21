@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { EyeOutlined, HistoryOutlined } from "@ant-design/icons";
+import { EyeOutlined } from "@ant-design/icons";
 import {
   App as AntApp,
   Button,
@@ -60,9 +60,6 @@ export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalPro
   // Keeps the «истекает» countdown and «назад» strings fresh while the modal is open.
   const now = useNow();
   const [pending, setPending] = useState<Action | null>(null);
-  // Per-portal history panel: open by default, collapses outwards with a CSS
-  // max-width/opacity transition (see `.portal-history` in app.css).
-  const [historyOpen, setHistoryOpen] = useState(true);
   // The glass background crossfades in only after the enter animation: blur
   // is always on (it would otherwise pop in when the zoom settles), while the
   // solid elevated token covers the animation itself.
@@ -146,7 +143,7 @@ export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalPro
 
   return (
     <Modal
-      width={historyOpen ? 1040 : 720}
+      width={1040}
       open={portal !== null}
       centered
       footer={null}
@@ -184,15 +181,6 @@ export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalPro
       {portal !== null && (
         <div className="portal-modal-layout">
           <div className="portal-modal-main">
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-              <Button
-                size="small"
-                icon={<HistoryOutlined />}
-                onClick={() => setHistoryOpen((open) => !open)}
-              >
-                {historyOpen ? "Скрыть историю" : "История"}
-              </Button>
-            </div>
             <Descriptions
               column={2}
               size="small"
@@ -323,10 +311,7 @@ export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalPro
             </Typography.Text>
           </div>
 
-          <aside
-            className={`portal-history ${historyOpen ? "portal-history--open" : "portal-history--closed"}`}
-            aria-hidden={!historyOpen}
-          >
+          <aside className="portal-history">
             <div className="portal-history-inner">
               <Typography.Text strong>История портала</Typography.Text>
               <div style={{ marginTop: 8 }}>

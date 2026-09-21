@@ -7,7 +7,7 @@ Frontend on branch `frontend/react-vite` (merged with master): real React SPA im
 
 Latest batch (9 tasks, committed on master): backend — CLOSE auto-recalls the observer, unauthenticated `GET /health`, DISMISS parks the portal (5 min window, rejected when TTL ≤ 5 min), `last_update` only on actions; frontend — reset-filters root-cause fix, per-metric snapshot deltas (table, stat cards, stats page), table rename «Открыть»→«Детали» + fixed divider column, merged observer toggle, AI-WORKLOG tab (`react-markdown` bundling). Backend 126 tests / 99 %; frontend 100 Vitest tests, tsc/oxlint/prettier/build green.
 
-Latest batch (recommended action + per-portal history + force-close, committed on master): backend — `recommended_action` scoring on `Portal` (exposed in `PortalSchema`, updates after every action), `POST /portals/{id}?force=true` force-close for CRITICAL portals with creatures, dismissed window ignored once TTL < 5 min; frontend — collapsible history panel in the modal (5 last entries + link to pre-filtered `/log?portal_id=N`), purple recommended highlight, force-close confirm modal. Backend 142 tests; frontend 135 Vitest tests, tsc/oxlint/prettier/build green.
+Latest batch (recommended action + per-portal history + force-close, committed on master): backend — `recommended_action` scoring on `Portal` (exposed in `PortalSchema`, updates after every action), `POST /portals/{id}?force=true` force-close for CRITICAL portals with creatures, dismissed window ignored once TTL < 5 min; frontend — fixed history panel in the modal (5 last entries + link to pre-filtered `/log?portal_id=N`), purple recommended highlight, force-close confirm modal. Backend 142 tests; frontend 135 Vitest tests, tsc/oxlint/prettier/build green.
 
 ## Roadmap (frontend, branch `frontend/react-vite`)
 1. **AntD v5 → v6** — done: `antd ^6.6.4` + icons `^6.3.4`, React-19 patch dropped, deprecated APIs migrated (Alert `title`, Table `medium`, Divider `titlePlacement`), embers tokens intact. ✅ (see DECISIONS.md)
@@ -139,10 +139,10 @@ Backend (gates green: black/ruff/mypy clean, 142 tests):
 - Fixed the exact `PortalSchema` field-set assertion (`recommended_action`).
 
 Frontend (gates green: 135 Vitest tests, tsc/oxlint/prettier/build):
-- **History panel**: `PortalModal` widened outwards (720 → 1040 px) with a collapsible right panel (open by default, `max-width`/`opacity` animation) showing 5 latest entries for the portal plus a «Полная история портала» link to `/log?portal_id=N`. No backend change — `portal_id` filter already existed; `ActionLogParams`/`LogFiltersState`/`actionLogQuery` now expose `portalId`/`userId`. `LogPage` pre-filters from the URL with a clearable chip.
+- **History panel**: `PortalModal` widened to 1040 px with a fixed right panel showing 5 latest entries for the portal plus a «Полная история портала» link to `/log?portal_id=N`. No backend change — `portal_id` filter already existed; `ActionLogParams`/`LogFiltersState`/`actionLogQuery` now expose `portalId`/`userId`. `LogPage` pre-filters from the URL with a clearable chip.
 - **Recommended highlight**: backend-scored button gets a pulsing purple outline + legend note; rides the action response, never shown on closed portals.
 - **Force-close confirm**: CLOSE on a critical portal with creatures opens a warning confirm and sends `force=true`; non-critical closes surface the verbatim 409. E2E-safe: seeded Гамма (close-with-creatures 409 spec) is MEDIUM, so no confirm intercepts it.
-- Test notes: antd confirm title renders twice (assert on the unique body copy); jsdom has no layout so panel open state is asserted via modifier classes, not `toBeVisible`; toggle button name includes the icon's accessible label (substring match).
+- Test notes: antd confirm title renders twice (assert on the unique body copy); toggle button name includes the icon's accessible label (substring match).
 
 ### Seven dev-mode/UX tasks + Docker hardening (master, 2026-09)
 Backend (gates green; 128 tests, coverage 99 %):

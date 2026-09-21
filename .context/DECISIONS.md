@@ -233,7 +233,7 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 
 ## Frontend: per-portal history panel (2026-09)
 - No backend change needed: `GET /portals/log` (and `/log/ws`) already filter by `portal_id`; the frontend `ActionLogParams`/`LogFiltersState`/`actionLogQuery` simply did not expose it — `portalId`/`userId` added.
-- `PortalModal` carries a right-hand history panel (open by default): 5 latest entries for the portal (Tag + relative time + user, refetched via the shared `["portals"]` invalidation + 30 s poll) plus a «Полная история портала» link to `/log?portal_id=N`. Collapse/expand animates `max-width`/`opacity` (modal widens outwards 720 → 1040 px); toggle button labelled «Скрыть историю»/«История».
+- `PortalModal` carries a fixed right-hand history panel (modal widened to 1040 px): 5 latest entries for the portal (Tag + relative time + user, refetched via the shared `["portals"]` invalidation + 30 s poll) plus a «Полная история портала» link to `/log?portal_id=N`.
 - `LogPage` reads `portal_id` from the URL once on mount into filter state and shows an «Показаны действия портала #N» chip with a «Показать все» clear button; «Сбросить» clears it too.
 
 ## Frontend: recommended-action highlight + force-close confirm (2026-09)

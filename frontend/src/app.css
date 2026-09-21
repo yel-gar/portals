@@ -395,9 +395,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Portal modal: main content + collapsible per-portal history panel. The modal
-   widens outwards (720 → 1040) while the panel itself animates open/closed via
-   max-width/opacity so the collapse is smooth rather than a jump cut. */
+/* Portal modal: main content + fixed per-portal history panel (280px). */
 .portal-modal-layout {
   display: flex;
   gap: 16px;
@@ -410,24 +408,8 @@ body {
 }
 
 .portal-history {
-  overflow: hidden;
-  transition:
-    max-width 0.3s ease,
-    opacity 0.3s ease,
-    margin 0.3s ease;
-}
-
-.portal-history--open {
   flex: none;
   width: 280px;
-  max-width: 280px;
-  opacity: 1;
-}
-
-.portal-history--closed {
-  max-width: 0;
-  opacity: 0;
-  margin-left: -16px;
 }
 
 .portal-history-inner {
@@ -475,9 +457,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .portal-action-recommended {
     animation: none;
-  }
-  .portal-history {
-    transition: none;
   }
 }
 

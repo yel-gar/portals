@@ -147,8 +147,7 @@ describe("PortalModal", () => {
     expect(await screen.findByText(/Фиолетовая подсветка — рекомендованное/)).toBeInTheDocument();
   });
 
-  it("shows the last portal actions and collapses the history panel", async () => {
-    const user = userEvent.setup();
+  it("shows the last portal actions for the portal", async () => {
     const entry = {
       id: 9,
       portal_id: OPEN_PORTAL.id,
@@ -173,18 +172,6 @@ describe("PortalModal", () => {
     await waitFor(() => {
       expect(new URL(captured!).searchParams.get("portal_id")).toBe(String(OPEN_PORTAL.id));
     });
-
-    await user.click(screen.getByRole("button", { name: /Скрыть историю/ }));
-    // jsdom performs no layout, so visibility cannot be asserted — the open
-    // state is pinned on the panel's modifier class and the toggle label.
-    const panel = () => document.querySelector(".portal-history");
-    await waitFor(() => expect(panel()).toHaveClass("portal-history--closed"));
-    expect(screen.queryByRole("button", { name: /Скрыть историю/ })).not.toBeInTheDocument();
-    // The toggle carries the icon's accessible name too ("history История"),
-    // so match by substring rather than by exact name.
-    await user.click(screen.getByRole("button", { name: /История/ }));
-    await waitFor(() => expect(panel()).toHaveClass("portal-history--open"));
-    expect(screen.getByRole("button", { name: /Скрыть историю/ })).toBeInTheDocument();
   });
 
   it("asks for confirmation before force-closing a critical portal with creatures", async () => {
