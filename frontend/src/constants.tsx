@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import type { ButtonProps } from "antd";
 import {
   BarChartOutlined,
   DashboardOutlined,
@@ -90,25 +91,23 @@ export const ACTION_ORDER: Action[] = [
 ];
 
 /**
- * Filled (primary) actions in the modal: every constructive direction plus the
- * destructive CLOSE (which is filled red via `DANGER_FILLED_ACTIONS`).
+ * Modal action-button palette. Constructive directions are filled (solid) in
+ * their own hue, the cancel direction of each toggle is a red outline, and
+ * DISMISS stays neutral.
  */
-export const PRIMARY_ACTIONS: ReadonlySet<Action> = new Set<Action>([
-  "STABILIZE",
-  "CLOSE",
-  "MARK",
-  "SEND_OBSERVER",
-  "WARN_CREATURES",
-]);
-
-/** Filled actions that also carry the AntD `danger` (red) style. */
-export const DANGER_FILLED_ACTIONS: ReadonlySet<Action> = new Set<Action>(["CLOSE"]);
-
-/** Cancel-direction toggles rendered as a red outline (AntD `danger` + default). */
-export const DANGER_OUTLINE_ACTIONS: ReadonlySet<Action> = new Set<Action>([
-  "UNMARK",
-  "RECALL_OBSERVER",
-]);
+export const ACTION_BUTTON_STYLE: Record<
+  Action,
+  Required<Pick<ButtonProps, "color" | "variant">>
+> = {
+  DISMISS: { color: "default", variant: "outlined" },
+  STABILIZE: { color: "green", variant: "solid" },
+  SEND_OBSERVER: { color: "blue", variant: "solid" },
+  RECALL_OBSERVER: { color: "danger", variant: "outlined" },
+  CLOSE: { color: "danger", variant: "solid" },
+  MARK: { color: "yellow", variant: "solid" },
+  UNMARK: { color: "danger", variant: "outlined" },
+  WARN_CREATURES: { color: "primary", variant: "solid" },
+};
 
 export const NAV_ICONS = {
   portals: DashboardOutlined,

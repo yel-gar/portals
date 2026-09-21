@@ -60,28 +60,35 @@ describe("PortalModal", () => {
     expect(screen.queryByRole("button", { name: /Отметить/ })).not.toBeInTheDocument();
   });
 
-  it("fills the constructive actions and keeps DISMISS outlined", async () => {
+  it("fills the constructive actions in their own hue and keeps DISMISS outlined", async () => {
     renderModal({ ...OPEN_PORTAL, has_observer: false, is_marked: false });
 
-    const filled = ["Стабилизировать", "Отправить наблюдателя", "Отметить", "Предупредить существ"];
-    const filledButtons = await Promise.all(filled.map((label) => screen.findByText(label)));
-    for (const el of filledButtons) {
+    const filled: Array<[string, string]> = [
+      ["Стабилизировать", "ant-btn-color-green"],
+      ["Отправить наблюдателя", "ant-btn-color-blue"],
+      ["Отметить", "ant-btn-color-yellow"],
+      ["Предупредить существ", "ant-btn-color-primary"],
+    ];
+    const filledButtons = await Promise.all(filled.map(([label]) => screen.findByText(label)));
+    filledButtons.forEach((el, index) => {
       const button = el.closest("button");
       expect(button).not.toBeNull();
       expect(button!).toHaveClass("ant-btn-variant-solid");
-      expect(button!).not.toHaveClass("ant-btn-dangerous");
-    }
+      expect(button!).toHaveClass(filled[index][1]);
+      expect(button!).not.toHaveClass("ant-btn-color-dangerous");
+    });
 
     // CLOSE is filled but destructive (red).
     const close = (await screen.findByText("Закрыть")).closest("button");
     expect(close).not.toBeNull();
     expect(close!).toHaveClass("ant-btn-variant-solid");
-    expect(close!).toHaveClass("ant-btn-dangerous");
+    expect(close!).toHaveClass("ant-btn-color-dangerous");
 
     const dismiss = (await screen.findByText("Оставить открытым")).closest("button");
     expect(dismiss).not.toBeNull();
     expect(dismiss!).toHaveClass("ant-btn-variant-outlined");
-    expect(dismiss!).not.toHaveClass("ant-btn-dangerous");
+    expect(dismiss!).toHaveClass("ant-btn-color-default");
+    expect(dismiss!).not.toHaveClass("ant-btn-color-dangerous");
   });
 
   it("renders the cancel-direction toggles as a red outline", async () => {
@@ -93,7 +100,7 @@ describe("PortalModal", () => {
       const button = el.closest("button");
       expect(button).not.toBeNull();
       expect(button!).toHaveClass("ant-btn-variant-outlined");
-      expect(button!).toHaveClass("ant-btn-dangerous");
+      expect(button!).toHaveClass("ant-btn-color-dangerous");
       expect(button!).not.toHaveClass("ant-btn-variant-solid");
     }
   });
