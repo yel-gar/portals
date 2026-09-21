@@ -584,7 +584,9 @@ async def test_recommended_action_updates_after_action(
     client: AsyncClient, create_portal: Callable[..., Awaitable[Portal]]
 ) -> None:
     await _login(client)
-    portal = await create_portal(stability=30, creatures_count=3, has_observer=False)
+    # 45 + [10..30] always lands at >= 55, so one STABILIZE deterministically
+    # clears the only scored condition (no observer, creatures present, long TTL).
+    portal = await create_portal(stability=45, creatures_count=3, has_observer=False)
 
     before = await client.get(f"/portals/{portal.id}")
     assert before.json()["recommended_action"] == Action.STABILIZE.value
