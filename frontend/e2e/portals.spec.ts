@@ -10,29 +10,35 @@ test.beforeAll(() => {
 
 test("таблица показывает посеянные порталы и статусы", async ({ page }) => {
   await registerUser(page, "e2e_table", "table-pass-1");
-  await expect(page.getByText("Всего: 7")).toBeVisible();
+  // Closed portals are filtered out by default: 6 of the 7 seeded rows remain.
+  await expect(page.getByText("Всего: 6")).toBeVisible();
   // Decorative fire side panels render in every environment (here the static
   // gradient — headless chromium has no WebGPU and reduced motion is emulated).
   await expect(page.locator(".fire-panels")).toBeVisible();
   await expect(page.locator(".ant-table-row", { hasText: "Портал Гамма" })).toBeVisible();
   await expect(
+    page.locator(".ant-table-row", { hasText: "Портал Бета" }).getByText("Отмечено"),
+  ).toBeVisible();
+  await expect(page.locator(".ant-table-row", { hasText: "Портал Эпсилон" })).toHaveCount(0);
+
+  // The closed portal is reachable through the «Закрытые» filter, tag included.
+  await selectOption(page, "Состояние", "Закрытые");
+  await expect(page.getByText("Всего: 1")).toBeVisible();
+  await expect(
     page
       .locator(".ant-table-row", { hasText: "Портал Эпсилон" })
       .getByText("закрыт", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.locator(".ant-table-row", { hasText: "Портал Бета" }).getByText("Отмечено"),
   ).toBeVisible();
 });
 
 test("поиск по названию сужает таблицу", async ({ page }) => {
   await registerUser(page, "e2e_search", "search-pass-1");
   const search = page.getByLabel("Поиск по названию или миру");
-  await search.fill("Эпсилон");
+  await search.fill("Дельта");
   await search.press("Enter");
   await expect(page.getByText("Всего: 1")).toBeVisible();
   await expect(tableRows(page)).toHaveCount(1);
-  await expect(tableRows(page).getByText("Портал Эпсилон")).toBeVisible();
+  await expect(tableRows(page).getByText("Портал Дельта")).toBeVisible();
 });
 
 test("фильтр «Закрытые» показывает только закрытые", async ({ page }) => {
@@ -63,14 +69,13 @@ test("фильтр «Отмеченные»", async ({ page }) => {
   await expect(tableRows(page).getByText("Отмечено")).toHaveCount(2);
 });
 
-test("сброс фильтров возвращает полный список", async ({ page }) => {
+test("сброс фильтров возвращает список по умолчанию", async ({ page }) => {
   await registerUser(page, "e2e_reset", "reset-pass-1");
-  const search = page.getByLabel("Поиск по названию или миру");
-  await search.fill("Эпсилон");
-  await search.press("Enter");
+  await selectOption(page, "Состояние", "Закрытые");
   await expect(page.getByText("Всего: 1")).toBeVisible();
   await page.getByRole("button", { name: "Сбросить" }).click();
-  await expect(page.getByText("Всего: 7")).toBeVisible();
+  // Reset restores the default view: every open portal, closed still hidden.
+  await expect(page.getByText("Всего: 6")).toBeVisible();
 });
 
 test("сортировка по алфавиту", async ({ page }) => {

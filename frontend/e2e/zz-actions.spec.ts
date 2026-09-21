@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { registerUser, resetPortals, tableRows } from "./helpers";
+import { registerUser, resetPortals, selectOption, tableRows } from "./helpers";
 
 // Portal-action specs mutate shared state (mark/close/observer), so they run
 // serially against a freshly seeded stack; a failed test skips the rest instead
@@ -40,7 +40,9 @@ test("закрытие портала блокирует действия и п�
   await expect(dialog.getByRole("button", { name: "Стабилизировать" })).toBeDisabled();
 
   await page.keyboard.press("Escape");
-  // The closed row now wears the red «закрыт» tag in the «Истекает» column.
+  // A closed portal drops out of the default (open-only) table, so switch to
+  // «Закрытые» to find the red «закрыт» tag on its row.
+  await selectOption(page, "Состояние", "Закрытые");
   await expect(row.getByText("закрыт", { exact: true })).toBeVisible();
 });
 
@@ -57,6 +59,8 @@ test("наблюдатель: отправить и отозвать", async ({ 
 
 test("закрытый портал: доступны только отметка и снятие отметки", async ({ page }) => {
   await registerUser(page, "e2e_closed", "closed-pass-1");
+  // The closed seed is hidden by default — surface it through the filter.
+  await selectOption(page, "Состояние", "Закрытые");
   const row = page.locator(".ant-table-row", { hasText: "Портал Эпсилон" });
   await row.click();
   const dialog = page.getByRole("dialog");
