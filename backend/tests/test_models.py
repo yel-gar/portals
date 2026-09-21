@@ -148,6 +148,39 @@ async def test_recommended_action_observer_branches() -> None:
 
 
 @pytest.mark.asyncio
+async def test_recommended_action_critical_table(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CRITICAL portals use a fixed observer/creature table that dominates scoring."""
+    # Production CRITICALs always carry creatures (the risk formula cannot pass
+    # 0.85 without the creature term), so force the level to hit the empty row.
+    with monkeypatch.context() as patch:
+        patch.setattr(Portal, "danger_level", property(lambda _self: DangerLevel.CRITICAL))
+        empty = _portal(stability=80, creatures_count=0, has_observer=True, expires_at=utc_now() + timedelta(hours=2))
+        assert empty.recommended_action == Action.RECALL_OBSERVER
+
+    watched = _portal(
+        energy_level=100,
+        stability=0,
+        creatures_count=1000,
+        has_observer=True,
+        expires_at=utc_now() + timedelta(seconds=20),
+    )
+    assert watched.danger_level == DangerLevel.CRITICAL
+    assert watched.recommended_action == Action.WARN_CREATURES
+
+    # No observer: the general scoring would pick SEND_OBSERVER here, but the
+    # table forces CLOSE, which the API accepts with force=true for CRITICALs.
+    unwatched = _portal(
+        energy_level=100,
+        stability=0,
+        creatures_count=1000,
+        has_observer=False,
+        expires_at=utc_now() + timedelta(seconds=20),
+    )
+    assert unwatched.danger_level == DangerLevel.CRITICAL
+    assert unwatched.recommended_action == Action.CLOSE
+
+
+@pytest.mark.asyncio
 async def test_force_close_only_critical() -> None:
     critical = _portal(
         energy_level=100,

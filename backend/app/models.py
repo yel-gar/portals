@@ -166,6 +166,9 @@ class Portal(Base):
         Every matching condition below adds its points, the highest total wins;
         ties resolve in CLOSE > SEND_OBSERVER > WARN_CREATURES > RECALL_OBSERVER
         > STABILIZE > DISMISS order. No points at all falls back to DISMISS.
+        CRITICAL portals bypass that scoring: observer with creatures →
+        WARN_CREATURES, observer without creatures → RECALL_OBSERVER, no observer
+        → CLOSE (each worth 100, so the critical row always dominates).
         Closed portals always fall back to DISMISS — no action is valid on them.
         """
         if self.closed:
@@ -176,6 +179,16 @@ class Portal(Base):
             scores[action] = scores.get(action, 0) + points
 
         ttl_seconds = (self.expires_at - utc_now()).total_seconds()
+        if self.danger_level == DangerLevel.CRITICAL:
+            # Dedicated priority table: the observer/creature state fully fixes
+            # the action, and the 100-point row cannot be outvoted by any
+            # accumulated general condition below.
+            if not self.has_observer:
+                add(Action.CLOSE, 100)
+            elif self.creatures_count > 0:
+                add(Action.WARN_CREATURES, 100)
+            else:
+                add(Action.RECALL_OBSERVER, 100)
         if not self.has_observer:
             if self.stability < 50:
                 add(Action.STABILIZE, 1)
