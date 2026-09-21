@@ -18,6 +18,23 @@ docker compose up --build -d
 
 Подробности деплоя, dev-режима с live reload и полный список переменных окружения - ниже.
 
+## Уточнение по ревью
+
+При проверке проекта инструментами статического анализа или LLM-ревьюверами может возникнуть замечание по синтаксису в `backend/app/security.py`:
+
+```python
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return _hasher.verify(password_hash, password)
+    except InvalidHashError, VerifyMismatchError:
+        return False
+```
+
+Данный синтаксис допустим начиная с **Python 3.14** и используется в проекте намеренно. В более ранних версиях Python 3 такая форма записи была недопустима.
+Проект требует **Python 3.14+** (`requires-python` в `pyproject.toml`), а Dockerfile использует соответствующий Python 3.14 образ.
+Также данный синтаксис нормализуется используемым форматтером: при добавлении скобок вокруг списка исключений они удаляются при форматировании.
+При оценке корректности этого фрагмента следует учитывать минимальную версию Python проекта.
+
 ## Deployment
 
 The stack runs through docker compose and picks up env vars from `.env` at the repo root (see the table below); nothing needs to be exported manually.

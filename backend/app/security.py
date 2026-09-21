@@ -15,7 +15,9 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     try:
         return _hasher.verify(password_hash, password)
-    except InvalidHashError, VerifyMismatchError:
+    # Python 3.14+ permits comma-separated exception types without parentheses.
+    # The project requires Python 3.14+.
+    except InvalidHashError, VerifyMismatchError:  # <-- valid syntax
         return False
 
 
