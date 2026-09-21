@@ -178,10 +178,7 @@ Getting to basic docker setup now. Project itself will be running ultimately thr
 - лишние вызовы `model_validate`: если у схемы `ConfigDict(from_attributes=True)`, можно возвращать ORM-объект напрямую, FastAPI сам сериализует через `response_model`. Также злоупотребление `(await session.execute(...)).scalars()` - достаточно `session.scalars()`. Эти проблемы были в `list_users`, `register`, `login`, `me`, `_portal_page`, `action_log`, `execute_action`.
 - эндпоинт `/stats` грузит все порталы в память и считает агрегаты в Python, нужно считать через SQL-агрегаты на стороне БД.
 - выполнение действий над порталами не являлось потокобезопасным, использование сайта 2мя пользователями одновременно могло привести к гонке состояний
-
-Дополнительно найдено в ходе исправлений:
-- `httpx2` - непонятный пакет в dev-зависимостях, заменён на `httpx`.
-- в `app/security.py` был синтаксический ошибочный `except InvalidHashError, VerifyMismatchError:` (Python 2), из-за чего модуль не импортировался.
+- добавил `httpx2` - непонятный пакет в dev-зависимости, заменён на `httpx`.
 
 ### Ключевые промпты
 **начальный промпт**
