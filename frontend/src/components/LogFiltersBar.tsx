@@ -6,11 +6,16 @@ import { ACTION_META, ALL_ACTIONS } from "../constants";
 /** Client-held filter state for the action log — mapped to backend query params. */
 export interface LogFiltersState {
   action?: Action;
+  portalId?: number;
   orderBy: LogOrder;
 }
 
-/** Fully-cleared log filter state — `action` is listed explicitly so a reset clears it. */
-export const DEFAULT_LOG_FILTERS: LogFiltersState = { action: undefined, orderBy: "newest" };
+/** Fully-cleared log filter state — `action`/`portalId` listed explicitly so a reset clears them. */
+export const DEFAULT_LOG_FILTERS: LogFiltersState = {
+  action: undefined,
+  portalId: undefined,
+  orderBy: "newest",
+};
 
 const ORDER_OPTIONS: Array<{ value: LogOrder; label: string }> = [
   { value: "newest", label: "Сначала новые" },

@@ -6,6 +6,7 @@ import type { Action } from "../api/types";
 export interface PortalActionVariables {
   portalId: number;
   action: Action;
+  force?: boolean;
 }
 
 /**
@@ -17,8 +18,8 @@ export interface PortalActionVariables {
 export function usePortalAction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ portalId, action }: PortalActionVariables) =>
-      portalsApi.action(portalId, action),
+    mutationFn: ({ portalId, action, force }: PortalActionVariables) =>
+      portalsApi.action(portalId, action, force ?? false),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["portals"] });
     },

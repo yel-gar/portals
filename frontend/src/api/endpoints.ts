@@ -42,6 +42,8 @@ export function actionLogQuery(params: ActionLogParams): Record<string, QueryVal
     page: params.page,
     items_per_page: params.itemsPerPage,
     action: params.action,
+    portal_id: params.portalId,
+    user_id: params.userId,
     order_by: params.orderBy,
   };
 }
@@ -55,8 +57,11 @@ export const portalsApi = {
   /** Single portal detail (`GET /portals/{id}`) — used to poll the open modal. */
   info: (portalId: number) => request<Portal>(`/portals/${portalId}`),
   /** Execute an action; the backend validates it and records it in the action log. */
-  action: (portalId: number, action: Action) =>
-    request<Portal>(`/portals/${portalId}`, { method: "POST", query: { action } }),
+  action: (portalId: number, action: Action, force = false) =>
+    request<Portal>(`/portals/${portalId}`, {
+      method: "POST",
+      query: force ? { action, force: true } : { action },
+    }),
 };
 
 export const adminApi = {

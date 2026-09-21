@@ -2,6 +2,7 @@ import { useState } from "react";
 import { UnorderedListOutlined } from "@ant-design/icons";
 import { Alert, Button, Card, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../api/client";
 import type { ActionLogEntry, ActionLogParams } from "../api/types";
@@ -20,12 +21,32 @@ export function LogPage() {
   const now = useNow();
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [filters, setFilters] = useState<LogFiltersState>(DEFAULT_LOG_FILTERS);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // A per-portal history link (`/log?portal_id=N`, e.g. from the portal modal)
+  // pre-filters the log to that portal. Read once on mount; afterwards the
+  // filter lives in component state so «Сбросить» clears it like any other.
+  const [filters, setFilters] = useState<LogFiltersState>(() => {
+    const portalId = Number(searchParams.get("portal_id"));
+    return {
+      ...DEFAULT_LOG_FILTERS,
+      portalId: Number.isInteger(portalId) && portalId > 0 ? portalId : undefined,
+    };
+  });
 
   const params: ActionLogParams = { page, itemsPerPage, ...filters };
   const applyFilters = (patch: Partial<LogFiltersState>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
     setPage(1);
+  };
+  const clearPortalFilter = () => {
+    applyFilters({ portalId: undefined });
+    setSearchParams(
+      (prev) => {
+        prev.delete("portal_id");
+        return prev;
+      },
+      { replace: true },
+    );
   };
 
   const { query, liveStatus } = useActionLogPage(params);
@@ -103,8 +124,23 @@ export function LogPage() {
           <LogFiltersBar
             filters={filters}
             onChange={applyFilters}
-            onReset={() => applyFilters(DEFAULT_LOG_FILTERS)}
+            onReset={() => {
+              applyFilters(DEFAULT_LOG_FILTERS);
+              setSearchParams((prev) => {
+                prev.delete("portal_id");
+                return prev;
+              });
+            }}
           />
+          {filters.portalId !== undefined && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message={`Показаны действия портала #${filters.portalId}`}
+              action={<Button onClick={clearPortalFilter}>Показать все</Button>}
+            />
+          )}
           <Table<ActionLogEntry>
             rowKey="id"
             columns={columns}

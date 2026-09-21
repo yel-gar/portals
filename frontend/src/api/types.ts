@@ -41,6 +41,9 @@ export interface ActionLogParams {
   page: number;
   itemsPerPage: number;
   action?: Action;
+  /** Filter to a single portal — used by the per-portal history panel. */
+  portalId?: number;
+  userId?: number;
   orderBy: LogOrder;
 }
 
@@ -63,6 +66,8 @@ export interface Portal {
   dismissed_until: string | null;
   risk_factor: number;
   danger_level: DangerLevel;
+  /** Backend-scored recommended action (MARK/UNMARK never suggested, DISMISS is the fallback). */
+  recommended_action: Action;
 }
 
 /** `PortalListSchema` — also the payload pushed over `/portals/ws`. */

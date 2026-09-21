@@ -395,6 +395,101 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Portal modal: main content + collapsible per-portal history panel. The modal
+   widens outwards (720 → 1040) while the panel itself animates open/closed via
+   max-width/opacity so the collapse is smooth rather than a jump cut. */
+.portal-modal-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.portal-modal-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-history {
+  overflow: hidden;
+  transition:
+    max-width 0.3s ease,
+    opacity 0.3s ease,
+    margin 0.3s ease;
+}
+
+.portal-history--open {
+  flex: none;
+  width: 280px;
+  max-width: 280px;
+  opacity: 1;
+}
+
+.portal-history--closed {
+  max-width: 0;
+  opacity: 0;
+  margin-left: -16px;
+}
+
+.portal-history-inner {
+  width: 280px;
+  border-inline-start: 1px solid rgba(255, 138, 51, 0.14);
+  padding-inline-start: 16px;
+}
+
+.portal-history-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(255, 138, 51, 0.12);
+}
+
+.portal-history-row:last-child {
+  border-bottom: none;
+}
+
+/* Backend-scored recommended action: pulsing purple outline + legend dot. */
+.portal-action-recommended {
+  border-color: #9254de !important;
+  box-shadow:
+    0 0 0 2px rgba(146, 84, 222, 0.45),
+    0 0 12px rgba(146, 84, 222, 0.8);
+  animation: recommended-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes recommended-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(146, 84, 222, 0.45),
+      0 0 12px rgba(146, 84, 222, 0.8);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgba(146, 84, 222, 0.25),
+      0 0 4px rgba(146, 84, 222, 0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-action-recommended {
+    animation: none;
+  }
+  .portal-history {
+    transition: none;
+  }
+}
+
+.portal-recommended-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9254de;
+  margin-inline-end: 6px;
+}
+
 /* The portals table spans the card edge-to-edge: the antd Card body pads by
    24px per side, which made the solid header band visibly stop short of the
    card background. The filters bar above stays inside the padded area. */

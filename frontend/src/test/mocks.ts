@@ -29,6 +29,7 @@ export const OPEN_PORTAL: Portal = {
   dismissed_until: null,
   risk_factor: 0.41,
   danger_level: "MEDIUM",
+  recommended_action: "STABILIZE",
 };
 
 export const CLOSED_PORTAL: Portal = {
@@ -46,6 +47,7 @@ export const CLOSED_PORTAL: Portal = {
   dismissed_until: null,
   risk_factor: 0.12,
   danger_level: "LOW",
+  recommended_action: "DISMISS",
 };
 
 export function portalPage(
