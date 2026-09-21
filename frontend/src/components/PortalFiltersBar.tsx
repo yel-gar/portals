@@ -15,14 +15,17 @@ export interface PortalFiltersState {
 }
 
 /**
- * The fully-cleared filter state. The optional keys are listed explicitly (as
- * `undefined`) so a reset replaces them instead of spreading stale values over
- * the previous state — `onReset` must not silently keep a filter the operator
- * already cleared.
+ * The default filter state: open portals only, every other filter unset.
+ * `closed` is explicitly `false` (not `undefined`) so the initial view and a
+ * reset both hide expired/closed portals; clearing the state select is the
+ * only way to widen it back to all portals. The optional keys are listed
+ * explicitly (as `undefined`) so a reset replaces them instead of spreading
+ * stale values over the previous state — `onReset` must not silently keep a
+ * filter the operator already cleared.
  */
 export const DEFAULT_PORTAL_FILTERS: PortalFiltersState = {
   search: "",
-  closed: undefined,
+  closed: false,
   dangerLevel: undefined,
   hasObserver: undefined,
   isMarked: undefined,

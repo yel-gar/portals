@@ -156,13 +156,35 @@ describe("PortalsPage", () => {
 
     await waitFor(() => {
       const params = new URL(captured!).searchParams;
-      expect(params.has("closed")).toBe(false);
+      expect(params.get("closed")).toBe("false");
       expect(params.has("danger_level")).toBe(false);
       expect(params.has("has_observer")).toBe(false);
       expect(params.has("is_marked")).toBe(false);
       expect(params.has("search")).toBe(false);
       expect(params.get("order_by")).toBe("risk");
     });
+  });
+
+  it("hides closed portals by default and reflects it in the state filter", async () => {
+    let captured: string | null = null;
+    server.use(
+      http.get(API_URL("/portals"), ({ request }) => {
+        captured = request.url;
+        return HttpResponse.json(portalPage());
+      }),
+    );
+
+    renderWithProviders(<PortalsPage />);
+    await screen.findByText("Портал Альфа");
+
+    await waitFor(() => {
+      expect(new URL(captured!).searchParams.get("closed")).toBe("false");
+    });
+
+    // The state select shows the default («Открытые») instead of its placeholder.
+    const stateSelect = screen.getByLabelText("Состояние").closest(".ant-select");
+    expect(stateSelect).not.toBeNull();
+    expect(within(stateSelect as HTMLElement).getByText("Открытые")).toBeInTheDocument();
   });
 
   it("shows per-row deltas from the previous snapshot", async () => {
