@@ -7,6 +7,8 @@ Frontend on branch `frontend/react-vite` (merged with master): real React SPA im
 
 Latest batch (9 tasks, committed on master): backend — CLOSE auto-recalls the observer, unauthenticated `GET /health`, DISMISS parks the portal (5 min window, rejected when TTL ≤ 5 min), `last_update` only on actions; frontend — reset-filters root-cause fix, per-metric snapshot deltas (table, stat cards, stats page), table rename «Открыть»→«Детали» + fixed divider column, merged observer toggle, AI-WORKLOG tab (`react-markdown` bundling). Backend 126 tests / 99 %; frontend 100 Vitest tests, tsc/oxlint/prettier/build green.
 
+Latest batch (recommended action + per-portal history + force-close, committed on master): backend — `recommended_action` scoring on `Portal` (exposed in `PortalSchema`, updates after every action), `POST /portals/{id}?force=true` force-close for CRITICAL portals with creatures, dismissed window ignored once TTL < 5 min; frontend — collapsible history panel in the modal (5 last entries + link to pre-filtered `/log?portal_id=N`), purple recommended highlight, force-close confirm modal. Backend 142 tests; frontend 135 Vitest tests, tsc/oxlint/prettier/build green.
+
 ## Roadmap (frontend, branch `frontend/react-vite`)
 1. **AntD v5 → v6** — done: `antd ^6.6.4` + icons `^6.3.4`, React-19 patch dropped, deprecated APIs migrated (Alert `title`, Table `medium`, Divider `titlePlacement`), embers tokens intact. ✅ (see DECISIONS.md)
 2. **Linter/formatter/coverage/pre-commit** — done: oxlint (react plugin, correctness/suspicious error + perf warn, 0 warnings 0 errors) + Prettier (printWidth 100), `--deny-warnings` strictness, coverage v8 (text + lcov, 76.7 % lines, no hard gate — mirrors backend), pre-commit hooks (format + lint:fix, `^frontend/`), CI workflows `frontend-ci.yml` + `frontend-coverage.yml` (Node 24 parity). ✅ (see DECISIONS.md)
@@ -116,8 +118,7 @@ The user's 14-scenario checklist closed the remaining gaps (all 14 now handled, 
 - **zz-actions.spec.ts** +6: warn creatures with observer (Альфа), warn without observer → 409 «Нет наблюдателя…» (Бета), «оставить открытым» (Зета), stabilize success (Бета «12%» disappears), close with creatures → 409 (Гамма), stabilize a stable portal → 409 (Альфа).
 - Empty-state assertions target `.ant-empty-description` (antd's Empty image carries a duplicate «Нет данных» `<title>` → strict-mode clash).
 
-### Nine UX/data tasks (master, 2026-09)
-Backend (all gates green: black/ruff/mypy clean, 126 tests, coverage 99 %):
+### Nine UX/data tasks (master, 2026-09)Backend (all gates green: black/ruff/mypy clean, 126 tests, coverage 99 %):
 - **CLOSE auto-recalls the observer**: `Portal.close()` sets `has_observer = False` before closing (a closed portal can never keep an observer inside); the log still records one `CLOSE` entry. New model test + `test_close_recalls_observer`.
 - **`GET /health`**: unauthenticated liveness endpoint (no DB access, `{"status": "ok"}` regardless of `DEBUG`), declared in the app factory; `test_health_endpoint` parametrized over debug on/off.
 - **DISMISS parks the portal**: new `dismissed_until` timestamptz column; `dismiss()` sets it to now + `DISMISS_DURATION_SECONDS` (5 min) and rejects when TTL ≤ `DISMISS_MIN_TTL_SECONDS` (5 min) with «Нельзя отложить портал: до истечения менее 5 минут» (409). Ordering has a `dismissed_sinks` clause after open-first in **every** `order_by` mode; `dismissed_until` added to `PortalSchema` and to the exact field-set assertion. Tests: model dismiss semantics, API park, urgent 409, sink in all four orderings + window expiry.
@@ -129,6 +130,19 @@ Frontend (gates green: 100 Vitest tests, tsc/oxlint/prettier/build):
 - **Table action column**: «Открыть» → «Детали», plus a fixed 1px amber divider between the scrollable data columns and the action column (header + body cells).
 - **Merged observer toggle**: modal resolves SEND/RECALL from `portal.has_observer` (like MARK/UNMARK); `RECALL_OBSERVER` removed from `ACTION_ORDER` but kept in the log filter. Tests: label flip per state, live flip when the portal closes over the socket.
 - **AI-WORKLOG tab**: `react-markdown` dependency; worklog bundled copy at `frontend/src/worklog/AI-WORKLOG.md` (`?raw` import — Vite build context is `frontend/` only, keep in sync with the root file); new `/worklog` route, nav tab «Журнал разработки» (FileTextOutlined), PAGE_META entry, dark-theme markdown CSS. WorklogPage tests render real headings and code blocks. All decisions recorded in DECISIONS.md.
+
+### Recommended action + per-portal history + force-close (master, 2026-09)
+Backend (gates green: black/ruff/mypy clean, 142 tests):
+- **`recommended_action` scoring**: `Portal.recommended_action` sums condition points per branch (no-observer: STABILIZE +1 if stability < 50, CLOSE +10 if empty, SEND_OBSERVER +1 if TTL < 5 min; observer-inside: STABILIZE +1, RECALL_OBSERVER +1 if TTL < 30 s, WARN_CREATURES +1 if TTL < 5 min, RECALL_OBSERVER +10 if empty), max wins, ties by CLOSE > SEND > WARN > RECALL > STABILIZE > DISMISS, empty map or closed portal → DISMISS. Exposed on `PortalSchema` (list/detail/action response), so it updates after every click. Tests: full scoring matrix incl. 10-point dominance, every tie, fallback, closed/expired.
+- **Force-close**: `Portal.close(force=True)` bypasses the creatures check only for CRITICAL portals (else 409); route flag `?force=true` documented in the endpoint description. Tests: model + route (critical 200 + CLOSE log entry, non-critical 409, no-flag 409).
+- **Dismissed TTL ignore**: `dismissed_sinks` ordering clause now also requires `expires_at > now + 5 min`, so a stale parking window never hides an urgent portal. Test parks an urgent portal and asserts natural order.
+- Fixed the exact `PortalSchema` field-set assertion (`recommended_action`).
+
+Frontend (gates green: 135 Vitest tests, tsc/oxlint/prettier/build):
+- **History panel**: `PortalModal` widened outwards (720 → 1040 px) with a collapsible right panel (open by default, `max-width`/`opacity` animation) showing 5 latest entries for the portal plus a «Полная история портала» link to `/log?portal_id=N`. No backend change — `portal_id` filter already existed; `ActionLogParams`/`LogFiltersState`/`actionLogQuery` now expose `portalId`/`userId`. `LogPage` pre-filters from the URL with a clearable chip.
+- **Recommended highlight**: backend-scored button gets a pulsing purple outline + legend note; rides the action response, never shown on closed portals.
+- **Force-close confirm**: CLOSE on a critical portal with creatures opens a warning confirm and sends `force=true`; non-critical closes surface the verbatim 409. E2E-safe: seeded Гамма (close-with-creatures 409 spec) is MEDIUM, so no confirm intercepts it.
+- Test notes: antd confirm title renders twice (assert on the unique body copy); jsdom has no layout so panel open state is asserted via modifier classes, not `toBeVisible`; toggle button name includes the icon's accessible label (substring match).
 
 ### Seven dev-mode/UX tasks + Docker hardening (master, 2026-09)
 Backend (gates green; 128 tests, coverage 99 %):

@@ -217,3 +217,25 @@ All architecture decisions are recorded here. Chronological, newest at the botto
 - Per the request, each element pops up with its own **bouncy overshoot** and a **slight jitter offset**: every top-level block of the page animates `translateY`/`scale`/`rotate` from a per-`nth-child` `--rise`/`--jitter` trajectory to identity with `cubic-bezier(0.34, 1.56, 0.64, 1)` (0.42 s, `backwards` fill so a block stays hidden until its own delayed start), and the delays (0/45/90/135/180 ms) stagger the sequence so elements settle one after another.
 - The `.page-enter` wrapper is `display: contents` — it only exists to remount and animate; `.app-content` keeps flex-gapping the page blocks directly, so page layout is byte-identical to before the feature.
 - **Reduced motion**: under `prefers-reduced-motion: reduce` every rule is `animation: none` → pages appear instantly. The Playwright suite pins `reducedMotion: "reduce"`, so all 38 e2e specs stay deterministic (no animation ever overlaps an assertion); the animated path was verified separately in headless Chromium (computed styles: staggered `page-pop`, `backwards` fill, wrapper `display: contents`, `animation-name: none` under reduce).
+
+## Backend: recommended action scoring (2026-09)
+- `Portal.recommended_action` (`app/models.py`) scores the current state into an `Action`: every matching condition adds points (summed), highest total wins, ties resolve in CLOSE > SEND_OBSERVER > WARN_CREATURES > RECALL_OBSERVER > STABILIZE > DISMISS order. MARK/UNMARK are never suggested.
+- No-observer branch: stability < 50 → STABILIZE +1; creatures == 0 → CLOSE +10; TTL < 5 min → SEND_OBSERVER +1. Observer-inside branch: stability < 50 → STABILIZE +1; TTL < 30 s → RECALL_OBSERVER +1; TTL < 5 min → WARN_CREATURES +1; creatures == 0 → RECALL_OBSERVER +10. No points (or a closed/expired portal) → DISMISS fallback.
+- TTL thresholds are constants (`RECOMMEND_TTL_SEND_WARN_SECONDS = 300`, `RECOMMEND_TTL_RECALL_SECONDS = 30`); comparison is strict `<`. The recommendation deliberately does not check action validity (e.g. SEND on a CRITICAL portal) — it answers "what to do", validation still answers "what is allowed" via 409.
+- Exposed as `recommended_action` on `PortalSchema`, so list, detail and action-response payloads all carry the freshly computed value — the recommendation updates after every click with no extra request.
+
+## Backend: force-close critical portals (2026-09)
+- `Portal.close(force=False)`: creatures inside without the flag → `BadAction` as before; `force=True` bypasses the creatures check only when `danger_level == CRITICAL`, otherwise `BadAction` («Принудительное закрытие разрешено только для … критического уровня опасности»). Observer auto-recall and the single CLOSE log entry are unchanged; no new `Action` enum value.
+- Route `POST /portals/{id}` takes `force: bool = Query(False)` (documented in the endpoint description); the flag only affects CLOSE and is ignored for other actions.
+
+## Backend: dismissed window ignored near expiry (2026-09)
+- The `dismissed_sinks` ordering clause now requires both `dismissed_until > now` AND `expires_at > now + DISMISS_MIN_TTL_SECONDS`: a portal dismissed earlier that aged into the sub-5-minute TTL window pops back to its natural position instead of staying parked. Applies to every `order_by` mode.
+
+## Frontend: per-portal history panel (2026-09)
+- No backend change needed: `GET /portals/log` (and `/log/ws`) already filter by `portal_id`; the frontend `ActionLogParams`/`LogFiltersState`/`actionLogQuery` simply did not expose it — `portalId`/`userId` added.
+- `PortalModal` carries a right-hand history panel (open by default): 5 latest entries for the portal (Tag + relative time + user, refetched via the shared `["portals"]` invalidation + 30 s poll) plus a «Полная история портала» link to `/log?portal_id=N`. Collapse/expand animates `max-width`/`opacity` (modal widens outwards 720 → 1040 px); toggle button labelled «Скрыть историю»/«История».
+- `LogPage` reads `portal_id` from the URL once on mount into filter state and shows an «Показаны действия портала #N» chip with a «Показать все» clear button; «Сбросить» clears it too.
+
+## Frontend: recommended-action highlight + force-close confirm (2026-09)
+- The button matching `portal.recommended_action` (resolved through the MARK/SEND toggles) gets a pulsing purple outline (`.portal-action-recommended`, static under reduced motion); the caption explains purple = recommended. The highlight rides the action response (`onPortalUpdated`), so it moves with no extra fetch; never shown on closed portals.
+- CLOSE on a CRITICAL portal with creatures inside opens an antd confirm modal (creature count in the body, «Закрыть принудительно»/«Отмена») and sends `force=true` on confirmation. Non-critical closes go through normally and surface the verbatim 409.
