@@ -12,6 +12,7 @@ cp .env.example .env # укажите непустой POSTGRES_PASSWORD, так
 docker compose up --build -d
 ./populate.sh # заполняет БД демо-порталами, безопасно перезапускать
 ```
+Также рекомендую установить `PORTAL_OPEN_CHANCE` на более высокое значение (например 0.5) для простого тестирования функционала.
 
 Приложение поднимется на `http://localhost:3000` (фронтенд) и `http://localhost:8000` (бэкенд, `/docs` при `DEBUG=1`). Если нужен суперпользователь сразу после старта - задайте `INITIAL_SUPERUSER_USERNAME`/`INITIAL_SUPERUSER_PASSWORD` в `.env` до первого запуска (иначе можно зарегистрироваться обычным пользователем через `/register`, если регистрация не отключена через `DISABLE_REGISTRATION`).
 
