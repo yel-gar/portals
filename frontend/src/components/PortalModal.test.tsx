@@ -77,6 +77,29 @@ describe("PortalModal", () => {
     expect(await screen.findByText("Действие «Стабилизировать» выполнено")).toBeInTheDocument();
   });
 
+  it("closes the modal after a successful DISMISS", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    server.use(http.post(API_URL("/portals/:id"), () => HttpResponse.json(OPEN_PORTAL)));
+
+    renderModal(OPEN_PORTAL, onClose);
+    await user.click(await screen.findByRole("button", { name: /Оставить открытым/ }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps the modal open after a non-DISMISS action", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    server.use(http.post(API_URL("/portals/:id"), () => HttpResponse.json(OPEN_PORTAL)));
+
+    renderModal(OPEN_PORTAL, onClose);
+    await user.click(await screen.findByRole("button", { name: /Стабилизировать/ }));
+
+    expect(await screen.findByText("Действие «Стабилизировать» выполнено")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("surfaces the backend's rejection reason verbatim (409)", async () => {
     const user = userEvent.setup();
     server.use(

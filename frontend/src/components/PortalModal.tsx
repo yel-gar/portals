@@ -98,6 +98,11 @@ export function PortalModal({ portal, onClose, onPortalUpdated }: PortalModalPro
             onPortalUpdated?.(fresh);
           }
           message.success(`Действие «${ACTION_META[selected].label}» выполнено`);
+          // DISMISS («оставить открытым») defers the portal: the operator has
+          // decided to leave it alone, so the detail modal closes itself.
+          if (selected === "DISMISS") {
+            onClose();
+          }
         },
         onError: (error) => {
           const text =
